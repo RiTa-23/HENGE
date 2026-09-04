@@ -18,7 +18,7 @@ import { createDb } from "./db/client";
 import { insertThemeWithPrompts, recentPromptTexts } from "./db/prompts";
 import { requestPrompts } from "./generation/ai";
 import { generateBatch, N_REQUEST } from "./generation/batch";
-import { resolveModel } from "./generation/model";
+import { DEFAULT_MODEL, type ModelId } from "./generation/model";
 import { buildGenerationPrompt } from "./generation/prompt";
 import { createGetReading } from "./reading/index";
 
@@ -31,12 +31,15 @@ const USD_PER_1K_NEURONS = 0.011;
  * AI Gateway のログから使用量を取る。ログは即時反映ではないため数回リトライする。
  * neurons は cost（USD）から換算した概算。
  */
-async function fetchUsage(env: Env, logId: string | undefined) {
+async function fetchUsage(env: Env, logId: string | undefined, usageNeurons?: number) {
   if (logId === undefined) return undefined;
   for (let attempt = 0; attempt < 5; attempt++) {
     try {
       const log = await env.AI.gateway("henge").getLog(logId);
-      const neurons = log.cost === undefined ? undefined : (log.cost / USD_PER_1K_NEURONS) * 1000;
+      // 応答の usage.neurons があればそれを使う。無ければ cost（USD）から換算する
+      const neurons =
+        usageNeurons ??
+        (log.cost === undefined ? undefined : (log.cost / USD_PER_1K_NEURONS) * 1000);
       return {
         入力トークン: log.tokens_in,
         出力トークン: log.tokens_out,
@@ -66,7 +69,8 @@ interface Body {
 /** モデルの生の応答をそのまま返す（パースの問題を切り分けるため） */
 spike.post("/spike/raw", async (c) => {
   const body = await c.req.json<Body>();
-  const model = resolveModel(body.model);
+  // 検証用。MODELS に無いモデルもそのまま試せるようにする
+  const model = (body.model ?? DEFAULT_MODEL) as ModelId;
   const { system, user } = buildGenerationPrompt({
     kind: body.kind ?? "theme",
     name: body.name ?? "忍びの心得",
@@ -108,11 +112,12 @@ spike.post("/spike/generate", async (c) => {
   const body = await c.req.json<Body>();
   const kind = body.kind ?? "theme";
   const name = body.name ?? "忍びの心得";
-  const model = resolveModel(body.model);
+  // 検証用。MODELS に無いモデルもそのまま試せるようにする
+  const model = (body.model ?? DEFAULT_MODEL) as ModelId;
   const getReading = createGetReading(c.env);
   const started = Date.now();
 
-  const { texts, logId } = await requestPrompts(c.env, {
+  const { texts, logId, neurons } = await requestPrompts(c.env, {
     model,
     kind,
     name,
@@ -162,7 +167,7 @@ spike.post("/spike/generate", async (c) => {
   return c.json({
     model,
     logId,
-    使用量: await fetchUsage(c.env, logId),
+    使用量: await fetchUsage(c.env, logId, neurons),
     prompt: buildGenerationPrompt({ kind, name, count: body.count ?? N_REQUEST, existing: [] }),
     生成件数: texts.length,
     採用: results.filter((r) => r.verdict === "採用").length,
@@ -177,7 +182,8 @@ spike.post("/spike/batch", async (c) => {
   const body = await c.req.json<Body>();
   const kind = body.kind ?? "theme";
   const name = body.name ?? "忍びの心得";
-  const model = resolveModel(body.model);
+  // 検証用。MODELS に無いモデルもそのまま試せるようにする
+  const model = (body.model ?? DEFAULT_MODEL) as ModelId;
   const db = createDb(c.env.DB);
   const themeId = crypto.randomUUID();
   const started = Date.now();

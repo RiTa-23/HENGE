@@ -22,6 +22,7 @@ export interface GenerationMetadata {
 interface AiResponse {
   response?: string;
   choices?: { message?: { content?: string } }[];
+  usage?: { neurons?: number };
 }
 
 function extractText(result: AiResponse): string {
@@ -32,6 +33,8 @@ export interface AiCallResult {
   texts: string[];
   /** patchLog() で検証結果を書き戻すためのログID */
   logId: string | undefined;
+  /** 応答が返す消費ニューロン（モデルによっては入っていない） */
+  neurons: number | undefined;
 }
 
 /**
@@ -86,6 +89,7 @@ export async function requestPrompts(
   return {
     texts: parseGeneratedLines(extractText(response)),
     logId: env.AI.aiGatewayLogId ?? undefined,
+    neurons: response.usage?.neurons,
   };
 }
 

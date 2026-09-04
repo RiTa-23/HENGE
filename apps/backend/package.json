@@ -15,14 +15,18 @@
     "build:types": "tsc -p tsconfig.build.json",
     "typecheck": "tsc --noEmit",
     "cf-typegen": "wrangler types",
-    "test:workers": "vitest run"
+    "test:workers": "vitest run",
+    "db:generate": "drizzle-kit generate",
+    "db:migrate:local": "wrangler d1 migrations apply henge-db --local"
   },
   "dependencies": {
     "@henge/shared": "workspace:*",
+    "drizzle-orm": "^0.45.2",
     "hono": "^4.13.5"
   },
   "devDependencies": {
     "@cloudflare/vitest-pool-workers": "^0.22.0",
+    "drizzle-kit": "^0.31.10",
     "vitest": "^4.1.0",
     "wrangler": "^4.129.0"
   }

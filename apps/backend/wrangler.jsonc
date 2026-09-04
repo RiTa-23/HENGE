@@ -4,6 +4,10 @@
   "main": "src/index.ts",
   "compatibility_date": "2026-08-22", // vitest-pool-workers 同梱の workerd の上限に合わせる（これより新しいとテストが起動しない）
   "compatibility_flags": ["nodejs_compat"],
+  // 外部に公開しない。workers.dev のサブドメインを付けると、Next.js Worker を
+  // 経由せず誰でも直接叩けるようになり、「Honoに公開ルートを生やさない」という
+  // 前提（＝Next.js側で認証を完結させられる根拠）が崩れる。
+  "workers_dev": false,
   // D1 / KV の近くで実行させる。fetchハンドラにしか効かないため、
   // Service Bindings は RPC方式ではなく HTTP方式で呼ぶこと。
   "placement": { "mode": "smart" },

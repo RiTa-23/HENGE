@@ -11,8 +11,8 @@
     "preview": "bun run --cwd apps/frontend preview",
     "build": "bun run --cwd apps/frontend build",
     "lint": "oxlint .",
-    "format": "oxfmt . '!**/*.md'",
-    "format:check": "oxfmt --check . '!**/*.md'",
+    "format": "oxfmt --ignore-path .gitignore --ignore-path .oxfmtignore .",
+    "format:check": "oxfmt --check --ignore-path .gitignore --ignore-path .oxfmtignore .",
     "typecheck": "bun run --cwd apps/backend build:types && bun run --filter '*' typecheck",
     "test": "bun test",
     "test:workers": "bun run --cwd apps/backend test:workers"

@@ -1,0 +1,40 @@
+name: CI
+
+on:
+  pull_request:
+    branches: [main]
+  # deploy.yml から呼ぶ。マージ後の状態で検査を通してからデプロイする。
+  workflow_call:
+
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: "1.3.14"
+
+      - run: bun install --frozen-lockfile
+
+      - name: lint (oxlint)
+        run: bun run lint
+
+      - name: format (oxfmt)
+        run: bun run format:check
+
+      - name: typecheck (tsc)
+        run: bun run typecheck
+
+      - name: test (純粋関数)
+        run: bun test
+
+      # vitest.config.ts で remoteBindings: false にしているため、
+      # Cloudflareの認証情報なしで実行できる（forkからのPRでも動く）。
+      - name: test:workers (D1 / KV 依存)
+        run: bun run test:workers

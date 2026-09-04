@@ -7,6 +7,11 @@ export default defineConfig({
   plugins: [
     cloudflareTest({
       wrangler: { configPath: "./wrangler.jsonc" },
+      // テストではリモートバインディングを使わない。
+      // wrangler.jsonc の AI バインディングは remote: true だが、これを持ち込むと
+      // 起動時にリモートプロキシセッションを張るため CLOUDFLARE_API_TOKEN が必須になり、
+      // CI（特にforkからのPR）でテストが動かせなくなる。
+      remoteBindings: false,
     }),
   ],
 });

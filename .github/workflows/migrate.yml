@@ -1,0 +1,57 @@
+name: D1 migrate
+
+# D1のマイグレーションは自動適用しない。サイレント失敗の報告があるため、
+# 「未適用の一覧を見る（list）」→「適用する（apply）」の2段構えの手動フローにしている。
+# マイグレーションファイル自体は Phase 2 以降、Drizzleが apps/backend に生成する。
+
+on:
+  workflow_dispatch:
+    inputs:
+      mode:
+        description: "list = 未適用の一覧を見るだけ / apply = 実際に適用する"
+        type: choice
+        options: [list, apply]
+        default: list
+        required: true
+
+concurrency:
+  group: d1-migrate
+  cancel-in-progress: false
+
+jobs:
+  migrate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: "1.3.14"
+
+      - run: bun install --frozen-lockfile
+
+      - name: d1 migrations ${{ inputs.mode }} (henge-db / remote)
+        id: migrate
+        uses: cloudflare/wrangler-action@v4
+        with:
+          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          workingDirectory: apps/backend
+          packageManager: bun
+          command: d1 migrations ${{ inputs.mode }} henge-db --remote
+
+      # 何が起きたかを必ず残す。失敗時も残す。
+      - name: 実行結果をサマリに出す
+        if: always()
+        env:
+          COMMAND_OUTPUT: ${{ steps.migrate.outputs.command-output }}
+          COMMAND_STDERR: ${{ steps.migrate.outputs.command-stderr }}
+        run: |
+          {
+            echo "## d1 migrations ${{ inputs.mode }} (henge-db / remote)"
+            echo
+            echo '```'
+            echo "$COMMAND_OUTPUT"
+            echo "$COMMAND_STDERR"
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"

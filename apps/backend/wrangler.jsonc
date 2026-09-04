@@ -1,0 +1,11 @@
+{
+  "$schema": "../../node_modules/wrangler/config-schema.json",
+  "name": "henge-backend",
+  "main": "src/index.ts",
+  "compatibility_date": "2026-08-22", // vitest-pool-workers 同梱の workerd の上限に合わせる（これより新しいとテストが起動しない）
+  "compatibility_flags": ["nodejs_compat"],
+  // D1 / KV の近くで実行させる。fetchハンドラにしか効かないため、
+  // Service Bindings は RPC方式ではなく HTTP方式で呼ぶこと。
+  "placement": { "mode": "smart" },
+  "observability": { "enabled": true },
+}

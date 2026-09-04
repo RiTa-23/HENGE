@@ -6,7 +6,7 @@
  *
  * どれを使うかは Phase 8 で品質・速度・ニューロン消費を実測して決める。
  */
-export const MODELS = ["@cf/z-ai/glm-4.7-flash", "@cf/meta/llama-3.2-3b-instruct"] as const;
+export const MODELS = ["@cf/zai-org/glm-4.7-flash", "@cf/meta/llama-3.2-3b-instruct"] as const;
 
 export type ModelId = (typeof MODELS)[number];
 

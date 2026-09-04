@@ -10,6 +10,24 @@ export interface GenerationMetadata {
   path: "create" | "regenerate" | "refill";
 }
 
+/**
+ * モデルによって応答の形が違う。
+ * - Workers AI の従来形: `{ response: "..." }`
+ * - OpenAI互換形: `{ choices: [{ message: { content: "..." } }] }`（GLM系）
+ *
+ * これはモデルごとの分岐ではなく応答形式の正規化なので、
+ * 「モデル名で分岐しない」方針とは矛盾しない。新しいモデルを足しても
+ * どちらかの形に収まる限りコードは変わらない。
+ */
+interface AiResponse {
+  response?: string;
+  choices?: { message?: { content?: string } }[];
+}
+
+function extractText(result: AiResponse): string {
+  return result.response ?? result.choices?.[0]?.message?.content ?? "";
+}
+
 export interface AiCallResult {
   texts: string[];
   /** patchLog() で検証結果を書き戻すためのログID */
@@ -38,11 +56,13 @@ export async function requestPrompts(
   // Workers AI の型はモデルごとのオーバーロードになっているため、
   // モデルIDを値（配列の要素）として持つ設計とは両立しない。
   // モデル追加を1行で済ませることを優先し、ここ1か所だけ型を緩める。
-  const run = env.AI.run as (
+  // bind を外すと env.AI の内部状態（プライベートフィールド）にアクセスできず
+  // 実行時に落ちる。型を緩めるだけでレシーバを切り離さないこと。
+  const run = env.AI.run.bind(env.AI) as (
     model: string,
     input: { messages: { role: string; content: string }[] },
     options: Record<string, unknown>,
-  ) => Promise<{ response?: string }>;
+  ) => Promise<AiResponse>;
 
   const response = await run(
     input.model,
@@ -64,7 +84,7 @@ export async function requestPrompts(
   );
 
   return {
-    texts: parseGeneratedLines(response.response ?? ""),
+    texts: parseGeneratedLines(extractText(response)),
     logId: env.AI.aiGatewayLogId ?? undefined,
   };
 }

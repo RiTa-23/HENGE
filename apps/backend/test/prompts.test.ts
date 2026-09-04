@@ -64,8 +64,8 @@ it("重複回避の文脈は新しい順に取れる", async () => {
 });
 
 it("生成に使ったモデル名を残す", async () => {
-  await insertThemeWithPrompts(db, theme, [item("あ")], "@cf/z-ai/glm-4.7-flash");
+  await insertThemeWithPrompts(db, theme, [item("あ")], "@cf/zai-org/glm-4.7-flash");
 
   const [row] = await db.select().from(prompts);
-  expect(row?.model).toBe("@cf/z-ai/glm-4.7-flash");
+  expect(row?.model).toBe("@cf/zai-org/glm-4.7-flash");
 });

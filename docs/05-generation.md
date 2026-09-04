@@ -99,6 +99,10 @@ MVPの実装はYahoo! JLP ルビ振りAPI（POST限定・JSON-RPC 2.0・1日50,0
 
 `glm-4.7-flash` と `llama-3.2-3b-instruct` の両方を実装し、環境変数かパラメータで切り替えられるようにする。Phase 8で品質・速度・コストを実測して確定する。
 
+モデルIDは `@cf/zai-org/glm-4.7-flash` と `@cf/meta/llama-3.2-3b-instruct`。**推測で書かず `wrangler ai models` で確認すること**（存在しないIDを渡すと実行時に `5007: No such model` で落ちる）。
+
+**応答の形はモデルによって違う。** Workers AI の従来形 `{ response }` と OpenAI互換形 `{ choices[0].message.content }` の両方があるため、テキストの取り出しは正規化して受ける。これはモデルごとの分岐ではないので「モデル名で分岐しない」方針とは矛盾しない。
+
 呼び出しは**AI Gateway経由**にする。
 
 ```ts

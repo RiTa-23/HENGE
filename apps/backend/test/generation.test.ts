@@ -56,15 +56,18 @@ const READINGS: Record<string, string> = {
 
 /** AIの応答を差し替えた env。ラウンドごとに別の応答を返す */
 function envWithAiResponses(rounds: string[][]): Env {
-  let call = 0;
-  return {
-    ...env,
-    AI: {
-      run: async () => ({ response: (rounds[call++] ?? []).join("\n") }),
-      aiGatewayLogId: undefined,
-      gateway: () => ({ patchLog: async () => {} }),
+  // run は this 経由で状態を読む。レシーバを切り離して呼ばれたら落ちるようにして、
+  // 本物の env.AI と同じ壊れ方をさせる（bind漏れを検出するため）
+  const ai = {
+    rounds,
+    call: 0,
+    async run(this: { rounds: string[][]; call: number }) {
+      return { response: (this.rounds[this.call++] ?? []).join("\n") };
     },
-  } as unknown as Env;
+    aiGatewayLogId: undefined,
+    gateway: () => ({ patchLog: async () => {} }),
+  };
+  return { ...env, AI: ai } as unknown as Env;
 }
 
 function input(overrides: Partial<GenerateBatchInput> = {}): GenerateBatchInput {

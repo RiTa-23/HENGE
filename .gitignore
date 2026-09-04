@@ -7,3 +7,6 @@ node_modules/
 *.log
 dist/
 *.tsbuildinfo
+
+# next dev と next build で内容が入れ替わる生成物（Next.jsが自動生成する）
+next-env.d.ts

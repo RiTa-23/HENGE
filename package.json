@@ -15,9 +15,12 @@
     "format:check": "oxfmt --check --ignore-path .gitignore --ignore-path .oxfmtignore .",
     "typecheck": "bun run --cwd apps/backend build:types && bun run --filter '*' typecheck",
     "test": "bun test",
-    "test:workers": "bun run --cwd apps/backend test:workers"
+    "test:workers": "bun run --cwd apps/backend test:workers",
+    "db:generate": "bun run --cwd apps/backend db:generate",
+    "db:migrate:local": "bun run --cwd apps/backend db:migrate:local"
   },
   "devDependencies": {
+    "@better-auth/cli": "^1.4.21",
     "@types/bun": "^1.4.0",
     "@types/node": "^24",
     "concurrently": "^10.0.5",

@@ -16,3 +16,10 @@ export {
   SYMBOLS,
   UnsupportedKanaError,
 } from "./typing/index";
+export {
+  includesConstraint,
+  isKeystrokeCountInRange,
+  isTypableText,
+  KEYSTROKE_MAX,
+  KEYSTROKE_MIN,
+} from "./generation/validate";

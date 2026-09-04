@@ -98,7 +98,67 @@ MVPの実装はYahoo! JLP ルビ振りAPI（POST限定・JSON-RPC 2.0・1日50,0
 呼び出しは**AI Gateway経由**にする。
 
 ```ts
-await env.AI.run(model, input, { gateway: { id: "henge" } })
+await env.AI.run(model, input, {
+  gateway: {
+    id: "henge",
+    skipCache: true,
+    metadata: { themeId, kind, round, path },
+  },
+})
 ```
 
-これでレイテンシ・コスト・回数がダッシュボードに記録され、比較用の計測コードを自前で書かずに済む。生成したお題には `prompts.model` にモデル名を残し、後から却下率を集計できるようにする。
+これでレイテンシ・コスト・回数がダッシュボードに記録され、比較用の計測コードを自前で書かずに済む。生成したお題には `prompts.model` にモデル名を残し、どのモデルが作ったお題か後から辿れるようにする。
+
+**`skipCache: true` を必ず付ける。** AI Gatewayのキャッシュが効くと、同じテーマに同じお題が返る。「毎回違うお題」というHENGEの前提が壊れるため、ダッシュボード側の設定に依存させない。
+
+ゲートウェイは Authenticated Gateway を有効にする。バインディング経由の呼び出しは事前認証済みのため、APIトークンは発行しなくてよい。
+
+## 計測
+
+**呼び出しには必ずカスタムメタデータを付ける。** AI Gatewayのログは「AIとのやりとり」しか知らないため、これが無いと「どのテーマの生成か」でログを絞り込めない。
+
+メタデータは**1リクエストにつき5件まで**（超過分は黙って捨てられる）。値は文字列・数値・真偽値のみで、オブジェクトは入らない。枠の割り当ては次のとおり。
+
+| キー | 付けるタイミング | 値 |
+|---|---|---|
+| `themeId` | リクエスト時 | テーマID |
+| `kind` | リクエスト時 | `theme` / `constraint` |
+| `round` | リクエスト時 | `1` / `2` |
+| `path` | リクエスト時 | `create` / `regenerate` / `refill` |
+| `rejected` | `patchLog()` | `"charset:3,keystroke:4,constraint:1"` |
+
+### 検証結果をログに書き戻す
+
+生成の成否は、AIが応答した時点では分からない。読み取得と検証を通した後に判明する。この時間差は `patchLog()` で埋める。
+
+```ts
+const res = await env.AI.run(model, input, { gateway: { /* 上記 */ } })
+const logId = env.AI.aiGatewayLogId
+
+// ... ホワイトリスト検査 → getReading() → 打鍵数検査 → 「含む」検査 ...
+
+ctx.waitUntil(
+  env.AI.gateway("henge").patchLog(logId, {
+    score: Math.round((valid / N_request) * 100),
+    metadata: { rejected: `charset:${c},keystroke:${k},constraint:${n}` },
+  }),
+)
+```
+
+**却下率はここで見る。D1に却下数を記録するテーブルを作らない。** Phase 8のモデル比較と同じダッシュボードに並ぶ。
+
+却下されたお題はD1に保存されないため、`prompts` テーブルからは却下率を計算できない（分母が残らない）。一方でAI Gatewayのログには落選分を含む生の応答が残っているので、原因を追うときはログ本文を読む。
+
+`rejected` の内訳はバリデーション3種に対応する。
+
+| ラベル | 落ちた理由 |
+|---|---|
+| `charset` | ホワイトリスト検査。打てない記号などが混ざっていた |
+| `keystroke` | 打鍵数が10〜40の範囲外 |
+| `constraint` | 「含む」モードで、指定文字が読み仮名に無かった |
+
+同じ却下率でも原因が違えば打ち手が変わる（記号ならプロンプトの指示、打鍵数なら長さの指示、含む文字ならテーマ自体の難しさ）。合計ではなく内訳で残すこと。
+
+`patchLog()` は同期生成の待ち時間を増やさないよう `ctx.waitUntil()` に逃がす。
+
+**`patchLog()` が外部サブリクエストを消費するか、Phase 3で実測すること。** バインディング経由なので内部扱いのはずだが、ドキュメントに明記が無い。外部扱いだった場合、`2 × N_request ≤ 50` の余裕が削られる。

@@ -1,0 +1,15 @@
+{
+  "$schema": "./node_modules/oxlint/configuration_schema.json",
+  "categories": {
+    "correctness": "error",
+    "suspicious": "warn",
+    "perf": "warn"
+  },
+  "ignorePatterns": [
+    "**/.next/**",
+    "**/.open-next/**",
+    "**/.wrangler/**",
+    "**/worker-configuration.d.ts",
+    "**/next-env.d.ts"
+  ]
+}

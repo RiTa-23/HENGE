@@ -1,5 +1,10 @@
 import { describe, expect, test } from "bun:test";
-import { buildRomanCandidates, countKeystrokesFromKana, UnsupportedKanaError } from "./index";
+import {
+  buildRomanCandidates,
+  countKeystrokesFromKana,
+  katakanaToHiragana,
+  UnsupportedKanaError,
+} from "./index";
 
 /** 読みを打てる最短のローマ字列にする（テストの可読性のため） */
 function shortest(kana: string): string {
@@ -161,5 +166,25 @@ describe("テーブルに無いかな", () => {
 
   test("漢字が残っていたら例外を投げる", () => {
     expect(() => buildRomanCandidates("手裏剣")).toThrow(UnsupportedKanaError);
+  });
+});
+
+describe("katakanaToHiragana", () => {
+  test("カタカナをひらがなに変換する", () => {
+    expect(katakanaToHiragana("シュリケン")).toBe("しゅりけん");
+    expect(katakanaToHiragana("ヴァイオリン")).toBe("ゔぁいおりん");
+  });
+
+  test("長音符は変換しない（ひらがなでも同じ文字を使う）", () => {
+    expect(katakanaToHiragana("スピード")).toBe("すぴーど");
+  });
+
+  test("ひらがな・漢字・記号はそのまま", () => {
+    expect(katakanaToHiragana("しのび")).toBe("しのび");
+    expect(katakanaToHiragana("手裏剣、")).toBe("手裏剣、");
+  });
+
+  test("変換後はローマ字候補テーブルに載る", () => {
+    expect(() => buildRomanCandidates(katakanaToHiragana("スピード"))).not.toThrow();
   });
 });

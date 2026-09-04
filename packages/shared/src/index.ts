@@ -12,6 +12,7 @@ export {
   countKeystrokes,
   countKeystrokesFromKana,
   KANA_TABLE,
+  katakanaToHiragana,
   type RomanCandidates,
   SYMBOLS,
   UnsupportedKanaError,

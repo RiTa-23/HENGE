@@ -1,0 +1,20 @@
+{
+  "$schema": "../../node_modules/wrangler/config-schema.json",
+  "name": "henge-frontend",
+  "main": ".open-next/worker.js",
+  "compatibility_date": "2026-08-22", // vitest-pool-workers 同梱の workerd の上限に合わせる（これより新しいとテストが起動しない）
+  "compatibility_flags": ["nodejs_compat", "global_fetch_strictly_public"],
+  "assets": {
+    "directory": ".open-next/assets",
+    "binding": "ASSETS",
+  },
+  // Hono Worker は外部公開しない。ここからのみ呼ぶ。
+  // RPC方式（WorkerEntrypoint）に変えないこと（Hono RPC と Smart Placement を失う）。
+  "services": [
+    {
+      "binding": "BACKEND",
+      "service": "henge-backend",
+    },
+  ],
+  "observability": { "enabled": true },
+}

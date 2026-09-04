@@ -1,0 +1,4 @@
+[test]
+# `bun test` は D1/KV に依存しない純粋関数のテストだけを走らせる。
+# D1/KV に依存するテスト（apps/backend/test）は `bun run test:workers`（Vitest）側で動かす。
+root = "packages"

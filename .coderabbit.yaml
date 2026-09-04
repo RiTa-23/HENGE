@@ -1,0 +1,21 @@
+# yaml-language-server: $schema=https://coderabbit.ai/integrations/schema.v2.json
+
+# レビューは日本語で行う。
+language: ja-JP
+
+reviews:
+  auto_review:
+    # 自動レビューはしない。PRに `@coderabbitai review` とコメントしたときだけ動く。
+    enabled: false
+  profile: chill
+  poem: false
+  # 生成物はレビュー対象から外す。
+  path_filters:
+    - "!bun.lock"
+    - "!**/worker-configuration.d.ts"
+    - "!**/cloudflare-env.d.ts"
+    - "!**/next-env.d.ts"
+    - "!**/.open-next/**"
+
+chat:
+  auto_reply: true

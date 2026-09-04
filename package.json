@@ -1,0 +1,29 @@
+{
+  "name": "henge",
+  "private": true,
+  "workspaces": [
+    "apps/*",
+    "packages/*"
+  ],
+  "type": "module",
+  "scripts": {
+    "dev": "concurrently -n backend,frontend -c cyan,magenta \"bun run --cwd apps/backend dev\" \"bun run --cwd apps/frontend dev\"",
+    "preview": "bun run --cwd apps/frontend preview",
+    "build": "bun run --cwd apps/frontend build",
+    "lint": "oxlint .",
+    "format": "oxfmt . '!**/*.md'",
+    "format:check": "oxfmt --check . '!**/*.md'",
+    "typecheck": "bun run --cwd apps/backend build:types && bun run --filter '*' typecheck",
+    "test": "bun test",
+    "test:workers": "bun run --cwd apps/backend test:workers"
+  },
+  "devDependencies": {
+    "@types/bun": "^1.4.0",
+    "@types/node": "^24",
+    "concurrently": "^10.0.5",
+    "oxfmt": "^0.66.0",
+    "oxlint": "^1.81.0",
+    "typescript": "^5.9.3",
+    "wrangler": "^4.129.0"
+  }
+}

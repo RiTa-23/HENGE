@@ -79,6 +79,6 @@ export function buildRomanCandidates(kana: string): RomanCandidates {
 
     const candidates = KANA_TABLE[unit];
     if (candidates === undefined) throw new UnsupportedKanaError(unit);
-    return [...candidates];
+    return candidates.slice();
   });
 }

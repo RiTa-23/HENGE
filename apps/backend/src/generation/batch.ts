@@ -1,3 +1,7 @@
+/* oxlint-disable no-await-in-loop --
+ * ラウンドは直列でなければならない。1ラウンド目の結果が目標に達したかを見てから
+ * 2ラウンド目を回すか決めるため、並列化すると常に2ラウンド走ってしまう。
+ */
 import {
   countKeystrokes,
   includesConstraint,

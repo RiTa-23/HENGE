@@ -1,0 +1,29 @@
+{
+  "name": "@henge/backend",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./src/index.ts"
+    }
+  },
+  "scripts": {
+    "dev": "wrangler dev",
+    "deploy": "wrangler deploy",
+    "build:types": "tsc -p tsconfig.build.json",
+    "typecheck": "tsc --noEmit",
+    "cf-typegen": "wrangler types",
+    "test:workers": "vitest run"
+  },
+  "dependencies": {
+    "@henge/shared": "workspace:*",
+    "hono": "^4.13.5"
+  },
+  "devDependencies": {
+    "@cloudflare/vitest-pool-workers": "^0.22.0",
+    "vitest": "^4.1.0",
+    "wrangler": "^4.129.0"
+  }
+}

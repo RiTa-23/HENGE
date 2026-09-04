@@ -7,11 +7,14 @@ import { Hono } from "hono";
  */
 const app = new Hono<{ Bindings: Env }>();
 
-app.get("/health", (c) =>
+const routes = app.get("/health", (c) =>
   c.json({
     service: "henge-backend",
     shared: ping("backend"),
     ok: true,
-  }));
+  }),
+);
+
+export type AppType = typeof routes;
 
 export default app;

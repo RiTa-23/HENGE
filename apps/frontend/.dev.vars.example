@@ -1,0 +1,12 @@
+# Next.js Worker のローカル開発用。`.dev.vars` にコピーして値を入れる。
+# 本番は `wrangler secret put <名前>` で設定する（リポジトリにコミットしない）。
+
+# Google OAuth（Better Auth）
+GOOGLE_CLIENT_ID=""
+GOOGLE_CLIENT_SECRET=""
+
+# セッション署名用。`openssl rand -base64 32` などで生成する
+BETTER_AUTH_SECRET=""
+
+# 管理者のメールアドレス。カンマ区切り
+ADMIN_EMAILS=""

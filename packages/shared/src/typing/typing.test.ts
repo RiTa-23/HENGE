@@ -101,8 +101,12 @@ describe("「ん」の扱い", () => {
     expect(buildRomanCandidates("ほん")[1]).toEqual(["nn", "xn"]);
   });
 
-  test("な行の前では n 単体を認める（minna で「みんな」が打てる実際の挙動に合わせる）", () => {
-    expect(accepts("みんな", 1, "n")).toBe(true);
+  test("な行の前では n 単体を認めない（minna で「みんな」は打てない）", () => {
+    expect(buildRomanCandidates("みんな")[1]).toEqual(["nn", "xn"]);
+  });
+
+  test("な行以外の子音の前では n 単体を認める", () => {
+    expect(accepts("しんかん", 1, "n")).toBe(true);
   });
 });
 

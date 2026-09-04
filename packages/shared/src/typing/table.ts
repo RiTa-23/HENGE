@@ -13,6 +13,15 @@ export const VOWEL_KANA = new Set(["あ", "い", "う", "え", "お"]);
 /** や行。母音と同じく「ん」の後に `n` 単体を認めない */
 export const YA_ROW_KANA = new Set(["や", "ゆ", "よ"]);
 
+/**
+ * な行。「ん」の後に `n` 単体を認めない。
+ *
+ * `n` + `な` が `nna` となり「んな」と区別できなくなるため。
+ * IMEによっては `minna` で「みんな」が打てるが、**HENGEでは認めない**。
+ * 曖昧さを設計時点で排除する方針に合わせる。
+ */
+export const NA_ROW_KANA = new Set(["な", "に", "ぬ", "ね", "の"]);
+
 /** 記号は5種のみ。候補は1つずつで揺れがない（Shiftは打鍵数に数えない） */
 export const SYMBOLS: Record<string, string[]> = {
   "、": [","],

@@ -1,4 +1,11 @@
-import { KANA_TABLE, N_ALWAYS, SOKUON_FALLBACK, VOWEL_KANA, YA_ROW_KANA } from "./table";
+import {
+  KANA_TABLE,
+  N_ALWAYS,
+  NA_ROW_KANA,
+  SOKUON_FALLBACK,
+  VOWEL_KANA,
+  YA_ROW_KANA,
+} from "./table";
 
 /** かな1文字ぶんに対応するローマ字候補の配列。`prompts.reading_roman_json` の中身 */
 export type RomanCandidates = string[][];
@@ -51,14 +58,16 @@ function sokuonCandidates(next: string | undefined): string[] {
  * HENGEはお題のテキストを知っているので技術的には解決できるが、
  * IMEで通用しない打ち方を許容しない方針に合わせる。
  *
- * なお「ん」の直後が「な」行の場合に `n` 単体を認めるかは docs/06-typing-engine.md の
- * 未決事項。ここでは `minna` で「みんな」が打てる実際の挙動に合わせ、認める実装にしている。
+ * **な行の前でも `n` 単体は認めない。** `n`+`な` が `nna` となり「んな」と衝突する。
+ * IMEによっては `minna` で「みんな」が打てるが、曖昧さを設計時点で排除する方針を優先する。
  */
 function nCandidates(next: string | undefined): string[] {
   if (next === undefined) return [...N_ALWAYS];
   const head = next[0];
   if (head === undefined) return [...N_ALWAYS];
-  if (VOWEL_KANA.has(head) || YA_ROW_KANA.has(head) || head === "ん") return [...N_ALWAYS];
+  if (VOWEL_KANA.has(head) || YA_ROW_KANA.has(head) || NA_ROW_KANA.has(head) || head === "ん") {
+    return [...N_ALWAYS];
+  }
   return ["n", ...N_ALWAYS];
 }
 

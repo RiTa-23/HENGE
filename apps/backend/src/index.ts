@@ -1,5 +1,7 @@
 import { ping } from "@henge/shared";
 import { Hono } from "hono";
+// 【一時的】検証用。Phase 4 で POST /themes が入ったら消す
+import { spike } from "./spike";
 
 /**
  * Hono Worker。外部には公開しない。
@@ -16,5 +18,7 @@ const routes = app.get("/health", (c) =>
 );
 
 export type AppType = typeof routes;
+
+app.route("/", spike);
 
 export default app;

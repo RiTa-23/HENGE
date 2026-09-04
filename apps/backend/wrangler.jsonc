@@ -8,4 +8,26 @@
   // Service Bindings は RPC方式ではなく HTTP方式で呼ぶこと。
   "placement": { "mode": "smart" },
   "observability": { "enabled": true },
+  // D1 / KV / Workers AI へのアクセスは Hono Worker に閉じる。
+  // Next.js Worker 側からは直接触らない。
+  "d1_databases": [
+    {
+      "binding": "DB",
+      "database_name": "henge-db",
+      "database_id": "6c46368a-5a74-4019-b922-4dff7b2a15da",
+    },
+  ],
+  "kv_namespaces": [
+    {
+      "binding": "KV",
+      "id": "075a3575eb084d58918d6d51e4a9ea85",
+    },
+  ],
+  // 呼び出しは AI Gateway（id: henge）経由にする。docs/05-generation.md を参照。
+  // ローカル開発でも Workers AI は常にリモートを叩く（ニューロンを消費する）。
+  // remote: true はその事実を明示するもので、挙動は変わらない。
+  "ai": {
+    "binding": "AI",
+    "remote": true,
+  },
 }

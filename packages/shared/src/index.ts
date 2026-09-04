@@ -7,3 +7,20 @@ export {
   normalizeThemeName,
   type ThemeKind,
 } from "./normalize";
+export {
+  buildRomanCandidates,
+  countKeystrokes,
+  countKeystrokesFromKana,
+  KANA_TABLE,
+  katakanaToHiragana,
+  type RomanCandidates,
+  SYMBOLS,
+  UnsupportedKanaError,
+} from "./typing/index";
+export {
+  includesConstraint,
+  isKeystrokeCountInRange,
+  isTypableText,
+  KEYSTROKE_MAX,
+  KEYSTROKE_MIN,
+} from "./generation/validate";

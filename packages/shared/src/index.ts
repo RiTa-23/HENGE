@@ -7,3 +7,12 @@ export {
   normalizeThemeName,
   type ThemeKind,
 } from "./normalize";
+export {
+  buildRomanCandidates,
+  countKeystrokes,
+  countKeystrokesFromKana,
+  KANA_TABLE,
+  type RomanCandidates,
+  SYMBOLS,
+  UnsupportedKanaError,
+} from "./typing/index";

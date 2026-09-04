@@ -12,7 +12,7 @@ D1（SQLite）+ Drizzle ORM。Better Auth管理下のテーブル（`user` / `se
 | `kind` | TEXT | NOT NULL | `'theme'` / `'constraint'` |
 | `name` | TEXT | NOT NULL | 表示名（入力されたまま） |
 | `normalized_name` | TEXT | NOT NULL | 重複判定用の正規化キー |
-| `created_by` | TEXT | NULL可 | `user.id`。運営投入分はNULL |
+| `created_by` | TEXT | NULL可, FK→`user.id` ON DELETE SET NULL | `user.id`。運営投入分はNULL。作成者が退会してもテーマは公開コンテンツとして残すためCASCADEにしない |
 | `generation_status` | TEXT | NOT NULL, default `'ok'` | `'ok'` / `'difficult'` |
 | `total_play_count` | INTEGER | NOT NULL, default 0 | 人気順ソート用。プレイ開始のたび+1 |
 | `created_at` | INTEGER | NOT NULL | unixepoch |
@@ -124,4 +124,27 @@ MVPでは日次上限のみ（50回/日）。月次上限は設けないため�
 
 D1のCASCADEはD1の中でしか効かない。KVを消し忘れると「削除したテーマがキャッシュ経由で復活したように見える」不具合になる。
 
-Drizzleで`references()`を明示しないとFK自体が作られないため、Phase 2でCASCADEが実際に効くか確認すること。
+## ユーザー削除時の連鎖
+
+| 対象 | 消え方 |
+|---|---|
+| `user_theme_progress` / `user_generation_usage` | FKのCASCADEで自動削除 |
+| Better Auth の `session` / `account` | 同上 |
+| `themes` | **消さない。** `created_by` がNULLになるだけ（公開コンテンツのため） |
+
+## マイグレーション
+
+Drizzleのスキーマは `apps/backend/src/db/schema.ts`。Better Auth管理下のテーブルは
+`@better-auth/cli generate` が出力した `apps/backend/src/db/auth-schema.ts` を取り込む（手で書かない）。
+
+生成先は `apps/backend/migrations/`（wranglerの `migrations_dir` の既定値）。
+
+```bash
+bun run db:generate        # Drizzleでマイグレーションを生成
+bun run db:migrate:local   # ローカルD1に適用
+```
+
+本番への適用は GitHub Actions の `D1 migrate` ワークフロー（手動トリガー）で行う。**自動適用しない。**
+
+Drizzleで`references()`を明示しないとFK自体が作られない。ローカルD1で外部キー制約が有効であることと、
+CASCADEが実際に効くことは `apps/backend/test/schema.test.ts` で検証している。

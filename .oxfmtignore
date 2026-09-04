@@ -1,0 +1,8 @@
+# wrangler types / next build が生成するファイル。
+# 整形しても再生成で元に戻り、そのたびに差分が出るため触らない。
+**/worker-configuration.d.ts
+**/cloudflare-env.d.ts
+**/next-env.d.ts
+
+# ドキュメントは手で整形している（表やコードブロックが崩れるため）。
+**/*.md

@@ -24,12 +24,43 @@ import { createGetReading } from "./reading/index";
 
 export const spike = new Hono<{ Bindings: Env }>();
 
+/** $0.011 / 1,000 neurons（Workers AI の課金単位）。無料枠は 10,000 neurons/日 */
+const USD_PER_1K_NEURONS = 0.011;
+
+/**
+ * AI Gateway のログから使用量を取る。ログは即時反映ではないため数回リトライする。
+ * neurons は cost（USD）から換算した概算。
+ */
+async function fetchUsage(env: Env, logId: string | undefined) {
+  if (logId === undefined) return undefined;
+  for (let attempt = 0; attempt < 5; attempt++) {
+    try {
+      const log = await env.AI.gateway("henge").getLog(logId);
+      const neurons = log.cost === undefined ? undefined : (log.cost / USD_PER_1K_NEURONS) * 1000;
+      return {
+        入力トークン: log.tokens_in,
+        出力トークン: log.tokens_out,
+        コストUSD: log.cost,
+        消費ニューロン概算: neurons === undefined ? undefined : Math.round(neurons * 10) / 10,
+        "1日の無料枠に対する割合%":
+          neurons === undefined ? undefined : Math.round((neurons / 10_000) * 1000) / 10,
+        ゲートウェイ計測の所要時間ms: log.duration,
+        キャッシュ: log.cached,
+      };
+    } catch {
+      await new Promise((resolve) => setTimeout(resolve, 600));
+    }
+  }
+  return { 取得できず: "AI Gatewayのログがまだ反映されていない" };
+}
+
 interface Body {
   kind?: ThemeKind;
   name?: string;
   model?: string;
   count?: number;
   save?: boolean;
+  reasoningEffort?: "low" | "medium" | "high";
 }
 
 /** モデルの生の応答をそのまま返す（パースの問題を切り分けるため） */
@@ -47,17 +78,29 @@ spike.post("/spike/raw", async (c) => {
     i: unknown,
     o: unknown,
   ) => Promise<unknown>;
-  const raw = await run(
+  const started = Date.now();
+  const raw = (await run(
     model,
     {
       messages: [
         { role: "system", content: system },
         { role: "user", content: user },
       ],
+      ...(body.reasoningEffort === undefined ? {} : { reasoning_effort: body.reasoningEffort }),
     },
     { gateway: { id: "henge", skipCache: true } },
-  );
-  return c.json({ model, raw });
+  )) as {
+    choices?: { message?: { content?: string; reasoning?: string } }[];
+    usage?: Record<string, number>;
+  };
+  return c.json({
+    model,
+    reasoningEffort: body.reasoningEffort ?? "(未指定)",
+    かかった時間ms: Date.now() - started,
+    usage: raw.usage,
+    推論の文字数: raw.choices?.[0]?.message?.reasoning?.length ?? 0,
+    本文: raw.choices?.[0]?.message?.content,
+  });
 });
 
 /** 1ラウンドだけ生成し、各お題がどの段階で落ちたかを1件ずつ返す */
@@ -119,6 +162,7 @@ spike.post("/spike/generate", async (c) => {
   return c.json({
     model,
     logId,
+    使用量: await fetchUsage(c.env, logId),
     prompt: buildGenerationPrompt({ kind, name, count: body.count ?? N_REQUEST, existing: [] }),
     生成件数: texts.length,
     採用: results.filter((r) => r.verdict === "採用").length,

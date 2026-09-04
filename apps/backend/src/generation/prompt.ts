@@ -28,6 +28,27 @@ function rules(count: number): string[] {
   ];
 }
 
+/**
+ * 「含む」モード固有の指示。
+ *
+ * 何も言わないと、モデルは指定文字を文頭に置いた語を毎回作る（実測で8文すべてが文頭）。
+ * しかも文頭に置くために「ざいあん」「ざいじん」のような**存在しない語を作る**。
+ * 位置を散らすことと、実在語だけを使うことを明示する。
+ */
+function constraintRules(char: string, count: number): string[] {
+  // 「散らす」「なおよい」のような曖昧な指示はほとんど効かなかった（実測で文頭6/8）。
+  // 個数を明示すると従う。
+  const headLimit = Math.max(1, Math.floor(count / 4));
+  const multiTarget = Math.ceil(count / 2);
+  return [
+    `- すべての文に「${char}」を必ず1回以上入れる`,
+    `- 最初の${headLimit}個を除き、「${char}」で文を始めない。文の2語目以降に「${char}」を置く`,
+    `- ${multiTarget}個以上の文では、1文の中に「${char}」を2回以上入れる。` +
+      `「${char}」を含む語を2つ使うか、「${char}」で始まる擬音語・擬態語を使うと入れやすい`,
+    `- 実在する言葉だけを使う。「${char}」を入れるために存在しない語を作らない`,
+  ];
+}
+
 export function buildGenerationPrompt(input: {
   kind: ThemeKind;
   /** テーマ名、または「含む文字」 */
@@ -39,9 +60,11 @@ export function buildGenerationPrompt(input: {
   const subject =
     input.kind === "theme"
       ? `テーマ「${input.name}」に沿った短文を作ってください。`
-      : `読み仮名に「${input.name}」を必ず含む短文を作ってください。表記に現れていなくても、読みに含まれていれば構いません。`;
+      : `読み仮名に「${input.name}」を含む短文を作ってください。表記に現れていなくても、読みに含まれていれば構いません。`;
 
   const lines = [subject, "", "条件:", ...rules(input.count)];
+
+  if (input.kind === "constraint") lines.push(...constraintRules(input.name, input.count));
 
   if (input.existing.length > 0) {
     lines.push(

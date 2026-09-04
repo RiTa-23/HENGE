@@ -24,6 +24,17 @@ import { createGetReading } from "./reading/index";
 
 export const spike = new Hono<{ Bindings: Env }>();
 
+/** 「含む」モードの評価用。指定文字が読みのどこに何回現れたか */
+function occurrences(kana: string, target: string) {
+  const positions: number[] = [];
+  for (let i = kana.indexOf(target); i !== -1; i = kana.indexOf(target, i + 1)) positions.push(i);
+  return {
+    出現回数: positions.length,
+    位置: positions.map((i) => `${i}/${kana.length}`).join(" "),
+    文頭: positions[0] === 0,
+  };
+}
+
 /** $0.011 / 1,000 neurons（Workers AI の課金単位）。無料枠は 10,000 neurons/日 */
 const USD_PER_1K_NEURONS = 0.011;
 
@@ -67,6 +78,8 @@ interface Body {
   maxTokens?: number;
   /** Qwen3系の思考モードを切る指示を末尾に足す */
   noThink?: boolean;
+  /** 重複回避の文脈として渡す既存お題（本番の2ラウンド目を模す） */
+  existing?: string[];
 }
 
 /** モデルの生の応答をそのまま返す（パースの問題を切り分けるため） */
@@ -127,7 +140,7 @@ spike.post("/spike/generate", async (c) => {
     kind,
     name,
     count: body.count ?? N_REQUEST,
-    existing: [],
+    existing: body.existing ?? [],
     // 検証用の上書き。省略すればモデルの設定（MODELS）が使われる
     promptSuffix: body.noThink === true ? "/no_think" : undefined,
     metadata: { themeId: "spike", kind, round: 1, path: "create" },
@@ -161,7 +174,13 @@ spike.post("/spike/generate", async (c) => {
         });
         continue;
       }
-      results.push({ text, kana: reading.kana, keystrokes, verdict: "採用" });
+      results.push({
+        text,
+        kana: reading.kana,
+        keystrokes,
+        verdict: "採用",
+        ...(kind === "constraint" ? occurrences(reading.kana, name) : {}),
+      });
     } catch (error) {
       const reason =
         error instanceof UnsupportedKanaError

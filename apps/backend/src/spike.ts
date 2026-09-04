@@ -107,6 +107,7 @@ spike.post("/spike/raw", async (c) => {
     かかった時間ms: Date.now() - started,
     usage: raw.usage,
     推論の文字数: raw.choices?.[0]?.message?.reasoning?.length ?? 0,
+    推論: raw.choices?.[0]?.message?.reasoning,
     本文: raw.choices?.[0]?.message?.content,
   });
 });
@@ -127,6 +128,7 @@ spike.post("/spike/generate", async (c) => {
     name,
     count: body.count ?? N_REQUEST,
     existing: [],
+    // 検証用の上書き。省略すればモデルの設定（MODELS）が使われる
     promptSuffix: body.noThink === true ? "/no_think" : undefined,
     metadata: { themeId: "spike", kind, round: 1, path: "create" },
   });

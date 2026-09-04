@@ -1,5 +1,5 @@
 import { buildGenerationPrompt, parseGeneratedLines } from "./prompt";
-import type { ModelId } from "./model";
+import { modelConfig, type ModelId } from "./model";
 import type { ThemeKind } from "@henge/shared";
 
 /**
@@ -58,14 +58,13 @@ export async function requestPrompts(
     count: number;
     existing: string[];
     metadata: GenerationMetadata;
-    /**
-     * プロンプト末尾に足す文字列。モデル固有の指示（Qwen3系の `/no_think` など）を
-     * 渡すために使う。コード上の分岐ではなく呼び出し側から渡すデータとして扱う。
-     */
+    /** モデルの設定を上書きする場合のみ指定する（検証用）。通常は MODELS から引く */
     promptSuffix?: string;
   },
 ): Promise<AiCallResult> {
   const { system, user } = buildGenerationPrompt(input);
+  // モデル固有の指示は MODELS から引く。呼び出し側がモデルの事情を知らなくて済む
+  const suffix = input.promptSuffix ?? modelConfig(input.model).promptSuffix;
 
   // Workers AI の型はモデルごとのオーバーロードになっているため、
   // モデルIDを値（配列の要素）として持つ設計とは両立しない。
@@ -85,7 +84,7 @@ export async function requestPrompts(
         { role: "system", content: system },
         {
           role: "user",
-          content: input.promptSuffix === undefined ? user : `${user}\n${input.promptSuffix}`,
+          content: suffix === undefined ? user : `${user}\n${suffix}`,
         },
       ],
       // 既定は2000。推論モデルは思考だけでこれを使い切り、本文が空のまま返る

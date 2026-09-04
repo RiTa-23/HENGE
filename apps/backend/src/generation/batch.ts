@@ -60,8 +60,6 @@ export interface GenerateBatchInput {
   /** 重複回避の文脈。既存お題の本文 */
   existing: string[];
   model: ModelId;
-  /** モデル固有の指示をプロンプト末尾に足す（Qwen3系の `/no_think` など） */
-  promptSuffix?: string;
   getReading: GetReading;
   /** 検証結果のログ書き戻しを遅らせる。Honoハンドラからは c.executionCtx.waitUntil を渡す */
   waitUntil?: (promise: Promise<unknown>) => void;
@@ -92,7 +90,6 @@ export async function generateBatch(env: Env, input: GenerateBatchInput): Promis
       name: input.name,
       count: N_REQUEST,
       existing: input.existing,
-      promptSuffix: input.promptSuffix,
       metadata: { themeId: input.themeId, kind: input.kind, round, path: input.path },
     });
 

@@ -2,7 +2,7 @@ import { buildRomanCandidates } from "@henge/shared";
 import { env } from "cloudflare:test";
 import { describe, expect, it } from "vitest";
 import { generateBatch, type GenerateBatchInput } from "../src/generation/batch";
-import { DEFAULT_MODEL, resolveModel } from "../src/generation/model";
+import { DEFAULT_MODEL, modelConfig, resolveModel } from "../src/generation/model";
 import { parseGeneratedLines } from "../src/generation/prompt";
 import type { GetReading } from "../src/reading/index";
 
@@ -37,6 +37,21 @@ describe("resolveModel", () => {
     expect(resolveModel("@cf/meta/llama-3.1-8b-instruct-fp8")).toBe(
       "@cf/meta/llama-3.1-8b-instruct-fp8",
     );
+  });
+
+  it("既定は qwen3（速度・コスト・品質のバランスが最も良い）", () => {
+    expect(DEFAULT_MODEL).toBe("@cf/qwen/qwen3-30b-a3b-fp8");
+  });
+});
+
+describe("modelConfig", () => {
+  it("qwen3 には /no_think が設定されている（思考を切ると速く安く品質も上がる）", () => {
+    expect(modelConfig("@cf/qwen/qwen3-30b-a3b-fp8").promptSuffix).toBe("/no_think");
+  });
+
+  it("設定を持たないモデルには空の設定を返す", () => {
+    expect(modelConfig("@cf/zai-org/glm-4.7-flash").promptSuffix).toBeUndefined();
+    expect(modelConfig("存在しないモデル").promptSuffix).toBeUndefined();
   });
 });
 

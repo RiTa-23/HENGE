@@ -93,14 +93,17 @@ export async function generateBatch(env: Env, input: GenerateBatchInput): Promis
       metadata: { themeId: input.themeId, kind: input.kind, round, path: input.path },
     });
 
-    const before = valid.length;
+    const validBefore = valid.length;
+    const rejectedBefore = { ...rejected };
     await validateInto(texts, input, seen, valid, rejected);
 
     if (logId !== undefined) {
+      // ログは1リクエスト（＝1ラウンド）に紐づくため、採用数も却下数も
+      // **そのラウンド分だけ**を渡す。累積を渡すと2ラウンド目で1ラウンド目が二重計上される
       const record = recordGenerationResult(env, logId, {
         requested: N_REQUEST,
-        valid: valid.length - before,
-        rejected: { ...rejected },
+        valid: valid.length - validBefore,
+        rejected: { ...subtract(rejected, rejectedBefore) },
       }).catch(() => {
         // 計測の失敗で生成そのものを落とさない
       });
@@ -112,6 +115,14 @@ export async function generateBatch(env: Env, input: GenerateBatchInput): Promis
   }
 
   return { valid, rejected, rounds, reachedTarget: valid.length >= input.target };
+}
+
+function subtract(after: RejectionCounts, before: RejectionCounts): RejectionCounts {
+  return {
+    charset: after.charset - before.charset,
+    keystroke: after.keystroke - before.keystroke,
+    constraint: after.constraint - before.constraint,
+  };
 }
 
 async function validateInto(

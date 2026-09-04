@@ -1,12 +1,6 @@
 import { buildGenerationPrompt, parseGeneratedLines } from "./prompt";
-import { modelConfig, type ModelId } from "./model";
+import { DEFAULT_MAX_TOKENS, modelConfig, type ModelId } from "./model";
 import type { ThemeKind } from "@henge/shared";
-
-/**
- * 応答の上限トークン数。モデル側の既定（2000）だと、推論モデルが思考の途中で
- * 打ち切られて本文が空になる。課金は実際に使った分だけなので余裕を取る。
- */
-const MAX_TOKENS = 4000;
 
 /** AI Gatewayのメタデータは1リクエスト5件まで。値は文字列・数値・真偽値のみ */
 export interface GenerationMetadata {
@@ -64,7 +58,8 @@ export async function requestPrompts(
 ): Promise<AiCallResult> {
   const { system, user } = buildGenerationPrompt(input);
   // モデル固有の指示は MODELS から引く。呼び出し側がモデルの事情を知らなくて済む
-  const suffix = input.promptSuffix ?? modelConfig(input.model).promptSuffix;
+  const config = modelConfig(input.model);
+  const suffix = input.promptSuffix ?? config.promptSuffix;
 
   // Workers AI の型はモデルごとのオーバーロードになっているため、
   // モデルIDを値（配列の要素）として持つ設計とは両立しない。
@@ -89,8 +84,8 @@ export async function requestPrompts(
       ],
       // 既定は2000。推論モデルは思考だけでこれを使い切り、本文が空のまま返る
       // （qwen3-30b-a3b-fp8 で実際に発生した）。実際に使った分しか課金されないため、
-      // 余裕を持たせておく。
-      max_tokens: MAX_TOKENS,
+      // 余裕を持たせておく。上限はモデルごとに変えられる。
+      max_tokens: config.maxTokens ?? DEFAULT_MAX_TOKENS,
     },
     {
       gateway: {

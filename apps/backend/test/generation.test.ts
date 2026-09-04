@@ -2,7 +2,12 @@ import { buildRomanCandidates } from "@henge/shared";
 import { env } from "cloudflare:test";
 import { describe, expect, it } from "vitest";
 import { generateBatch, type GenerateBatchInput } from "../src/generation/batch";
-import { DEFAULT_MODEL, modelConfig, resolveModel } from "../src/generation/model";
+import {
+  DEFAULT_MAX_TOKENS,
+  DEFAULT_MODEL,
+  modelConfig,
+  resolveModel,
+} from "../src/generation/model";
 import { parseGeneratedLines } from "../src/generation/prompt";
 import type { GetReading } from "../src/reading/index";
 
@@ -53,6 +58,11 @@ describe("modelConfig", () => {
     expect(modelConfig("@cf/zai-org/glm-4.7-flash").promptSuffix).toBeUndefined();
     expect(modelConfig("存在しないモデル").promptSuffix).toBeUndefined();
   });
+
+  it("glm は思考が長いので上限トークン数を大きく取る", () => {
+    // 8件の生成で出力5,878トークンを使った実測がある。既定の4,000では本番の20件で足りない
+    expect(modelConfig("@cf/zai-org/glm-4.7-flash").maxTokens).toBeGreaterThan(DEFAULT_MAX_TOKENS);
+  });
 });
 
 /** 読みを返すだけの偽の実装。外部APIを呼ばない */
@@ -72,7 +82,12 @@ const READINGS: Record<string, string> = {
 };
 
 /** AIの応答を差し替えた env。ラウンドごとに別の応答を返す */
-function envWithAiResponses(rounds: string[][]): Env {
+interface PatchedLog {
+  score?: number;
+  metadata?: { rejected?: string };
+}
+
+function envWithAiResponses(rounds: string[][], logs: PatchedLog[] = []): Env {
   // run は this 経由で状態を読む。レシーバを切り離して呼ばれたら落ちるようにして、
   // 本物の env.AI と同じ壊れ方をさせる（bind漏れを検出するため）
   const ai = {
@@ -81,8 +96,12 @@ function envWithAiResponses(rounds: string[][]): Env {
     async run(this: { rounds: string[][]; call: number }) {
       return { response: (this.rounds[this.call++] ?? []).join("\n") };
     },
-    aiGatewayLogId: undefined,
-    gateway: () => ({ patchLog: async () => {} }),
+    aiGatewayLogId: "log-id",
+    gateway: () => ({
+      patchLog: async (_logId: string, data: PatchedLog) => {
+        logs.push(data);
+      },
+    }),
   };
   return { ...env, AI: ai } as unknown as Env;
 }
@@ -176,6 +195,27 @@ describe("generateBatch", () => {
     );
 
     expect(result.valid.map((v) => v.text)).toEqual(["影が揺れた。"]);
+  });
+
+  it("却下数はラウンドごとに記録する（累積を渡すと2ラウンド目で二重計上される）", async () => {
+    const logs: PatchedLog[] = [];
+    await generateBatch(
+      envWithAiResponses(
+        [
+          // 1ラウンド目: 有効1件・charset却下1件
+          ["忍びは闇を走る。", "「打てない記号」"],
+          // 2ラウンド目: 有効1件・charset却下1件
+          ["影が揺れた。", "（これも打てない）"],
+        ],
+        logs,
+      ),
+      input({ target: 3 }), // 到達しないので必ず2ラウンド走る
+    );
+
+    expect(logs).toHaveLength(2);
+    expect(logs[0]?.metadata?.rejected).toBe("charset:1,keystroke:0,constraint:0");
+    // 累積を渡していれば charset:2 になる
+    expect(logs[1]?.metadata?.rejected).toBe("charset:1,keystroke:0,constraint:0");
   });
 
   it("有効なお題は読みと打鍵数を持って返る", async () => {

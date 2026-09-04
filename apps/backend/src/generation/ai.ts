@@ -2,6 +2,12 @@ import { buildGenerationPrompt, parseGeneratedLines } from "./prompt";
 import type { ModelId } from "./model";
 import type { ThemeKind } from "@henge/shared";
 
+/**
+ * 応答の上限トークン数。モデル側の既定（2000）だと、推論モデルが思考の途中で
+ * 打ち切られて本文が空になる。課金は実際に使った分だけなので余裕を取る。
+ */
+const MAX_TOKENS = 4000;
+
 /** AI Gatewayのメタデータは1リクエスト5件まで。値は文字列・数値・真偽値のみ */
 export interface GenerationMetadata {
   themeId: string;
@@ -52,6 +58,11 @@ export async function requestPrompts(
     count: number;
     existing: string[];
     metadata: GenerationMetadata;
+    /**
+     * プロンプト末尾に足す文字列。モデル固有の指示（Qwen3系の `/no_think` など）を
+     * 渡すために使う。コード上の分岐ではなく呼び出し側から渡すデータとして扱う。
+     */
+    promptSuffix?: string;
   },
 ): Promise<AiCallResult> {
   const { system, user } = buildGenerationPrompt(input);
@@ -63,7 +74,7 @@ export async function requestPrompts(
   // 実行時に落ちる。型を緩めるだけでレシーバを切り離さないこと。
   const run = env.AI.run.bind(env.AI) as (
     model: string,
-    input: { messages: { role: string; content: string }[] },
+    input: { messages: { role: string; content: string }[]; max_tokens: number },
     options: Record<string, unknown>,
   ) => Promise<AiResponse>;
 
@@ -72,8 +83,15 @@ export async function requestPrompts(
     {
       messages: [
         { role: "system", content: system },
-        { role: "user", content: user },
+        {
+          role: "user",
+          content: input.promptSuffix === undefined ? user : `${user}\n${input.promptSuffix}`,
+        },
       ],
+      // 既定は2000。推論モデルは思考だけでこれを使い切り、本文が空のまま返る
+      // （qwen3-30b-a3b-fp8 で実際に発生した）。実際に使った分しか課金されないため、
+      // 余裕を持たせておく。
+      max_tokens: MAX_TOKENS,
     },
     {
       gateway: {

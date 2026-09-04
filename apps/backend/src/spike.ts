@@ -64,6 +64,9 @@ interface Body {
   count?: number;
   save?: boolean;
   reasoningEffort?: "low" | "medium" | "high";
+  maxTokens?: number;
+  /** Qwen3系の思考モードを切る指示を末尾に足す */
+  noThink?: boolean;
 }
 
 /** モデルの生の応答をそのまま返す（パースの問題を切り分けるため） */
@@ -88,8 +91,9 @@ spike.post("/spike/raw", async (c) => {
     {
       messages: [
         { role: "system", content: system },
-        { role: "user", content: user },
+        { role: "user", content: body.noThink === true ? `${user}\n/no_think` : user },
       ],
+      max_tokens: body.maxTokens ?? 4000,
       ...(body.reasoningEffort === undefined ? {} : { reasoning_effort: body.reasoningEffort }),
     },
     { gateway: { id: "henge", skipCache: true } },
@@ -123,6 +127,7 @@ spike.post("/spike/generate", async (c) => {
     name,
     count: body.count ?? N_REQUEST,
     existing: [],
+    promptSuffix: body.noThink === true ? "/no_think" : undefined,
     metadata: { themeId: "spike", kind, round: 1, path: "create" },
   });
   const generatedAt = Date.now();

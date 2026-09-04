@@ -34,7 +34,9 @@ describe("resolveModel", () => {
   });
 
   it("既知のモデル名はそのまま使える", () => {
-    expect(resolveModel("@cf/meta/llama-3.2-3b-instruct")).toBe("@cf/meta/llama-3.2-3b-instruct");
+    expect(resolveModel("@cf/meta/llama-3.1-8b-instruct-fp8")).toBe(
+      "@cf/meta/llama-3.1-8b-instruct-fp8",
+    );
   });
 });
 

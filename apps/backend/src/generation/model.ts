@@ -6,7 +6,12 @@
  *
  * どれを使うかは Phase 8 で品質・速度・ニューロン消費を実測して決める。
  */
-export const MODELS = ["@cf/zai-org/glm-4.7-flash", "@cf/meta/llama-3.2-3b-instruct"] as const;
+export const MODELS = [
+  // 品質は高いが遅く高価（実測 24〜132秒 / 96〜215 neurons）
+  "@cf/zai-org/glm-4.7-flash",
+  // 速く安いが品質は落ちる（実測 2〜8秒 / 4〜6 neurons）。書式を崩すことがある
+  "@cf/meta/llama-3.1-8b-instruct-fp8",
+] as const;
 
 export type ModelId = (typeof MODELS)[number];
 

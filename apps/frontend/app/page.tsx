@@ -22,9 +22,31 @@ export default async function HomePage() {
           日本語タイピングの修行場
         </h1>
         <p className="mt-6 max-w-xl leading-loose text-kinari/70">
-          同じ文章を繰り返さないので「慣れ」が起きません。テーマを選んで、
-          15問ひと組で打ちます。ログインしなくても遊べます。
+          同じ文章を繰り返さないので「慣れ」が起きません。15問ひと組で打ちます。
+          ログインしなくても遊べます。
         </p>
+
+        {/* 2つのモードは排他。トップで並べて、どちらから入るかだけ選ばせる */}
+        <div className="mt-12 grid gap-4 sm:grid-cols-2">
+          <a
+            href="/themes"
+            className="rounded-md border border-kinari/15 bg-kinari/5 px-8 py-7 transition-colors hover:border-shu/60"
+          >
+            <span className="font-mincho text-xl tracking-wide text-kinari">テーマで打つ</span>
+            <span className="mt-3 block text-sm leading-relaxed text-kinari/60">
+              好きな題材の文章で練習する。無ければその場で作れます。
+            </span>
+          </a>
+          <a
+            href="/practice"
+            className="rounded-md border border-kinari/15 bg-kinari/5 px-8 py-7 transition-colors hover:border-shu/60"
+          >
+            <span className="font-mincho text-xl tracking-wide text-kinari">文字を含めて打つ</span>
+            <span className="mt-3 block text-sm leading-relaxed text-kinari/60">
+              「ざ」など苦手な音を必ず含む文章だけで、運指の弱点を詰める。
+            </span>
+          </a>
+        </div>
 
         <section className="mt-16">
           <h2 className="text-sm tracking-[0.25em] text-kinari/50">よく打たれているお題</h2>

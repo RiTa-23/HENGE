@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { ModeTabs } from "@/components/ModeTabs";
 import { SiteHeader } from "@/components/SiteHeader";
 import { ThemeCard } from "@/components/ThemeCard";
 import { listThemes } from "@/lib/api/themes";
@@ -29,9 +30,16 @@ export default async function ThemesPage({
     <>
       <SiteHeader />
       <main className="mx-auto w-full max-w-5xl px-6 py-16">
-        <h1 className="font-mincho text-3xl tracking-wide text-kinari">お題一覧</h1>
+        <h1 className="font-mincho text-3xl tracking-wide text-kinari">テーマで打つ</h1>
+        <p className="mt-6 max-w-2xl leading-loose text-kinari/70">
+          選んだテーマに沿った文章が出ます。15問ひと組で、同じ文章は繰り返し出ません。
+        </p>
 
-        <div className="mt-8 flex gap-2">
+        <div className="mt-8">
+          <ModeTabs current="theme" />
+        </div>
+
+        <div className="mt-10 flex gap-2">
           {tabs.map((tab) => (
             <a
               key={tab.key}

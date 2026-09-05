@@ -107,3 +107,16 @@ packages/
 | `ADMIN_EMAILS` | 管理者判定（カンマ区切り） | 同上（Next.js側） |
 
 ローカル開発では `.dev.vars` を使う。テンプレートは `apps/frontend/.dev.vars.example` / `apps/backend/.dev.vars.example`。**リポジトリにコミットしない。**
+
+### ローカルのD1は両Workerで共有する
+
+本番は1つのD1（`henge-db`）を両Workerが見るが、ローカルでは既定で各Workerの `.wrangler/state` に別々のDBが作られる。**そのままだと、Hono側でマイグレーションしても Next.js（Better Auth）からは認証テーブルが見えず、ログインが500で落ちる。**
+
+永続化先をリポジトリ直下の `.wrangler/state` に揃えてある。
+
+| 対象 | 指定 |
+|---|---|
+| `apps/backend` の `dev` / `db:migrate:local` | `--persist-to ../../.wrangler/state` |
+| `apps/frontend` の `next dev` | `initOpenNextCloudflareForDev({ persist: { path: "../../.wrangler/state/v3" } })` |
+
+片方だけ変えると再び別々のDBを見ることになるので、**変更するときは必ず両方を揃える。**

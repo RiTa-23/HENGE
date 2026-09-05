@@ -14,7 +14,7 @@
     "format": "oxfmt --ignore-path .gitignore --ignore-path .oxfmtignore .",
     "format:check": "oxfmt --check --ignore-path .gitignore --ignore-path .oxfmtignore .",
     "typecheck": "bun run --cwd apps/backend build:types && bun run --filter '*' typecheck",
-    "test": "bun test",
+    "test": "bun test packages/shared apps/frontend",
     "test:workers": "bun run --cwd apps/backend test:workers",
     "db:generate": "bun run --cwd apps/backend db:generate",
     "db:migrate:local": "bun run --cwd apps/backend db:migrate:local"

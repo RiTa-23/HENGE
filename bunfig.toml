@@ -1,4 +1,4 @@
 [test]
 # `bun test` は D1/KV に依存しない純粋関数のテストだけを走らせる。
-# D1/KV に依存するテスト（apps/backend/test）は `bun run test:workers`（Vitest）側で動かす。
-root = "packages"
+# 対象は package.json の test スクリプトで指定する（apps/backend の
+# Workersテストを拾わないため、ディレクトリを明示している）。

@@ -9,3 +9,12 @@ export const PLAY_SIZE = 15;
  * 「もう一度」を押した時点で在庫切れに当たりやすくなる。
  */
 export const STOCK_TARGET = 30;
+
+/**
+ * 1日の生成回数上限（JST基準）。
+ *
+ * 判定は Next.js 側、記録（加算）は Hono 側で行う。この定数を参照するのは
+ * 判定と残数計算を担う Next.js 側のみでよい。Hono 側は渡された許可フラグを
+ * 信頼するだけ（クォータのポリシー値を持たない）。
+ */
+export const DAILY_GENERATION_LIMIT = 50;

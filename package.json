@@ -20,7 +20,7 @@
     "db:migrate:local": "bun run --cwd apps/backend db:migrate:local"
   },
   "devDependencies": {
-    "@better-auth/cli": "^1.4.21",
+    "@better-auth/cli": "~1.4.21",
     "@types/bun": "^1.4.0",
     "@types/node": "^24",
     "concurrently": "^10.0.5",

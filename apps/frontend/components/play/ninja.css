@@ -4,15 +4,17 @@
  */
 
 /* ---- 巻物 ---------------------------------------------------------------
- * 一枚の紙に2本の軸が付いた「1つの物体」。**両端は同じ材質・同じ色**にして、
- * 左右の違いは太さだけで付ける。色を変えると別々の物体に見える。
+ * 一枚の紙に2本の軸が付いた「1つの物体」。**両端は同じ材質・同じ色・同じ太さ**。
+ * 色や太さを変えると別々の物体に見える。
  * 金は軸の縁の細い線までに留め、面で使わない（主役は文章と次に打つキー）。
+ *
+ * 太さで在庫を表すのはやめた。在庫は巻物ではなく数字で示す方が読み取りやすく、
+ * 太さが動くと「いま何かが起きた」と誤読させる。
  */
 .scroll {
-  --roller-left: 40px;
-  --roller-right: 48px;
+  --roller-width: 46px;
   display: grid;
-  grid-template-columns: var(--roller-left) 1fr var(--roller-right);
+  grid-template-columns: var(--roller-width) 1fr var(--roller-width);
   align-items: stretch;
 }
 
@@ -59,8 +61,8 @@
 
 /* 広げられた紙の面。巻物の内側なので、地よりわずかに明るいだけに留める */
 .scroll__sheet {
-  background: color-mix(in oklab, var(--color-kinari) 6%, transparent);
-  border-block: 1px solid color-mix(in oklab, var(--color-kinari) 16%, transparent);
+  background: color-mix(in oklab, var(--color-kinari) 9%, transparent);
+  border-block: 1px solid color-mix(in oklab, var(--color-kinari) 20%, transparent);
 }
 
 /* ---- 苦無（キャレット） --------------------------------------------------

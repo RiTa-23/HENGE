@@ -1,4 +1,12 @@
-/** 生成待ちのスピナー。回転する道具そのものを使う。色は金 */
+import "./ninja.css";
+
+/**
+ * 生成待ちのスピナー。回転する道具そのものを使う。色は金。
+ *
+ * **CSSはこのファイルで読む。** 他所（Loading や Scroll）任せにすると、
+ * それらを使わない画面（/themes/new など）で回転も色も当たらず、
+ * 銀色の手裏剣が止まったまま出る。
+ */
 export function Shuriken({ size = 64 }: { size?: number }) {
   return (
     <svg

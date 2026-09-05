@@ -43,7 +43,7 @@
       "readingRoman": [["shu","syu"], ["ri"], ...] }
   ],
   "nextOffset": 45,
-  "remainingInPool": 12,     // 巻物の在庫表示用（総生成数 − nextOffset）
+  "remainingInPool": 12,     // 残り在庫（総生成数 − nextOffset）
   "quotaConsumed": true,     // 補充が走った場合true
   "quotaRemaining": 47       // ログイン時のみ
 }

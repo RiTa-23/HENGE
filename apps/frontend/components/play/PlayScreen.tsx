@@ -292,7 +292,7 @@ export function PlayScreen({ themeId, themeName }: { themeId: string; themeName:
       tabIndex={0}
       onKeyDown={onKeyDown}
       onBlur={() => surface.current?.focus()}
-      className="mx-auto flex min-h-dvh w-full max-w-6xl flex-col px-8 py-6"
+      className="mx-auto flex min-h-dvh w-full max-w-4xl flex-col px-8 py-6"
     >
       <header className="flex items-start justify-between border-b border-kin/40 pb-4">
         <Logo />
@@ -306,7 +306,6 @@ export function PlayScreen({ themeId, themeName }: { themeId: string; themeName:
           text={prompt.text}
           kanaUnits={splitKanaUnits(prompt.readingKana)}
           progress={progress}
-          remainingInPool={phase.session.remainingInPool}
         />
 
         <div className="flex items-center justify-between">

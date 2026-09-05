@@ -1,3 +1,4 @@
+/* oxlint-disable no-await-in-loop -- D1のバインド変数上限に合わせて分割投入するため、順に入れる */
 import { PLAY_SIZE, STOCK_TARGET } from "@henge/shared";
 import { env, SELF } from "cloudflare:test";
 import { eq } from "drizzle-orm";

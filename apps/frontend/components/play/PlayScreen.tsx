@@ -35,6 +35,8 @@ interface SessionResponse {
 }
 
 type Phase =
+  /** 開始前。**ここではまだ在庫を消費しない** */
+  | { name: "ready" }
   | { name: "loading" }
   /** 在庫が足りず生成中。エラーではなく待ち */
   | { name: "preparing" }
@@ -63,9 +65,17 @@ function isTypingKey(event: KeyboardEvent): boolean {
   return [...event.key].length === 1;
 }
 
-export function PlayScreen({ themeId, themeName }: { themeId: string; themeName: string }) {
+export function PlayScreen({
+  themeId,
+  themeName,
+  promptCount,
+}: {
+  themeId: string;
+  themeName: string;
+  promptCount: number;
+}) {
   const { data: authSession } = authClient.useSession();
-  const [phase, setPhase] = useState<Phase>({ name: "loading" });
+  const [phase, setPhase] = useState<Phase>({ name: "ready" });
   const [promptIndex, setPromptIndex] = useState(0);
   const [progress, setProgress] = useState<TypingProgress>(() => startTyping([]));
   const [stats, setStats] = useState<PlayStats>({ hits: 0, misses: 0, elapsedMs: 0 });
@@ -125,8 +135,11 @@ export function PlayScreen({ themeId, themeName }: { themeId: string; themeName:
     setPhase({ name: "playing", session });
   }, [themeId]);
 
+  // **開始するまで sessions/start を呼ばない。** 呼んだ時点でオフセットの消費が
+  // 確定し、条件次第では背景補充も走る（＝クォータを1消費する）。画面を開いた
+  // だけでそれが起きるのは、利用者から見て身に覚えのない消費になる
   useEffect(() => {
-    void load();
+    if (attempt > 0) void load();
   }, [load, attempt]);
 
   // 待ち直しの予約を残したまま画面を離れない
@@ -138,8 +151,10 @@ export function PlayScreen({ themeId, themeName }: { themeId: string; themeName:
 
   // 打鍵を拾う要素にフォーカスを当て続ける。外れると1打も拾えなくなる
   useEffect(() => {
-    if (phase.name === "playing") surface.current?.focus();
+    if (phase.name === "playing" || phase.name === "ready") surface.current?.focus();
   }, [phase.name]);
+
+  const start = () => setAttempt((count) => count + 1);
 
   /**
    * 枯渇からの復帰。**ログインユーザーだけが使える**（クォータを1消費する）。
@@ -195,6 +210,52 @@ export function PlayScreen({ themeId, themeName }: { themeId: string; themeName:
     // 撒菱は次の問題で消える（新しい TypingProgress を作り直すため）
     setProgress(startTyping(phase.session.prompts[upcoming]?.readingRoman ?? []));
   };
+
+  if (phase.name === "ready") {
+    return (
+      <div
+        ref={surface}
+        data-typing-surface=""
+        tabIndex={0}
+        onKeyDown={(event) => {
+          // key と code の両方を見る。配列やIMEの状態によって key が空になることがある
+          if (event.key !== " " && event.code !== "Space") return;
+          // スペースでの画面スクロールを止める
+          event.preventDefault();
+          start();
+        }}
+        onBlur={() => surface.current?.focus()}
+        className="flex min-h-dvh items-center justify-center p-6"
+      >
+        <div className="w-full max-w-lg rounded-lg border border-kin/60 bg-kinari/5 px-10 py-14 text-center">
+          <p className="text-sm tracking-[0.25em] text-kinari/60">{themeName}</p>
+          <h1 className="mt-3 font-mincho text-3xl tracking-widest text-kinari">
+            {PLAY_SIZE}問 ひと組
+          </h1>
+          <p className="mt-4 font-mono text-sm text-kinari/50">お題 {promptCount} 問</p>
+
+          <p className="mt-12 flex items-center justify-center gap-3 text-kinari">
+            <span className="rounded-md border border-shu bg-shu/20 px-10 py-2 font-mono text-sm tracking-widest shadow-[0_0_10px_var(--color-shu)]">
+              Space
+            </span>
+            <span className="tracking-widest">で開始</span>
+          </p>
+          <p className="mt-4 text-xs leading-relaxed text-kinari/40">
+            押すまでお題は消費されません。
+          </p>
+
+          <div className="mt-12 flex justify-center">
+            <a
+              href="/themes"
+              className="rounded-md border border-kinari/20 px-8 py-2.5 tracking-widest text-kinari/80 transition-colors hover:border-kin hover:text-kinari"
+            >
+              一覧に戻る
+            </a>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   if (phase.name === "loading") {
     return <Loading message="お題を用意しています" note="生成が要る場合は十数秒かかります。" />;
@@ -252,7 +313,7 @@ export function PlayScreen({ themeId, themeName }: { themeId: string; themeName:
             {!exhausted && (
               <button
                 type="button"
-                onClick={() => void load()}
+                onClick={start}
                 className="rounded-md border border-shu bg-shu/15 px-6 py-2.5 tracking-widest text-kinari transition-colors hover:bg-shu/25"
               >
                 もう一度
@@ -277,7 +338,7 @@ export function PlayScreen({ themeId, themeName }: { themeId: string; themeName:
   }
 
   if (phase.name === "result") {
-    return <Result stats={stats} themeName={themeName} onRetry={() => void load()} />;
+    return <Result stats={stats} themeName={themeName} onRetry={start} />;
   }
 
   const prompt = phase.session.prompts[promptIndex];

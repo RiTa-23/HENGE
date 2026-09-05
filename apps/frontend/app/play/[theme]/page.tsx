@@ -22,5 +22,5 @@ export default async function PlayPage({ params }: { params: Promise<{ theme: st
   const found = await findTheme("theme", name);
   if (found === null) notFound();
 
-  return <PlayScreen themeId={found.id} themeName={found.name} />;
+  return <PlayScreen themeId={found.id} themeName={found.name} promptCount={found.promptCount} />;
 }

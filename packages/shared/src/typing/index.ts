@@ -8,3 +8,4 @@ export {
 export { countKeystrokes, countKeystrokesFromKana } from "./keystrokes";
 export { KANA_TABLE, SYMBOLS } from "./table";
 export { pressKey, romanDisplay, startTyping, type TypingProgress } from "./match";
+export { isImeKey, normalizeTypedKey } from "./input";

@@ -2,6 +2,8 @@
 
 import {
   isApiError,
+  isImeKey,
+  normalizeTypedKey,
   PLAY_SIZE,
   pressKey,
   type RomanCandidates,
@@ -60,11 +62,15 @@ function nextKeysOf(progress: TypingProgress): NextKey[] {
   return [...letters].map((letter) => toNextKey(letter));
 }
 
-/** 打鍵として扱うキーか。修飾キー付きのショートカットは拾わない */
+/**
+ * 打鍵として扱うキーか。
+ *
+ * ここで見るのは修飾キーだけ。**どの文字を打鍵として受けるかは
+ * `normalizeTypedKey`（packages/shared）に任せる。** Shift は `！` `？` の
+ * 入力に要るので許す。
+ */
 function isTypingKey(event: KeyboardEvent): boolean {
-  if (event.ctrlKey || event.metaKey || event.altKey) return false;
-  // Shift は `！` `？` の入力に要るので許す。key が1文字のものだけ受ける
-  return [...event.key].length === 1;
+  return !(event.ctrlKey || event.metaKey || event.altKey);
 }
 
 /**
@@ -86,6 +92,11 @@ export function PlayScreen({
   const [promptIndex, setPromptIndex] = useState(0);
   const [progress, setProgress] = useState<TypingProgress>(() => startTyping([]));
   const [stats, setStats] = useState<PlayStats>({ hits: 0, misses: 0, elapsedMs: 0 });
+  /**
+   * 日本語入力のまま打たれたことがあるか。**一度でも見たら出しっぱなしにする。**
+   * 打つたびに出たり消えたりすると、打鍵に気を取られて読めない
+   */
+  const [imeDetected, setImeDetected] = useState(false);
   const startedAt = useRef<number>(0);
   const surface = useRef<HTMLDivElement>(null);
   // 生成中の待ち。attempt を増やすと load が走り直す
@@ -213,9 +224,22 @@ export function PlayScreen({
 
   const onKeyDown = (event: React.KeyboardEvent<HTMLDivElement>) => {
     if (phase.name !== "playing" || !isTypingKey(event.nativeEvent)) return;
+
+    // **`event.key` をそのまま渡さない。** 候補テーブルは小文字のASCIIしか持たないため、
+    // Caps Lock の `"S"` や、かなで届いた `"し"` は**すべてミスとして数えられてしまう**。
+    // 「正しく打っているのに一文字も進まない」という、画面から原因の見えない壊れ方になる
+    const typed = normalizeTypedKey(event.key);
+    if (typed === null) {
+      // 打鍵として解釈できないものは**ミスに数えない**。原因が分かるものだけ画面で伝える
+      if (isImeKey(event.key)) {
+        event.preventDefault();
+        setImeDetected(true);
+      }
+      return;
+    }
     event.preventDefault();
 
-    const next = pressKey(progress, event.key);
+    const next = pressKey(progress, typed);
     if (!next.finished) {
       setProgress(next);
       return;
@@ -394,6 +418,12 @@ export function PlayScreen({
       <div className="border-t border-kin/40 pt-6">
         <Keyboard nextKeys={nextKeysOf(progress)} />
       </div>
+
+      {imeDetected && (
+        <p className="mt-4 rounded-md border border-shu/50 bg-shu/10 px-4 py-3 text-center text-sm text-kinari">
+          日本語入力のままです。<strong>英数入力に切り替えてください。</strong>
+        </p>
+      )}
 
       <p className="mt-4 text-center font-mono text-xs text-kinari/40">
         {romanDisplay(progress).cursor} 打目 ／ ミス {progress.missCount}

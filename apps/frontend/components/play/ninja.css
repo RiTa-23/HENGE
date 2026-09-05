@@ -1,0 +1,144 @@
+/**
+ * 忍者モチーフ。ユーティリティクラスでは表現しづらいのでここだけ素のCSSで書く
+ * （docs/07-ui.md）。**色は @theme のトークンからしか取らない。**
+ */
+
+/* ---- 巻物 ---------------------------------------------------------------
+ * 一枚の紙に2本の軸が付いた「1つの物体」。**両端は同じ材質・同じ色**にして、
+ * 左右の違いは太さだけで付ける。色を変えると別々の物体に見える。
+ * 金は軸の縁の細い線までに留め、面で使わない（主役は文章と次に打つキー）。
+ */
+.scroll {
+  --roller-left: 40px;
+  --roller-right: 48px;
+  display: grid;
+  grid-template-columns: var(--roller-left) 1fr var(--roller-right);
+  align-items: stretch;
+}
+
+/* 軸は紙の面より上下に張り出す。1本の軸に紙が巻かれている形にする */
+.scroll__roller {
+  position: relative;
+  margin-block: -22px;
+  border-radius: 4px;
+  /* 巻いた紙の断面。生成りに墨を混ぜて厚みの陰影を作る（色は足さない） */
+  background: linear-gradient(
+    to right,
+    color-mix(in oklab, var(--color-kinari) 42%, var(--color-sumi)),
+    var(--color-kinari) 38%,
+    color-mix(in oklab, var(--color-kinari) 82%, var(--color-sumi)) 62%,
+    color-mix(in oklab, var(--color-kinari) 48%, var(--color-sumi))
+  );
+}
+
+/* 軸の縁。**金はこの細い線だけに使う**（面では使わない） */
+.scroll__roller::before,
+.scroll__roller::after {
+  content: "";
+  position: absolute;
+  left: -5px;
+  right: -5px;
+  height: 26px;
+  border-radius: 3px;
+  background: linear-gradient(
+    to right,
+    color-mix(in oklab, var(--color-sumi) 82%, var(--color-kinari)),
+    color-mix(in oklab, var(--color-sumi) 62%, var(--color-kinari)) 45%,
+    color-mix(in oklab, var(--color-sumi) 84%, var(--color-kinari))
+  );
+  border-block: 1px solid color-mix(in oklab, var(--color-kin) 75%, transparent);
+}
+
+.scroll__roller::before {
+  top: 0;
+}
+
+.scroll__roller::after {
+  bottom: 0;
+}
+
+/* 広げられた紙の面。巻物の内側なので、地よりわずかに明るいだけに留める */
+.scroll__sheet {
+  background: color-mix(in oklab, var(--color-kinari) 6%, transparent);
+  border-block: 1px solid color-mix(in oklab, var(--color-kinari) 16%, transparent);
+}
+
+/* ---- 苦無（キャレット） --------------------------------------------------
+ * 次に打つ1文字を指す。**文字の下**に置く。色は朱（＝今すぐ打つべきもの）。
+ */
+.kunai {
+  position: absolute;
+  top: calc(100% + 4px);
+  left: 50%;
+  translate: -50% 0;
+  width: 18px;
+  height: 42px;
+  color: var(--color-shu);
+}
+
+.kunai__blade {
+  position: absolute;
+  inset-inline: 0;
+  top: 0;
+  height: 31px;
+  background: currentcolor;
+  /* 上向きの刃。切っ先を細く、根元を広く */
+  clip-path: polygon(50% 0, 78% 40%, 66% 100%, 34% 100%, 22% 40%);
+}
+
+.kunai__ring {
+  position: absolute;
+  left: 50%;
+  bottom: 0;
+  translate: -50% 0;
+  width: 11px;
+  height: 11px;
+  border: 2px solid currentcolor;
+  border-radius: 50%;
+}
+
+/* ---- 撒菱（ミス表示） ----------------------------------------------------
+ * ミスしたローマ字の**真上**に置く。苦無は下、撒菱は上なので衝突しない。
+ * 色は朱より暗く鈍い赤（朱に墨を混ぜたもの）。
+ */
+.makibishi {
+  position: absolute;
+  bottom: calc(100% + 3px);
+  left: 50%;
+  translate: -50% 0;
+  width: 18px;
+  height: 18px;
+  background: var(--color-makibishi);
+  /* 四方に棘が出た形。棘を太めに取らないと小さい表示で潰れて見えなくなる */
+  clip-path: polygon(50% 0, 66% 34%, 100% 50%, 66% 66%, 50% 100%, 34% 66%, 0 50%, 34% 34%);
+}
+
+/* ---- 手裏剣（生成待ちのスピナー） ---------------------------------------
+ * 回転する道具そのものをスピナーにする。色は金（待ち時間に朱を使わない）。
+ */
+.shuriken {
+  color: var(--color-kin);
+  animation: shuriken-spin 1.6s linear infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .shuriken {
+    animation-duration: 6s;
+  }
+}
+
+@keyframes shuriken-spin {
+  to {
+    rotate: 360deg;
+  }
+}
+
+/* ローディングの進捗バー。実際の進捗は取れないので往復させるだけに留める */
+@keyframes loading-sweep {
+  0% {
+    translate: -100% 0;
+  }
+  100% {
+    translate: 300% 0;
+  }
+}

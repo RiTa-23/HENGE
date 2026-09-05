@@ -11,7 +11,7 @@
     "deploy": "opennextjs-cloudflare build && opennextjs-cloudflare deploy",
     "typecheck": "tsc --noEmit",
     "cf-typegen": "wrangler types --env-interface CloudflareEnv cloudflare-env.d.ts",
-    "test": "bun test lib"
+    "test": "bun test lib components"
   },
   "dependencies": {
     "@henge/shared": "workspace:*",

@@ -17,6 +17,7 @@ export {
   pressKey,
   type RomanCandidates,
   romanDisplay,
+  splitKanaUnits,
   startTyping,
   SYMBOLS,
   type TypingProgress,

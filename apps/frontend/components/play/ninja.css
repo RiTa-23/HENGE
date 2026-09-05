@@ -12,9 +12,14 @@
  * 太さが動くと「いま何かが起きた」と誤読させる。
  */
 .scroll {
-  --roller-width: 46px;
+  --roller-width: 38px;
   display: grid;
-  grid-template-columns: var(--roller-width) 1fr var(--roller-width);
+  /**
+   * 中央の列は **minmax(0, 1fr)**。素の `1fr` は min-content 未満に縮まないため、
+   * 長いローマ字列（等幅＋字間広め）が列を押し広げ、お題の文の長さで巻物の幅が
+   * 変わってしまう。0 を下限にして、はみ出す分は中の行で折り返させる。
+   */
+  grid-template-columns: var(--roller-width) minmax(0, 1fr) var(--roller-width);
   align-items: stretch;
 }
 
@@ -73,8 +78,8 @@
   top: calc(100% + 4px);
   left: 50%;
   translate: -50% 0;
-  width: 18px;
-  height: 42px;
+  width: 15px;
+  height: 35px;
   color: var(--color-shu);
 }
 
@@ -82,7 +87,7 @@
   position: absolute;
   inset-inline: 0;
   top: 0;
-  height: 31px;
+  height: 26px;
   background: currentcolor;
   /* 上向きの刃。切っ先を細く、根元を広く */
   clip-path: polygon(50% 0, 78% 40%, 66% 100%, 34% 100%, 22% 40%);
@@ -93,8 +98,8 @@
   left: 50%;
   bottom: 0;
   translate: -50% 0;
-  width: 11px;
-  height: 11px;
+  width: 9px;
+  height: 9px;
   border: 2px solid currentcolor;
   border-radius: 50%;
 }
@@ -108,8 +113,8 @@
   bottom: calc(100% + 3px);
   left: 50%;
   translate: -50% 0;
-  width: 18px;
-  height: 18px;
+  width: 15px;
+  height: 15px;
   background: var(--color-makibishi);
   /* 四方に棘が出た形。棘を太めに取らないと小さい表示で潰れて見えなくなる */
   clip-path: polygon(50% 0, 66% 34%, 100% 50%, 66% 66%, 50% 100%, 34% 66%, 0 50%, 34% 34%);

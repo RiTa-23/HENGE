@@ -26,13 +26,15 @@ export function Scroll({ text, kanaUnits, progress }: ScrollProps) {
   const { text: roman, cursor } = romanDisplay(progress);
 
   return (
-    <div className="scroll">
+    <div className="scroll mx-auto w-full max-w-3xl">
       <div className="scroll__roller" />
 
-      <div className="scroll__sheet flex min-h-72 flex-col items-center justify-center gap-6 px-12 py-14">
-        <p className="font-mincho text-5xl leading-tight tracking-[0.06em] text-kinari">{text}</p>
+      <div className="scroll__sheet flex min-h-60 flex-col items-center justify-center gap-5 px-8 py-12">
+        <p className="text-balance text-center font-mincho text-3xl leading-snug tracking-[0.06em] text-kinari">
+          {text}
+        </p>
 
-        <p className="font-mincho text-2xl tracking-wide">
+        <p className="text-center font-mincho text-lg tracking-wide">
           {kanaUnits.map((unit, index) => (
             <span key={index} className={kanaClass(index, progress.unitIndex)}>
               {unit}
@@ -41,8 +43,9 @@ export function Scroll({ text, kanaUnits, progress }: ScrollProps) {
         </p>
 
         {/* ローマ字列。1文字ずつ span にするのは、苦無と撒菱を
-            「その文字の真下／真上」に置くため（かな単位ではない） */}
-        <p className="flex font-mono text-3xl tracking-[0.3em]">
+            「その文字の真下／真上」に置くため（かな単位ではない）。
+            折り返しの行間（gap-y）は苦無の高さぶん取る。詰めると次の行に食い込む */}
+        <p className="flex flex-wrap justify-center gap-y-11 font-mono text-xl tracking-[0.22em]">
           {[...roman].map((letter, index) => (
             <span
               key={index}

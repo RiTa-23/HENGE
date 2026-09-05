@@ -12,6 +12,7 @@ import {
 } from "@henge/shared";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Logo } from "@/components/Logo";
+import { authClient } from "@/lib/api/auth-client";
 import { Keyboard, type NextKey, toNextKey } from "./Keyboard";
 import { Loading } from "./Loading";
 import { ProgressDots } from "./ProgressDots";
@@ -63,6 +64,7 @@ function isTypingKey(event: KeyboardEvent): boolean {
 }
 
 export function PlayScreen({ themeId, themeName }: { themeId: string; themeName: string }) {
+  const { data: session } = authClient.useSession();
   const [phase, setPhase] = useState<Phase>({ name: "loading" });
   const [promptIndex, setPromptIndex] = useState(0);
   const [progress, setProgress] = useState<TypingProgress>(() => startTyping([]));
@@ -139,6 +141,34 @@ export function PlayScreen({ themeId, themeName }: { themeId: string; themeName:
     if (phase.name === "playing") surface.current?.focus();
   }, [phase.name]);
 
+  /**
+   * 枯渇からの復帰。**ログインユーザーだけが使える**（クォータを1消費する）。
+   * 匿名は別テーマかログインへ誘導する（docs/04-api.md）。
+   *
+   * 自動では走らせない。クォータを消費する行為なので、本人が選んだときだけ動かす。
+   */
+  const regenerate = async () => {
+    setPhase({ name: "preparing" });
+    const response = await fetch("/api/prompts/regenerate", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ themeId }),
+    });
+
+    if (response.ok) {
+      // 積み上がった在庫で引き直す
+      waitingSince.current = null;
+      setAttempt((count) => count + 1);
+      return;
+    }
+
+    const body: unknown = await response.json();
+    const { code, message } = isApiError(body)
+      ? body.error
+      : { code: "UNKNOWN", message: "お題を作れませんでした" };
+    setPhase({ name: "error", code, message });
+  };
+
   const onKeyDown = (event: React.KeyboardEvent<HTMLDivElement>) => {
     if (phase.name !== "playing" || !isTypingKey(event.nativeEvent)) return;
     event.preventDefault();
@@ -180,25 +210,67 @@ export function PlayScreen({ themeId, themeName }: { themeId: string; themeName:
   }
 
   if (phase.name === "error") {
+    // 枯渇はログインしていれば作り足して続けられる。匿名は別テーマかログインへ
+    const exhausted = phase.code === "THEME_EXHAUSTED";
+    const canRegenerate = exhausted && session !== null;
+
     return (
       <div className="flex min-h-dvh items-center justify-center p-6">
         <div className="w-full max-w-lg rounded-lg border border-kin/60 bg-kinari/5 px-10 py-12 text-center">
           <h1 className="font-mincho text-2xl tracking-widest text-kinari">{phase.message}</h1>
-          <div className="mt-10 flex justify-center gap-4">
-            <button
-              type="button"
-              onClick={() => void load()}
-              className="rounded-md border border-shu bg-shu/15 px-6 py-2.5 tracking-widest text-kinari"
-            >
-              もう一度
-            </button>
+
+          {canRegenerate && (
+            <p className="mt-5 text-sm leading-relaxed text-kinari/60">
+              このテーマのお題を作り足せます。本日の生成回数を1つ使います。
+            </p>
+          )}
+          {exhausted && session === null && (
+            <p className="mt-5 text-sm leading-relaxed text-kinari/60">
+              ログインすると、このテーマのお題を作り足して続けられます。
+            </p>
+          )}
+
+          <div className="mt-10 flex flex-wrap justify-center gap-4">
+            {canRegenerate && (
+              <button
+                type="button"
+                onClick={() => void regenerate()}
+                className="rounded-md border border-shu bg-shu/15 px-6 py-2.5 tracking-widest text-kinari transition-colors hover:bg-shu/25"
+              >
+                お題を作り足す
+              </button>
+            )}
+            {exhausted && session === null && (
+              <button
+                type="button"
+                onClick={() => authClient.signIn.social({ provider: "google" })}
+                className="rounded-md border border-shu bg-shu/15 px-6 py-2.5 tracking-widest text-kinari transition-colors hover:bg-shu/25"
+              >
+                Googleでログイン
+              </button>
+            )}
+            {!exhausted && (
+              <button
+                type="button"
+                onClick={() => void load()}
+                className="rounded-md border border-shu bg-shu/15 px-6 py-2.5 tracking-widest text-kinari transition-colors hover:bg-shu/25"
+              >
+                もう一度
+              </button>
+            )}
             <a
               href="/themes"
-              className="rounded-md border border-kinari/20 px-6 py-2.5 tracking-widest text-kinari/80"
+              className="rounded-md border border-kinari/20 px-6 py-2.5 tracking-widest text-kinari/80 transition-colors hover:border-kin hover:text-kinari"
             >
-              テーマ一覧へ
+              ほかのお題を見る
             </a>
           </div>
+
+          <p className="mt-8 text-sm">
+            <a href="/" className="tracking-widest text-kinari/50 hover:text-kinari">
+              トップへ戻る
+            </a>
+          </p>
         </div>
       </div>
     );

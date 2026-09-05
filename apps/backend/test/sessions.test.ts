@@ -84,7 +84,7 @@ describe("配信", () => {
   it("オフセットの続きから配る", async () => {
     await seed(45);
     const { body } = await start({ themeId: "t1", offset: 15 });
-    const texts = (body.prompts as { text: string }[]).map((p) => p.text).sort();
+    const texts = (body.prompts as { text: string }[]).map((p) => p.text).toSorted();
     expect(texts[0]).toBe("お題16");
     expect(texts.at(-1)).toBe("お題30");
   });
@@ -92,7 +92,7 @@ describe("配信", () => {
   it("オフセット30でも続きから配る", async () => {
     await seed(45);
     const { body } = await start({ themeId: "t1", offset: 30 });
-    const texts = (body.prompts as { text: string }[]).map((p) => p.text).sort();
+    const texts = (body.prompts as { text: string }[]).map((p) => p.text).toSorted();
     expect(texts[0]).toBe("お題31");
     expect(body.nextOffset).toBe(45);
   });

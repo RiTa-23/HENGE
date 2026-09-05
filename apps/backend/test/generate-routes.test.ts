@@ -1,5 +1,4 @@
 import { env, SELF } from "cloudflare:test";
-import { eq } from "drizzle-orm";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { createDb } from "../src/db/client";
 import { prompts, themes, user } from "../src/db/schema";

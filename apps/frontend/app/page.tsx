@@ -1,4 +1,5 @@
 import { ping } from "@henge/shared";
+import { LoginButton } from "@/components/LoginButton";
 
 export default function Home() {
   return (
@@ -9,6 +10,7 @@ export default function Home() {
       <p>
         <a href="/api/health">/api/health</a>
       </p>
+      <LoginButton />
     </main>
   );
 }

@@ -4,10 +4,14 @@
   "private": true,
   "type": "module",
   "exports": {
-    ".": "./src/index.ts"
+    ".": "./src/index.ts",
+    "./db/auth-schema": "./src/db/auth-schema.ts"
   },
   "scripts": {
     "typecheck": "tsc --noEmit",
     "test": "bun test"
+  },
+  "dependencies": {
+    "drizzle-orm": "^0.45.2"
   }
 }

@@ -36,6 +36,7 @@
       "dependencies": {
         "@henge/shared": "workspace:*",
         "better-auth": "^1.7.2",
+        "drizzle-orm": "^0.45.2",
         "hono": "^4.13.5",
         "next": "^16.3.4",
         "react": "^19.2.0",
@@ -53,6 +54,9 @@
     "packages/shared": {
       "name": "@henge/shared",
       "version": "0.0.0",
+      "dependencies": {
+        "drizzle-orm": "^0.45.2",
+      },
     },
   },
   "packages": {

@@ -16,5 +16,16 @@
       "service": "henge-backend",
     },
   ],
+  // Better Auth 用の D1 バインディング。「D1へのアクセスはHono Workerに閉じる」の
+  // 例外で、認証テーブル（user / session / account / verification）の読み書きのみに
+  // 使う。ビジネスデータ（themes / prompts 等）には Hono 経由でのみアクセスする。
+  // 詳細は docs/02-architecture.md。
+  "d1_databases": [
+    {
+      "binding": "DB",
+      "database_name": "henge-db",
+      "database_id": "6c46368a-5a74-4019-b922-4dff7b2a15da",
+    },
+  ],
   "observability": { "enabled": true },
 }

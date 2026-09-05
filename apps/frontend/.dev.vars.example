@@ -1,12 +1,16 @@
 # Next.js Worker のローカル開発用。`.dev.vars` にコピーして値を入れる。
 # 本番は `wrangler secret put <名前>` で設定する（リポジトリにコミットしない）。
 
-# Google OAuth（Better Auth）
+# Google OAuth 2.0 クライアント。Google Cloud Console で作る。
+# リダイレクトURIには BETTER_AUTH_URL/api/auth/callback/google を登録する
 GOOGLE_CLIENT_ID=""
 GOOGLE_CLIENT_SECRET=""
 
-# セッション署名用。`openssl rand -base64 32` などで生成する
+# セッションの署名鍵。openssl rand -base64 32 等で作る
 BETTER_AUTH_SECRET=""
 
-# 管理者のメールアドレス。カンマ区切り
+# Better Auth の baseURL。ローカルの next dev は http://localhost:3000
+BETTER_AUTH_URL="http://localhost:3000"
+
+# 管理者のメールアドレス（カンマ区切り）
 ADMIN_EMAILS=""

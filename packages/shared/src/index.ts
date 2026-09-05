@@ -33,3 +33,4 @@ export {
   statusFor,
 } from "./errors";
 export { DAILY_GENERATION_LIMIT, PLAY_SIZE, STOCK_TARGET } from "./session";
+export { canGenerate, remainingQuota } from "./quota";

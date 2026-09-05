@@ -26,7 +26,7 @@ export async function GET(request: Request) {
 
 /** 新規作成。初回15問を同期生成するため認証が要る */
 export async function POST(request: Request) {
-  const userId = await currentUserId();
+  const userId = await currentUserId(request);
   if (userId === null) return errorResponse("UNAUTHORIZED");
 
   const parsed = themeNameSchema.safeParse(await request.json());

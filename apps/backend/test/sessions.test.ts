@@ -171,9 +171,9 @@ describe("オフセットの扱い", () => {
 });
 
 describe("補充のキック", () => {
-  it("残りが30を下回り、ログインしていればキックしてクォータを消費する", async () => {
+  it("残りが30を下回り、許可されていればキックしてクォータを消費する", async () => {
     await seed(44); // 15問配ると残り29
-    const { body } = await start({ themeId: "t1", userId: "u1" });
+    const { body } = await start({ themeId: "t1", userId: "u1", allowRefill: true });
     expect(body.remainingInPool).toBe(STOCK_TARGET - 1);
     expect(body.quotaConsumed).toBe(true);
     // ロックを取っている
@@ -182,7 +182,7 @@ describe("補充のキック", () => {
 
   it("残りがちょうど30ならキックしない（境界値）", async () => {
     await seed(45);
-    const { body } = await start({ themeId: "t1", userId: "u1" });
+    const { body } = await start({ themeId: "t1", userId: "u1", allowRefill: true });
     expect(body.remainingInPool).toBe(STOCK_TARGET);
     expect(body.quotaConsumed).toBe(false);
   });
@@ -196,7 +196,7 @@ describe("補充のキック", () => {
 
   it("生成困難なテーマではキックしない", async () => {
     await seed(44, { generationStatus: "difficult" });
-    const { body } = await start({ themeId: "t1", userId: "u1" });
+    const { body } = await start({ themeId: "t1", userId: "u1", allowRefill: true });
     expect(body.quotaConsumed).toBe(false);
   });
 
@@ -204,7 +204,22 @@ describe("補充のキック", () => {
     await seed(44);
     await env.KV.put(themeLockKey("t1"), "1", { expirationTtl: 60 });
 
+    const { body } = await start({ themeId: "t1", userId: "u1", allowRefill: true });
+    expect(body.quotaConsumed).toBe(false);
+  });
+
+  it("許可フラグが無ければキックしない（Next.jsが残数0と判定した場合）", async () => {
+    await seed(44);
     const { body } = await start({ themeId: "t1", userId: "u1" });
+    expect(body.quotaConsumed).toBe(false);
+    expect(await env.KV.get(themeLockKey("t1"))).toBeNull();
+  });
+
+  it("許可フラグがfalseでもプレイ自体は成功する（プレイはクォータを消費しないため）", async () => {
+    await seed(44);
+    const { status, body } = await start({ themeId: "t1", userId: "u1", allowRefill: false });
+    expect(status).toBe(200);
+    expect((body.prompts as unknown[]).length).toBe(PLAY_SIZE);
     expect(body.quotaConsumed).toBe(false);
   });
 });

@@ -12,7 +12,7 @@
  * 太さが動くと「いま何かが起きた」と誤読させる。
  */
 .scroll {
-  --roller-width: 38px;
+  --roller-width: 44px;
   display: grid;
   /**
    * 中央の列は **minmax(0, 1fr)**。素の `1fr` は min-content 未満に縮まないため、
@@ -26,42 +26,51 @@
 /* 軸は紙の面より上下に張り出す。1本の軸に紙が巻かれている形にする */
 .scroll__roller {
   position: relative;
-  margin-block: -22px;
-  border-radius: 4px;
-  /* 巻いた紙の断面。生成りに墨を混ぜて厚みの陰影を作る（色は足さない） */
+  margin-block: -26px;
+  /**
+   * 巻いた紙の断面。左端から右へ「陰 → 明 → 中間 → 陰」と置いて円柱に見せる。
+   * 生成りをそのまま使うと白すぎるので、墨を1割ほど混ぜて紙の色に寄せる。
+   */
   background: linear-gradient(
     to right,
-    color-mix(in oklab, var(--color-kinari) 42%, var(--color-sumi)),
-    var(--color-kinari) 38%,
-    color-mix(in oklab, var(--color-kinari) 82%, var(--color-sumi)) 62%,
-    color-mix(in oklab, var(--color-kinari) 48%, var(--color-sumi))
+    color-mix(in oklab, var(--color-kinari) 55%, var(--color-sumi)),
+    color-mix(in oklab, var(--color-kinari) 78%, var(--color-sumi)) 18%,
+    color-mix(in oklab, var(--color-kinari) 86%, var(--color-sumi)) 44%,
+    color-mix(in oklab, var(--color-kinari) 74%, var(--color-sumi)) 74%,
+    color-mix(in oklab, var(--color-kinari) 50%, var(--color-sumi))
   );
 }
 
-/* 軸の縁。**金はこの細い線だけに使う**（面では使わない） */
+/**
+ * 軸のキャップ。**紙より明るいグレーで、左右に張り出す。**
+ * 内側の縁にだけ金の帯を入れる（金は線までに留め、面では使わない）。
+ * グレーは色を足さず、墨に生成りを混ぜて作る。
+ */
 .scroll__roller::before,
 .scroll__roller::after {
   content: "";
   position: absolute;
-  left: -5px;
-  right: -5px;
-  height: 26px;
-  border-radius: 3px;
+  left: -7px;
+  right: -7px;
+  height: 30px;
+  border-radius: 4px;
   background: linear-gradient(
     to right,
-    color-mix(in oklab, var(--color-sumi) 82%, var(--color-kinari)),
-    color-mix(in oklab, var(--color-sumi) 62%, var(--color-kinari)) 45%,
-    color-mix(in oklab, var(--color-sumi) 84%, var(--color-kinari))
+    color-mix(in oklab, var(--color-sumi) 64%, var(--color-kinari)),
+    color-mix(in oklab, var(--color-sumi) 46%, var(--color-kinari)) 32%,
+    color-mix(in oklab, var(--color-sumi) 54%, var(--color-kinari)) 68%,
+    color-mix(in oklab, var(--color-sumi) 68%, var(--color-kinari))
   );
-  border-block: 1px solid color-mix(in oklab, var(--color-kin) 75%, transparent);
 }
 
 .scroll__roller::before {
   top: 0;
+  border-bottom: 3px solid var(--color-kin);
 }
 
 .scroll__roller::after {
   bottom: 0;
+  border-top: 3px solid var(--color-kin);
 }
 
 /* 広げられた紙の面。巻物の内側なので、地よりわずかに明るいだけに留める */

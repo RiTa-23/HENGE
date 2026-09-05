@@ -36,3 +36,12 @@ export const themeListQuerySchema = z.object({
   limit: z.coerce.number().int().min(1).max(50).optional(),
   cursor: z.coerce.number().int().min(0).optional(),
 });
+
+/** 管理用一覧のページング。公開一覧と違い kind / sort での分岐は持たない */
+export const adminListQuerySchema = z.object({
+  limit: z.coerce.number().int().min(1).max(50).optional(),
+  cursor: z.coerce.number().int().min(0).optional(),
+});
+
+/** 削除対象のテーマID（パスパラメータ） */
+export const themeIdParamSchema = z.object({ id: z.string().min(1) });

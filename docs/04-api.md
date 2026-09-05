@@ -79,6 +79,32 @@
 }
 ```
 
+### /api/admin/*
+
+管理者判定は `ADMIN_EMAILS`（カンマ区切り）で行う。**判定はNext.js側だけ**で、Honoの `/admin/*` は認可を持たない。
+
+```jsonc
+// GET /api/admin/themes?limit=&cursor=
+// kind で絞らず、テーマと含む文字の両方を作成順（新しい順）に返す。
+// 公開一覧と違い、お題数と作成者を含む（削除の判断材料になるため）
+{ "themes": [{ "id": "...", "kind": "theme", "name": "忍びの心得", "promptCount": 17,
+               "createdBy": "...", "totalPlayCount": 3, "generationStatus": "ok", "createdAt": 1757000000 }],
+  "nextCursor": 20 }
+
+// DELETE /api/admin/themes/[id]
+{ "deleted": true, "themeId": "..." }
+
+// GET /api/admin/users?limit=&cursor=
+// 閲覧のみ。更新・削除の口は持たない
+{ "users": [{ "id": "...", "name": "Rita", "email": "...", "image": null,
+              "createdAt": 1757000000, "todayGenerationCount": 3 }],
+  "nextCursor": null }
+```
+
+**削除では `prompts` / `user_theme_progress` がFKのCASCADEで消えるが、KVは消えない。** Hono側で `theme:<kind>:<normalized_name>` と `theme:<id>:lock` を明示的に削除する。消し忘れると、削除したテーマがキャッシュ経由で復活したように見える。
+
+未ログインは `UNAUTHORIZED`、ログイン済みの非管理者は `FORBIDDEN` を返す。`FORBIDDEN` の文言は `NOT_FOUND` と同じ「見つかりません」で、権限が無いのか存在しないのかを区別させない。
+
 **テーマ詳細（`/api/themes/[kind]/[name]`）は2回に分けて引く。** 名前で1件を特定してから、IDで詳細を取る。一覧にお題数を含めるとテーマごとの集計が要って重くなるため、一覧と詳細で持つ情報を変えている。
 
 **入力検証（Zod）**

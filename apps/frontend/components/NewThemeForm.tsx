@@ -1,7 +1,7 @@
 "use client";
 
 import { isApiError } from "@henge/shared";
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { authClient } from "@/lib/api/auth-client";
 import { Shuriken } from "@/components/play/Shuriken";
 
@@ -9,6 +9,10 @@ interface CreatedTheme {
   theme: { name: string };
   created: boolean;
 }
+
+/** 生成中のときに送り直す間隔と、諦めるまでの上限 */
+const RETRY_INTERVAL_MS = 3_000;
+const MAX_WAIT_MS = 90_000;
 
 /**
  * テーマ作成。生成を伴うので認証が要る。
@@ -21,6 +25,7 @@ export function NewThemeForm() {
   const [name, setName] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const waitingSince = useRef<number | null>(null);
 
   if (isPending) return null;
 
@@ -39,11 +44,7 @@ export function NewThemeForm() {
     );
   }
 
-  const submit = async (event: React.FormEvent) => {
-    event.preventDefault();
-    setBusy(true);
-    setError(null);
-
+  const create = async () => {
     const response = await fetch("/api/themes", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -52,8 +53,23 @@ export function NewThemeForm() {
     const body: unknown = await response.json();
 
     if (!response.ok) {
+      const code = isApiError(body) ? body.error.code : "UNKNOWN";
+
+      // **「生成中」はエラーではなく待ち。** 手裏剣を回したまま送り直す。
+      // 待てば解決すると分かっている状況で「もう一度お試しください」と
+      // 操作を押し付けない
+      if (code === "GENERATION_IN_PROGRESS") {
+        const since = waitingSince.current ?? Date.now();
+        waitingSince.current = since;
+        if (Date.now() - since < MAX_WAIT_MS) {
+          setTimeout(() => void create(), RETRY_INTERVAL_MS);
+          return;
+        }
+      }
+
       // 案内文はサーバーが組み立てたものをそのまま出す。QUOTA_EXCEEDED は
       // リセット時刻を含み、GENERATION_FAILED は名前の変更を促す
+      waitingSince.current = null;
       setError(isApiError(body) ? body.error.message : "お題を作れませんでした");
       setBusy(false);
       return;
@@ -62,6 +78,14 @@ export function NewThemeForm() {
     // **既存と一致した場合もエラーにしない。** そのテーマへ送る
     const { theme } = body as CreatedTheme;
     globalThis.location.href = `/play/${encodeURIComponent(theme.name)}`;
+  };
+
+  const submit = (event: React.FormEvent) => {
+    event.preventDefault();
+    setBusy(true);
+    setError(null);
+    waitingSince.current = null;
+    void create();
   };
 
   if (busy) {

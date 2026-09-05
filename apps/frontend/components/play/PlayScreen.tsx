@@ -35,9 +35,15 @@ interface SessionResponse {
 
 type Phase =
   | { name: "loading" }
+  /** 在庫が足りず生成中。エラーではなく待ち */
+  | { name: "preparing" }
   | { name: "error"; code: string; message: string }
   | { name: "playing"; session: SessionResponse }
   | { name: "result"; session: SessionResponse };
+
+/** 生成中のときに引き直す間隔と、諦めるまでの上限 */
+const RETRY_INTERVAL_MS = 3_000;
+const MAX_WAIT_MS = 90_000;
 
 /** 次に打てるキー。候補それぞれの「いま打つべき1文字」を集める */
 function nextKeysOf(progress: TypingProgress): NextKey[] {
@@ -63,6 +69,10 @@ export function PlayScreen({ themeId, themeName }: { themeId: string; themeName:
   const [stats, setStats] = useState<PlayStats>({ hits: 0, misses: 0, elapsedMs: 0 });
   const startedAt = useRef<number>(0);
   const surface = useRef<HTMLDivElement>(null);
+  // 生成中の待ち。attempt を増やすと load が走り直す
+  const [attempt, setAttempt] = useState(0);
+  const waitingSince = useRef<number | null>(null);
+  const retryTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const load = useCallback(async () => {
     setPhase({ name: "loading" });
@@ -79,9 +89,29 @@ export function PlayScreen({ themeId, themeName }: { themeId: string; themeName:
       const { code, message } = isApiError(body)
         ? body.error
         : { code: "UNKNOWN", message: "お題を取得できませんでした" };
+
+      // **「生成中」はエラーではなく待ち。** 手裏剣を回したまま数秒後に引き直す。
+      // 「少し待ってからもう一度」と出して操作を押し付けるのは、待てば解決する
+      // ことが分かっている状況ではただの手間になる
+      if (code === "GENERATION_IN_PROGRESS") {
+        const since = waitingSince.current ?? Date.now();
+        waitingSince.current = since;
+        if (Date.now() - since < MAX_WAIT_MS) {
+          setPhase({ name: "preparing" });
+          retryTimer.current = setTimeout(
+            () => setAttempt((count) => count + 1),
+            RETRY_INTERVAL_MS,
+          );
+          return;
+        }
+      }
+
+      waitingSince.current = null;
       setPhase({ name: "error", code, message });
       return;
     }
+
+    waitingSince.current = null;
 
     const session = body as SessionResponse;
     // **返された時点で消費が確定する。** 中断しても巻き戻さない
@@ -95,7 +125,14 @@ export function PlayScreen({ themeId, themeName }: { themeId: string; themeName:
 
   useEffect(() => {
     void load();
-  }, [load]);
+  }, [load, attempt]);
+
+  // 待ち直しの予約を残したまま画面を離れない
+  useEffect(() => {
+    return () => {
+      if (retryTimer.current !== null) clearTimeout(retryTimer.current);
+    };
+  }, []);
 
   // 打鍵を拾う要素にフォーカスを当て続ける。外れると1打も拾えなくなる
   useEffect(() => {
@@ -131,6 +168,15 @@ export function PlayScreen({ themeId, themeName }: { themeId: string; themeName:
 
   if (phase.name === "loading") {
     return <Loading message="お題を用意しています" note="生成が要る場合は十数秒かかります。" />;
+  }
+
+  if (phase.name === "preparing") {
+    return (
+      <Loading
+        message="お題を作っています"
+        note="できあがり次第そのまま始まります。閉じずにお待ちください。"
+      />
+    );
   }
 
   if (phase.name === "error") {

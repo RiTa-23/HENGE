@@ -60,7 +60,7 @@ export function Result({
           ))}
         </dl>
 
-        <div className="mt-12 flex justify-center">
+        <div className="mt-12 flex flex-wrap items-center justify-center gap-4">
           <button
             type="button"
             onClick={onRetry}
@@ -68,7 +68,19 @@ export function Result({
           >
             もう一度
           </button>
+          <a
+            href="/themes"
+            className="rounded-md border border-kinari/20 px-8 py-3 font-gothic tracking-widest text-kinari/80 transition-colors hover:border-kin hover:text-kinari"
+          >
+            ほかのお題を見る
+          </a>
         </div>
+
+        <p className="mt-8 text-center text-sm">
+          <a href="/" className="tracking-widest text-kinari/50 hover:text-kinari">
+            トップへ戻る
+          </a>
+        </p>
       </div>
     </div>
   );

@@ -1,0 +1,46 @@
+@import "tailwindcss";
+
+/**
+ * 配色は4色、書体は3種だけ。**ここに無い色・書体を使わない。**
+ * `bg-blue-600` のような汎用色や生の16進数値を書くと、世界観が崩れる前に
+ * 「朱＝今すぐ打つべきもの」という色の意味が薄まる。
+ *
+ * 面の濃淡は色を足さずに不透明度で作る（`bg-kinari/5` など）。
+ */
+@theme {
+  /* 墨: 地の色 */
+  --color-sumi: #15171d;
+  /* 朱: 今すぐ打つべきものだけに使う。待ち時間や装飾には使わない */
+  --color-shu: #d24a25;
+  /* 金: 進行中・完了・装飾。面で使わず、細い線までに留める */
+  --color-kin: #c9a45f;
+  /* 生成り: 文字と巻物の紙 */
+  --color-kinari: #ece2cf;
+
+  /* 見出し・お題本文。Google Fonts CDN（動的生成の漢字に対応するため） */
+  --font-mincho: "Shippori Mincho", serif;
+  /* UI周り。同上 */
+  --font-gothic: "Zen Kaku Gothic New", sans-serif;
+  /* ローマ字列・キーボード。next/font で自己ホスト */
+  --font-mono: var(--font-jetbrains-mono), ui-monospace, monospace;
+}
+
+/* 撒菱の色。「朱より暗く鈍い赤」を、色を足さずに墨を混ぜて作る */
+@theme {
+  --color-makibishi: color-mix(in oklab, var(--color-shu) 62%, var(--color-sumi));
+}
+
+html {
+  color-scheme: dark;
+}
+
+body {
+  background-color: var(--color-sumi);
+  color: var(--color-kinari);
+  font-family: var(--font-gothic);
+}
+
+/* 打鍵を拾う要素にフォーカスリングを出さない（常にフォーカスしているため） */
+[data-typing-surface]:focus {
+  outline: none;
+}

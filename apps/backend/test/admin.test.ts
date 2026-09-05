@@ -204,3 +204,20 @@ describe("GET /admin/users", () => {
     expect(body.nextCursor).toBe(2);
   });
 });
+
+describe("管理用一覧の日時の形", () => {
+  // themes.created_at は秒（integer）、user.created_at はミリ秒（timestamp_ms）で、
+  // JSON になったときの形が違う。管理画面がどちらもパースできるよう固定する
+  it("themes は秒の数値、users は ISO 文字列で返る", async () => {
+    await seedTheme({ id: "t1", createdAt: 1757000000 });
+    await seedUser("u1", new Date("2026-09-05T12:00:00.000Z"));
+
+    const themeList = await request("/admin/themes");
+    const userList = await request("/admin/users");
+
+    expect((themeList.body.themes as { createdAt: unknown }[])[0]?.createdAt).toBe(1757000000);
+    expect((userList.body.users as { createdAt: unknown }[])[0]?.createdAt).toBe(
+      "2026-09-05T12:00:00.000Z",
+    );
+  });
+});

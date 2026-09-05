@@ -96,8 +96,9 @@
 
 // GET /api/admin/users?limit=&cursor=
 // 閲覧のみ。更新・削除の口は持たない
+// createdAt は認証テーブル（Better Auth）の列でミリ秒精度のため、themes と違い ISO 文字列で返る
 { "users": [{ "id": "...", "name": "Rita", "email": "...", "image": null,
-              "createdAt": 1757000000, "todayGenerationCount": 3 }],
+              "createdAt": "2026-09-05T12:00:00.000Z", "todayGenerationCount": 3 }],
   "nextCursor": null }
 ```
 

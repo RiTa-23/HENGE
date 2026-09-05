@@ -64,7 +64,7 @@ function isTypingKey(event: KeyboardEvent): boolean {
 }
 
 export function PlayScreen({ themeId, themeName }: { themeId: string; themeName: string }) {
-  const { data: session } = authClient.useSession();
+  const { data: authSession } = authClient.useSession();
   const [phase, setPhase] = useState<Phase>({ name: "loading" });
   const [promptIndex, setPromptIndex] = useState(0);
   const [progress, setProgress] = useState<TypingProgress>(() => startTyping([]));
@@ -212,7 +212,7 @@ export function PlayScreen({ themeId, themeName }: { themeId: string; themeName:
   if (phase.name === "error") {
     // 枯渇はログインしていれば作り足して続けられる。匿名は別テーマかログインへ
     const exhausted = phase.code === "THEME_EXHAUSTED";
-    const canRegenerate = exhausted && session !== null;
+    const canRegenerate = exhausted && authSession !== null;
 
     return (
       <div className="flex min-h-dvh items-center justify-center p-6">
@@ -224,7 +224,7 @@ export function PlayScreen({ themeId, themeName }: { themeId: string; themeName:
               このテーマのお題を作り足せます。本日の生成回数を1つ使います。
             </p>
           )}
-          {exhausted && session === null && (
+          {exhausted && authSession === null && (
             <p className="mt-5 text-sm leading-relaxed text-kinari/60">
               ログインすると、このテーマのお題を作り足して続けられます。
             </p>
@@ -240,7 +240,7 @@ export function PlayScreen({ themeId, themeName }: { themeId: string; themeName:
                 お題を作り足す
               </button>
             )}
-            {exhausted && session === null && (
+            {exhausted && authSession === null && (
               <button
                 type="button"
                 onClick={() => authClient.signIn.social({ provider: "google" })}

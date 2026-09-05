@@ -89,6 +89,27 @@ describe("配信", () => {
     expect(texts.at(-1)).toBe("お題30");
   });
 
+  it("オフセット30でも続きから配る", async () => {
+    await seed(45);
+    const { body } = await start({ themeId: "t1", offset: 30 });
+    const texts = (body.prompts as { text: string }[]).map((p) => p.text).sort();
+    expect(texts[0]).toBe("お題31");
+    expect(body.nextOffset).toBe(45);
+  });
+
+  it("続けて遊ぶとオフセットが進み続ける（巻き戻らない）", async () => {
+    await seed(45);
+    const first = await start({ themeId: "t1", userId: "u1" });
+    const second = await start({ themeId: "t1", userId: "u1" });
+
+    expect(first.body.nextOffset).toBe(15);
+    expect(second.body.nextOffset).toBe(30);
+    // 2回目に1回目と同じお題が混ざっていない
+    const firstTexts = new Set((first.body.prompts as { text: string }[]).map((p) => p.text));
+    const secondTexts = (second.body.prompts as { text: string }[]).map((p) => p.text);
+    expect(secondTexts.some((text) => firstTexts.has(text))).toBe(false);
+  });
+
   it("シャッフルして返す（連番のまま出さない）", async () => {
     await seed(45);
     // 偶然そろう可能性があるため複数回試す

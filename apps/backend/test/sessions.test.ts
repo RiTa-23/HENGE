@@ -238,8 +238,8 @@ describe("枯渇", () => {
     expect((body.error as { code: string }).code).toBe("GENERATION_IN_PROGRESS");
   });
 
-  it("存在しないテーマはエラーになる", async () => {
+  it("存在しないテーマは NOT_FOUND を返す", async () => {
     const { status } = await start({ themeId: "none", offset: 0 });
-    expect(status).toBe(400);
+    expect(status).toBe(404);
   });
 });

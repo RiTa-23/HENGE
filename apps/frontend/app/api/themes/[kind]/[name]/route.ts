@@ -13,9 +13,12 @@ export async function GET(
 
   const client = await backendClient();
   // 表示名の正規化はHono側で行う。規則を2か所に分けない
-  const found = await client.themes.$get({ query: { kind, name: decodeURIComponent(name) } });
+  // **name をデコードし直さない。** Next.js はルートパラメータを既にデコードして渡すため、
+  // ここで decodeURIComponent をかけると二重デコードになり、`%` を含むテーマ名
+  // （「100%の集中」など）が URIError: URI malformed で500になる
+  const found = await client.themes.$get({ query: { kind, name } });
   const [summary] = ((await found.json()) as { themes: { id: string }[] }).themes;
-  if (summary === undefined) return errorResponse("VALIDATION_ERROR", "テーマが見つかりません");
+  if (summary === undefined) return errorResponse("NOT_FOUND", "テーマが見つかりません");
 
   // 一覧はお題数を持たない（テーマごとに集計すると重い）。詳細は別に取る
   return relay(await client.themes[":id"].$get({ param: { id: summary.id } }));

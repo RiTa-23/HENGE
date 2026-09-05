@@ -135,8 +135,8 @@ describe("POST /prompts/regenerate", () => {
     expect(await env.KV.get(themeLockKey("t1"))).toBeNull();
   });
 
-  it("存在しないテーマはエラーになる", async () => {
+  it("存在しないテーマは NOT_FOUND を返す", async () => {
     const { status } = await post("/prompts/regenerate", { themeId: "none", userId: "u1" });
-    expect(status).toBe(400);
+    expect(status).toBe(404);
   });
 });

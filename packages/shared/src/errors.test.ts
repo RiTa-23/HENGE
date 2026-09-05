@@ -7,6 +7,7 @@ describe("エラーコードとHTTPステータス", () => {
       VALIDATION_ERROR: 400,
       UNAUTHORIZED: 401,
       FORBIDDEN: 403,
+      NOT_FOUND: 404,
       THEME_EXHAUSTED: 409,
       GENERATION_IN_PROGRESS: 409,
       GENERATION_FAILED: 422,
@@ -37,6 +38,10 @@ describe("apiError", () => {
 
   test("FORBIDDEN は管理画面の存在を悟らせない文言にする", () => {
     expect(apiError("FORBIDDEN").error.message).toBe("見つかりません");
+  });
+
+  test("NOT_FOUND と FORBIDDEN は同じ文言（権限か存在かを区別させない）", () => {
+    expect(apiError("NOT_FOUND").error.message).toBe(apiError("FORBIDDEN").error.message);
   });
 });
 

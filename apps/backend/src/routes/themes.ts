@@ -36,6 +36,6 @@ export const themeRoutes = new Hono<{ Bindings: Env }>()
   })
   .get("/themes/:id", async (c) => {
     const theme = await getThemeDetail(createDb(c.env.DB), c.req.param("id"));
-    if (theme === null) return fail(c, "VALIDATION_ERROR", "テーマが見つかりません");
+    if (theme === null) return fail(c, "NOT_FOUND", "テーマが見つかりません");
     return c.json({ theme });
   });

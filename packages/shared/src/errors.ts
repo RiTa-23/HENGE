@@ -11,6 +11,8 @@ export const ERROR_STATUS = {
   UNAUTHORIZED: 401,
   /** 管理者以外が /api/admin/* を叩いた。クライアントには404相当に見せる */
   FORBIDDEN: 403,
+  /** 指定されたものが存在しない。入力の形式は正しい */
+  NOT_FOUND: 404,
   /** プールが尽きた。匿名は別テーマ／ログイン、ログインは再生成へ誘導する */
   THEME_EXHAUSTED: 409,
   /** 在庫不足だが生成ロックがある。クォータを消費せず、数秒後に再試行させる */
@@ -29,6 +31,8 @@ const DEFAULT_MESSAGE: Record<ErrorCode, string> = {
   VALIDATION_ERROR: "入力の形式が正しくありません",
   UNAUTHORIZED: "ログインが必要です",
   FORBIDDEN: "見つかりません",
+  // FORBIDDEN と同じ文言。権限が無いのか存在しないのかを区別させない
+  NOT_FOUND: "見つかりません",
   THEME_EXHAUSTED: "このテーマのお題を使い切りました",
   GENERATION_IN_PROGRESS: "お題を準備しています。少し待ってからもう一度お試しください",
   GENERATION_FAILED: "お題を作れませんでした。テーマ名を変えてお試しください",

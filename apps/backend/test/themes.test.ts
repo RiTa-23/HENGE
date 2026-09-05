@@ -107,9 +107,9 @@ describe("GET /themes/:id", () => {
     expect((body.theme as { promptCount: number }).promptCount).toBe(0);
   });
 
-  it("存在しないテーマはエラー形式で返す", async () => {
+  it("存在しないテーマは NOT_FOUND を返す（入力の形式は正しいため）", async () => {
     const { status, body } = await get("/themes/none");
-    expect(status).toBe(400);
-    expect((body.error as { code: string }).code).toBe("VALIDATION_ERROR");
+    expect(status).toBe(404);
+    expect((body.error as { code: string }).code).toBe("NOT_FOUND");
   });
 });

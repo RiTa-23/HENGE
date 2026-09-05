@@ -22,6 +22,12 @@ interface RegenerateBody {
   userId: string;
 }
 
+/** 表示名で引いて、見つかれば詳細（お題数つき）を返す */
+async function findByNameDetail(db: ReturnType<typeof createDb>, kind: ThemeKind, name: string) {
+  const summary = await findThemeByName(db, kind, name);
+  return summary === null ? null : await getThemeDetail(db, summary.id);
+}
+
 export const generateRoutes = new Hono<{ Bindings: Env }>()
   .post("/themes", async (c) => {
     const body = await c.req.json<CreateBody>();
@@ -30,14 +36,12 @@ export const generateRoutes = new Hono<{ Bindings: Env }>()
 
     // 既存と一致したらエラーにせず既存を返す。クォータも消費しない
     const cachedId = await getCachedThemeId(c.env.KV, body.kind, normalizedName);
-    const existing =
-      cachedId === null
-        ? await findThemeByName(db, body.kind, body.name)
-        : await getThemeDetail(db, cachedId);
-    if (existing !== null) {
-      const detail = "promptCount" in existing ? existing : await getThemeDetail(db, existing.id);
-      return c.json({ theme: detail, created: false });
-    }
+    // キャッシュが古い（指すテーマが消えている）場合は必ずD1で引き直す。
+    // ここでフォールバックしないと、同名テーマがD1に残っているときに
+    // 新規作成へ進んで一意制約違反になる
+    const cached = cachedId === null ? null : await getThemeDetail(db, cachedId);
+    const existing = cached ?? (await findByNameDetail(db, body.kind, body.name));
+    if (existing !== null) return c.json({ theme: existing, created: false });
 
     const themeId = crypto.randomUUID();
     const model = resolveModel(c.env.GENERATION_MODEL);
@@ -72,7 +76,7 @@ export const generateRoutes = new Hono<{ Bindings: Env }>()
     const db = createDb(c.env.DB);
 
     const theme = await getThemeDetail(db, body.themeId);
-    if (theme === null) return fail(c, "VALIDATION_ERROR", "テーマが見つかりません");
+    if (theme === null) return fail(c, "NOT_FOUND", "テーマが見つかりません");
 
     // 背景補充が走っている最中なら、二重に生成しない
     if (!(await acquireThemeLock(c.env.KV, body.themeId))) {

@@ -31,7 +31,7 @@ export const sessionRoutes = new Hono<{ Bindings: Env }>().post("/sessions/start
   const db = createDb(c.env.DB);
 
   const theme = await getThemeDetail(db, body.themeId);
-  if (theme === null) return fail(c, "VALIDATION_ERROR", "テーマが見つかりません");
+  if (theme === null) return fail(c, "NOT_FOUND", "テーマが見つかりません");
 
   const offset =
     body.userId === undefined

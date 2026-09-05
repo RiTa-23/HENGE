@@ -8,7 +8,6 @@ import { join } from "node:path";
  * **noindex の付け忘れは気付けない。** 付け忘れても画面は正常に動き、
  * 検索エンジンに拾われて初めて分かる。ここで機械的に固定する。
  *
- * `/practice/[char]`（含む文字の練習ページ）は #67 で足す。
  */
 
 const APP = join(import.meta.dir, "../../app");
@@ -19,6 +18,7 @@ const PAGES: { route: string; file: string; noindex: boolean }[] = [
   { route: "/themes", file: "themes/page.tsx", noindex: false },
   { route: "/themes/[name]", file: "themes/[name]/page.tsx", noindex: false },
   { route: "/practice", file: "practice/page.tsx", noindex: false },
+  { route: "/practice/[char]", file: "practice/[char]/page.tsx", noindex: false },
   { route: "/play/[theme]", file: "play/[theme]/page.tsx", noindex: true },
   { route: "/themes/new", file: "themes/new/page.tsx", noindex: true },
   { route: "/admin/themes", file: "admin/themes/page.tsx", noindex: true },

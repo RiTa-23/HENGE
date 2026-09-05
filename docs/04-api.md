@@ -176,6 +176,18 @@ MVPは**50回/日**（月次上限なし）。日付はJST基準。
 
 `RATE_LIMITED`と`QUOTA_EXCEEDED`はどちらも429だが、前者は数秒、後者は日付が変わるまで解消しない。案内文が変わるためcodeで区別する。
 
+## Rate Limiting
+
+Cloudflare の Rate Limiting binding（`GENERATION_RATE_LIMIT`、Next.js Worker の `wrangler.jsonc`）で、生成系の連打を弾く。
+
+| 対象 | キー | 上限 |
+|---|---|---|
+| `POST /api/themes` / `POST /api/prompts/regenerate` | ユーザーID | 5回 / 60秒 |
+
+- キーをIPにしないのは、生成系がいずれも要認証で、共有回線の背後にいる別のユーザーを巻き添えにする理由が無いため
+- **クォータ判定より先に判定する。** 弾かれたリクエストで `GET /usage/:userId` を引くのは無駄で、連打を弾く目的にも反する
+- `period` は 10 か 60 しか指定できない
+
 `NOT_FOUND`と`FORBIDDEN`は**同じ文言**（「見つかりません」）を返す。権限が無いのか存在しないのかを、クライアントから区別できないようにするため。
 
 **在庫不足時は「生成中」と「本当に尽きた」を区別する。** KVの`theme:<id>:lock`の有無で判定し、ロックがあれば`GENERATION_IN_PROGRESS`を返す（クォータを消費せず、再生成もキックしない）。

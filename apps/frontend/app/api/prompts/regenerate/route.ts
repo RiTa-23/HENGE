@@ -1,6 +1,7 @@
 import { canGenerate, quotaResetAt } from "@henge/shared";
 import { backendClient, relay } from "@/lib/api/backend";
 import { errorResponse } from "@/lib/api/error";
+import { limitGeneration } from "@/lib/api/rate-limit";
 import { regenerateSchema } from "@/lib/api/schema";
 import { currentUserId } from "@/lib/api/session";
 
@@ -10,6 +11,10 @@ export const dynamic = "force-dynamic";
 export async function POST(request: Request) {
   const userId = await currentUserId(request);
   if (userId === null) return errorResponse("UNAUTHORIZED");
+
+  // 連打はここで弾く。クォータの取得（D1アクセス）より先に判定する
+  const limited = await limitGeneration(userId);
+  if (limited !== null) return limited;
 
   const parsed = regenerateSchema.safeParse(await request.json());
   if (!parsed.success) return errorResponse("VALIDATION_ERROR");

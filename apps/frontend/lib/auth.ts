@@ -27,5 +27,9 @@ export function createAuth(env: CloudflareEnv) {
     // Googleプロバイダのみ。パスワードログインは持たない
     emailAndPassword: { enabled: false },
     baseURL: env.BETTER_AUTH_URL,
+    // **明示的に渡す。** 省略すると Better Auth は process.env を見にいくが、
+    // Workers のシークレットは env バインディングであって process.env ではない。
+    // 見つからないと既定の秘密鍵にフォールバックし、本番では起動時に例外になる
+    secret: env.BETTER_AUTH_SECRET,
   });
 }

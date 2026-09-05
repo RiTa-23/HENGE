@@ -1,5 +1,6 @@
 import { ping } from "@henge/shared";
 import { Hono } from "hono";
+import { sessionRoutes } from "./routes/sessions";
 import { themeRoutes } from "./routes/themes";
 // 【一時的】検証用。POST /themes が入ったら消す（#82）
 import { spike } from "./spike";
@@ -18,7 +19,8 @@ const routes = app
       ok: true,
     }),
   )
-  .route("/", themeRoutes);
+  .route("/", themeRoutes)
+  .route("/", sessionRoutes);
 
 export type AppType = typeof routes;
 

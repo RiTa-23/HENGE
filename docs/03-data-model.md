@@ -146,5 +146,11 @@ bun run db:migrate:local   # ローカルD1に適用
 
 本番への適用は GitHub Actions の `D1 migrate` ワークフロー（手動トリガー）で行う。**自動適用しない。**
 
+## D1のバインド変数の上限
+
+**1クエリにつき100個まで。** `db.batch()` の中の各文にも個別に適用される。
+
+お題1件の挿入で8個使うため、**13件以上を1文で挿入すると `too many SQL variables` で落ちる**。生成は1ラウンド20件なので、お題の挿入は必ず分割すること（`apps/backend/src/db/prompts.ts` で10件ずつに分けている）。テーマ行とお題は分割してもバッチの中に収める。
+
 Drizzleで`references()`を明示しないとFK自体が作られない。ローカルD1で外部キー制約が有効であることと、
 CASCADEが実際に効くことは `apps/backend/test/schema.test.ts` で検証している。

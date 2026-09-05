@@ -12,6 +12,10 @@
   // Service Bindings は RPC方式ではなく HTTP方式で呼ぶこと。
   "placement": { "mode": "smart" },
   "observability": { "enabled": true },
+  // 使う生成モデル。切り替えはここを変えてデプロイする（MODELS に無い値は既定にフォールバック）
+  "vars": {
+    "GENERATION_MODEL": "@cf/qwen/qwen3-30b-a3b-fp8",
+  },
   // D1 / KV / Workers AI へのアクセスは Hono Worker に閉じる。
   // Next.js Worker 側からは直接触らない。
   "d1_databases": [

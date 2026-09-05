@@ -31,8 +31,11 @@ jobs:
       - name: typecheck (tsc)
         run: bun run typecheck
 
+      # bun test を直接呼ばない。対象ディレクトリの指定は package.json の
+      # test スクリプトが持っており、素の bun test はリポジトリ全体を走査して
+      # apps/backend の Workersテスト（cloudflare:test に依存）まで拾ってしまう
       - name: test (純粋関数)
-        run: bun test
+        run: bun run test
 
       # vitest.config.ts で remoteBindings: false にしているため、
       # Cloudflareの認証情報なしで実行できる（forkからのPRでも動く）。

@@ -22,8 +22,11 @@ const VOWEL_LETTERS = new Set(["a", "i", "u", "e", "o"]);
 
 /**
  * 読み仮名を打鍵の単位に切る。拗音・外来語のかなは2文字で1単位。
+ *
+ * 公開しているのは、UIが `TypingProgress.unitIndex` と読みの表示位置を
+ * 対応づけるため。候補配列と同じ切り方でないと色がずれる。
  */
-function splitUnits(kana: string): string[] {
+export function splitKanaUnits(kana: string): string[] {
   const units: string[] = [];
   for (let i = 0; i < kana.length; i++) {
     const pair = kana.slice(i, i + 2);
@@ -80,7 +83,7 @@ function nCandidates(next: string | undefined): string[] {
  * @throws {UnsupportedKanaError} テーブルに無いかなが含まれている場合
  */
 export function buildRomanCandidates(kana: string): RomanCandidates {
-  const units = splitUnits(kana);
+  const units = splitKanaUnits(kana);
   return units.map((unit, index) => {
     const next = units[index + 1];
     if (unit === "っ") return sokuonCandidates(next);

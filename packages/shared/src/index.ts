@@ -13,8 +13,13 @@ export {
   countKeystrokesFromKana,
   KANA_TABLE,
   katakanaToHiragana,
+  pressKey,
   type RomanCandidates,
+  romanDisplay,
+  splitKanaUnits,
+  startTyping,
   SYMBOLS,
+  type TypingProgress,
   UnsupportedKanaError,
 } from "./typing/index";
 export {

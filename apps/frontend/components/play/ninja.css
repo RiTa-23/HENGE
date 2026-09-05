@@ -1,0 +1,176 @@
+/**
+ * 忍者モチーフ。ユーティリティクラスでは表現しづらいのでここだけ素のCSSで書く
+ * （docs/07-ui.md）。**色は @theme のトークンからしか取らない。**
+ */
+
+/* ---- 巻物 ---------------------------------------------------------------
+ * 一枚の紙に2本の軸が付いた「1つの物体」。**両端は同じ材質・同じ色・同じ太さ**。
+ * 色や太さを変えると別々の物体に見える。
+ * 紙は墨に生成りを混ぜた暗い面、軸は生成りの円柱。上下に張り出した軸の端は
+ * 紙より暗いキャップが覆い、**キャップの外側の縁にだけ金の帯**を入れる
+ * （金は面で使わない。主役は文章と次に打つキー）。
+ *
+ * 太さで在庫を表すのはやめた。在庫は巻物ではなく数字で示す方が読み取りやすく、
+ * 太さが動くと「いま何かが起きた」と誤読させる。
+ */
+.scroll {
+  --roller-width: 44px;
+  /**
+   * 軸の地色。金（黄）と墨（青寄りの暗色）を **oklch で**混ぜると中間は
+   * くすんだ緑になり、竹軸のような色になる（oklab だと黄褐色に寄る）。
+   * それを生成りで淡く上げる。緑を濃くしたいときは内側の金の割合を、
+   * 明るくしたいときは外側の生成りの割合を上げる。
+   */
+  --roller-color: color-mix(
+    in oklab,
+    color-mix(in oklch, var(--color-kin) 50%, var(--color-sumi)) 36%,
+    var(--color-kinari)
+  );
+  display: grid;
+  /**
+   * 中央の列は **minmax(0, 1fr)**。素の `1fr` は min-content 未満に縮まないため、
+   * 長いローマ字列（等幅＋字間広め）が列を押し広げ、お題の文の長さで巻物の幅が
+   * 変わってしまう。0 を下限にして、はみ出す分は中の行で折り返させる。
+   */
+  grid-template-columns: var(--roller-width) minmax(0, 1fr) var(--roller-width);
+  align-items: stretch;
+}
+
+/**
+ * 軸の円柱は紙の面と**同じ高さ**。キャップは軸に重ねず、この外側
+ * （上下にはみ出す側）に置いて「軸から飛び出た留め具」に見せる。
+ */
+.scroll__roller {
+  position: relative;
+  /**
+   * 巻いた紙の断面。左端から右へ「陰 → 明 → 中間 → 陰」と置いて円柱に見せる。
+   * 地色は --roller-color（くすんだ薄い緑）。影は墨を足して作る。
+   */
+  background: linear-gradient(
+    to right,
+    color-mix(in oklab, var(--roller-color) 58%, var(--color-sumi)),
+    color-mix(in oklab, var(--roller-color) 86%, var(--color-sumi)) 18%,
+    var(--roller-color) 44%,
+    color-mix(in oklab, var(--roller-color) 82%, var(--color-sumi)) 74%,
+    color-mix(in oklab, var(--roller-color) 52%, var(--color-sumi))
+  );
+}
+
+/**
+ * 軸のキャップ。**紙より暗いグレーで、軸より細く**（左右を内側に折り込む）。
+ * 位置は軸のボックスの**外**（top/bottom に負の値）。軸の端と面一で接する。
+ * 金の帯は外側の縁（上キャップは上辺、下キャップは下辺）に入れる。
+ * グレーは色を足さず、墨に生成りを混ぜて作る。
+ */
+.scroll__roller::before,
+.scroll__roller::after {
+  content: "";
+  position: absolute;
+  left: 5px;
+  right: 5px;
+  height: 16px;
+  border-radius: 4px;
+  background: linear-gradient(
+    to right,
+    color-mix(in oklab, var(--color-sumi) 80%, var(--color-kinari)),
+    color-mix(in oklab, var(--color-sumi) 66%, var(--color-kinari)) 30%,
+    color-mix(in oklab, var(--color-sumi) 74%, var(--color-kinari)) 68%,
+    color-mix(in oklab, var(--color-sumi) 84%, var(--color-kinari))
+  );
+}
+
+.scroll__roller::before {
+  top: -16px;
+  border-top: 3px solid var(--color-kin);
+}
+
+.scroll__roller::after {
+  bottom: -16px;
+  border-bottom: 3px solid var(--color-kin);
+}
+
+/* 広げられた紙の面。墨に生成りを混ぜた暗い紙。地より一段明るい独立した面にする */
+.scroll__sheet {
+  background: color-mix(in oklab, var(--color-kinari) 26%, var(--color-sumi));
+  border-block: 1px solid color-mix(in oklab, var(--color-kinari) 14%, var(--color-sumi));
+}
+
+/* ---- 苦無（キャレット） --------------------------------------------------
+ * 次に打つ1文字を指す。**文字の下**に置く。色は朱（＝今すぐ打つべきもの）。
+ */
+.kunai {
+  position: absolute;
+  top: calc(100% + 4px);
+  left: 50%;
+  translate: -50% 0;
+  width: 15px;
+  height: 35px;
+  color: var(--color-shu);
+}
+
+.kunai__blade {
+  position: absolute;
+  inset-inline: 0;
+  top: 0;
+  height: 26px;
+  background: currentcolor;
+  /* 上向きの刃。切っ先を細く、根元を広く */
+  clip-path: polygon(50% 0, 78% 40%, 66% 100%, 34% 100%, 22% 40%);
+}
+
+.kunai__ring {
+  position: absolute;
+  left: 50%;
+  bottom: 0;
+  translate: -50% 0;
+  width: 9px;
+  height: 9px;
+  border: 2px solid currentcolor;
+  border-radius: 50%;
+}
+
+/* ---- 撒菱（ミス表示） ----------------------------------------------------
+ * ミスしたローマ字の**真上**に置く。苦無は下、撒菱は上なので衝突しない。
+ * 色は朱より暗く鈍い赤（朱に墨を混ぜたもの）。
+ */
+.makibishi {
+  position: absolute;
+  bottom: calc(100% + 3px);
+  left: 50%;
+  translate: -50% 0;
+  width: 15px;
+  height: 15px;
+  background: var(--color-makibishi);
+  /* 四方に棘が出た形。棘を太めに取らないと小さい表示で潰れて見えなくなる */
+  clip-path: polygon(50% 0, 66% 34%, 100% 50%, 66% 66%, 50% 100%, 34% 66%, 0 50%, 34% 34%);
+}
+
+/* ---- 手裏剣（生成待ちのスピナー） ---------------------------------------
+ * 回転する道具そのものをスピナーにする。色は金（待ち時間に朱を使わない）。
+ */
+.shuriken {
+  color: var(--color-kin);
+  animation: shuriken-spin 1.6s linear infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .shuriken {
+    animation-duration: 6s;
+  }
+}
+
+@keyframes shuriken-spin {
+  to {
+    rotate: 360deg;
+  }
+}
+
+/* ローディングの進捗バー。実際の進捗は取れないので往復させるだけに留める */
+@keyframes loading-sweep {
+  0% {
+    translate: -100% 0;
+  }
+  100% {
+    translate: 300% 0;
+  }
+}

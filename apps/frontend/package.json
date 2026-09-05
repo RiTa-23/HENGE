@@ -11,16 +11,19 @@
     "deploy": "opennextjs-cloudflare build && opennextjs-cloudflare deploy",
     "typecheck": "tsc --noEmit",
     "cf-typegen": "wrangler types --env-interface CloudflareEnv cloudflare-env.d.ts",
-    "test": "bun test lib"
+    "test": "bun test lib components"
   },
   "dependencies": {
     "@henge/shared": "workspace:*",
+    "@tailwindcss/postcss": "^4.3.3",
     "better-auth": "~1.4.22",
     "drizzle-orm": "^0.45.2",
     "hono": "^4.13.5",
     "next": "^16.3.4",
+    "postcss": "^8.5.28",
     "react": "^19.2.0",
     "react-dom": "^19.2.0",
+    "tailwindcss": "^4.3.3",
     "zod": "^4.5.4"
   },
   "devDependencies": {

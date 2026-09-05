@@ -1,6 +1,7 @@
 import { canGenerate, remainingQuota } from "@henge/shared";
 import { backendClient, relay } from "@/lib/api/backend";
 import { errorResponse } from "@/lib/api/error";
+import { canKickRefill } from "@/lib/api/rate-limit";
 import { sessionStartSchema } from "@/lib/api/schema";
 import { currentUserId } from "@/lib/api/session";
 
@@ -33,8 +34,9 @@ export async function POST(request: Request) {
       themeId: parsed.data.themeId,
       userId,
       // 残数0でもプレイは許可する（クォータを消費しない行為のため）。
-      // 補充のキックだけ許可しない
-      allowRefill: canGenerate(count),
+      // 補充のキックだけ許可しない。レート制限も同じ畳み方にしてあり、
+      // 弾かれてもプレイは通って補充だけスキップされる
+      allowRefill: canGenerate(count) && (await canKickRefill(userId)),
     },
   });
   const body = await res.json();

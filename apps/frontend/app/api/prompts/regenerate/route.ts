@@ -1,3 +1,4 @@
+import { canGenerate, quotaResetAt } from "@henge/shared";
 import { backendClient, relay } from "@/lib/api/backend";
 import { errorResponse } from "@/lib/api/error";
 import { regenerateSchema } from "@/lib/api/schema";
@@ -13,7 +14,18 @@ export async function POST(request: Request) {
   const parsed = regenerateSchema.safeParse(await request.json());
   if (!parsed.success) return errorResponse("VALIDATION_ERROR");
 
-  // TODO(#43): クォータの判定をここで行う（加算はHono側）
   const client = await backendClient();
+
+  // クォータの判定はここ（Next.js側）。残数0なら Hono を呼ばずに弾く。
+  // 加算は Hono 側（生成に成功した場合のみ）
+  const usage = await client.usage[":userId"].$get({ param: { userId } });
+  const { count } = (await usage.json()) as { count: number };
+  if (!canGenerate(count)) {
+    return errorResponse(
+      "QUOTA_EXCEEDED",
+      `本日の生成上限に達しました。日本時間の翌0時（${quotaResetAt()}）にリセットされます`,
+    );
+  }
+
   return relay(await client.prompts.regenerate.$post({ json: { ...parsed.data, userId } }));
 }

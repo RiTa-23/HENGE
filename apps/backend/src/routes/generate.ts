@@ -3,6 +3,7 @@ import { Hono } from "hono";
 import { createDb } from "../db/client";
 import { appendPrompts, insertThemeWithPrompts, recentPromptTexts } from "../db/prompts";
 import { findThemeByName, getThemeDetail, setGenerationStatus } from "../db/themes";
+import { incrementUsage } from "../db/usage";
 import { generateBatch } from "../generation/batch";
 import { resolveModel } from "../generation/model";
 import { EXISTING_CONTEXT_SIZE } from "../generation/prompt";
@@ -68,6 +69,9 @@ export const generateRoutes = new Hono<{ Bindings: Env }>()
       model,
     );
     await cacheThemeId(c.env.KV, body.kind, normalizedName, themeId);
+    // 生成に成功した（テーマ行の挿入まで完了した）ためクォータを1消費する。
+    // 加算は挿入の後。逆にすると挿入が失敗したときにクォータだけ減る
+    await incrementUsage(db, body.userId);
 
     return c.json({ theme: await getThemeDetail(db, themeId), created: true });
   })
@@ -102,6 +106,8 @@ export const generateRoutes = new Hono<{ Bindings: Env }>()
       await appendPrompts(db, theme.id, result.valid, model);
       // 生成できることが実証されたので「生成困難」の印を外す
       if (theme.generationStatus === "difficult") await setGenerationStatus(db, theme.id, "ok");
+      // 生成に成功したためクォータを1消費する（appendの後。逆順だと失敗時にクォータだけ減る）
+      await incrementUsage(db, body.userId);
 
       return c.json({ theme: await getThemeDetail(db, theme.id), added: result.valid.length });
     } finally {

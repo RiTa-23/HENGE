@@ -14,6 +14,12 @@ interface StartBody {
   userId?: string;
   /** 匿名時のみ必須。改ざんされても他人に影響しないため許容する */
   offset?: number;
+  /**
+   * バックグラウンド補充の許可フラグ。Next.js 側でクォータ残を判定した結果。
+   * Hono 側ではクォータのポリシー値（上限50等）を持たず、このフラグを信頼するだけ
+   * （判定はNext.js、記録はHonoの分担）。
+   */
+  allowRefill?: boolean;
 }
 
 /** 出題順が毎回同じにならないよう混ぜる */
@@ -57,16 +63,23 @@ export const sessionRoutes = new Hono<{ Bindings: Env }>().post("/sessions/start
 
   const remainingInPool = theme.promptCount - nextOffset;
 
-  // **キックできるのはログインユーザーだけ。** 匿名のプレイでは補充が走らない
+  // **キックできるのはログインユーザーだけ。** 匿名のプレイでは補充が走らない。
+  // クォータ残が0のときもキックしない（プレイ自体はクォータを消費しない行為なので
+  // 止めず、補充だけスキップする。許可フラグは Next.js 側の判定による）
   const needsRefill =
-    body.userId !== undefined && remainingInPool < STOCK_TARGET && theme.generationStatus === "ok";
-  const quotaConsumed = needsRefill
-    ? await kickRefill(c.env, (promise) => c.executionCtx.waitUntil(promise), {
-        db,
-        theme,
-        nextOffset,
-      })
-    : false;
+    body.userId !== undefined &&
+    body.allowRefill === true &&
+    remainingInPool < STOCK_TARGET &&
+    theme.generationStatus === "ok";
+  const quotaConsumed =
+    needsRefill && body.userId !== undefined
+      ? await kickRefill(c.env, (promise) => c.executionCtx.waitUntil(promise), {
+          db,
+          theme,
+          nextOffset,
+          userId: body.userId,
+        })
+      : false;
 
   return c.json({
     prompts: shuffle(prompts),

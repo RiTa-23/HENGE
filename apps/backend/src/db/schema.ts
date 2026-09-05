@@ -7,7 +7,7 @@ import {
   text,
   uniqueIndex,
 } from "drizzle-orm/sqlite-core";
-import { user } from "./auth-schema";
+import { user } from "@henge/shared/db/auth-schema";
 
 /**
  * テーマと「含む文字」の両方を格納する。kind で区別する。
@@ -114,4 +114,11 @@ export const userGenerationUsage = sqliteTable(
   (t) => [primaryKey({ columns: [t.userId, t.date] })],
 );
 
-export * from "./auth-schema";
+/**
+ * Better Auth 管理下のテーブル。@better-auth/cli generate が生成したものを
+ * packages/shared に置き、両Workerから参照する。
+ *
+ * 認証テーブルの書き込みは Next.js Worker（Better Auth）のみ。ここでの
+ * 再exportはFKの親テーブルとしての参照（読み取り）に使うためのもの。
+ */
+export * from "@henge/shared/db/auth-schema";

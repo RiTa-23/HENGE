@@ -16,5 +16,39 @@
       "service": "henge-backend",
     },
   ],
+  // Better Auth 用の D1 バインディング。「D1へのアクセスはHono Workerに閉じる」の
+  // 例外で、認証テーブル（user / session / account / verification）の読み書きのみに
+  // 使う。ビジネスデータ（themes / prompts 等）には Hono 経由でのみアクセスする。
+  // 詳細は docs/02-architecture.md。
+  "d1_databases": [
+    {
+      "binding": "DB",
+      "database_name": "henge-db",
+      "database_id": "6c46368a-5a74-4019-b922-4dff7b2a15da",
+    },
+  ],
+  // 生成系エンドポイント（POST /api/themes / /api/prompts/regenerate）の連打を弾く。
+  // 日次クォータ（50回/日）とは別物で、こちらは数秒〜1分で解消する。
+  // 弾いたときは RATE_LIMITED を返し、QUOTA_EXCEEDED と区別する（案内文が変わる）。
+  // period は 10 または 60 しか指定できない。
+  "ratelimits": [
+    {
+      "name": "GENERATION_RATE_LIMIT",
+      // アカウント内で一意ならよい。他のバインディングと重複させないこと
+      "namespace_id": "1001",
+      "simple": { "limit": 5, "period": 60 },
+    },
+    {
+      // バックグラウンド補充のキック（POST /api/sessions/start）用。上の枠と
+      // 分けているのは、遊んでいるだけでテーマ作成の予算を食い潰さないため。
+      // 補充が要るかは Hono しか知らない（在庫数を持っているのがHono側）ため、
+      // 補充の不要なプレイでも1消費する。よって上限は補充の頻度ではなく
+      // **プレイの頻度**で見積もる。1プレイ15問なので、人間が1分に10回
+      // セッションを開始することはない＝実質スクリプト連打にだけ効く。
+      "name": "REFILL_RATE_LIMIT",
+      "namespace_id": "1002",
+      "simple": { "limit": 10, "period": 60 },
+    },
+  ],
   "observability": { "enabled": true },
 }

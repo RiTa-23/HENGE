@@ -1,5 +1,5 @@
 export { PING, ping } from "./ping";
-export { nextJstMidnight, toJstDateString } from "./jst";
+export { nextJstMidnight, quotaResetAt, toJstDateString } from "./jst";
 export {
   isHiraganaOnly,
   normalizeConstraintChar,
@@ -32,4 +32,6 @@ export {
   isApiError,
   statusFor,
 } from "./errors";
-export { PLAY_SIZE, STOCK_TARGET } from "./session";
+export { DAILY_GENERATION_LIMIT, PLAY_SIZE, STOCK_TARGET } from "./session";
+export { canGenerate, remainingQuota } from "./quota";
+export { isAdminEmail } from "./admin";

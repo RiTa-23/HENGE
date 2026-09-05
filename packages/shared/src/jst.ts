@@ -25,3 +25,19 @@ export function nextJstMidnight(date: Date = new Date()): Date {
   );
   return new Date(startOfNextJstDay - JST_OFFSET_MS);
 }
+
+/**
+ * クォータのリセット時刻（JSTの翌0時）を `+09:00` 付きのISO形式で返す。
+ * 機械可読の形でAPIに乗せるためのもの。案内文の組み立てはクライアントが行う。
+ *
+ * `nextJstMidnight().toISOString()` の末尾を置換する作り方では、toISOString が
+ * UTC表記を返すため時刻そのものがずれる（JST0時 = UTC前日15時）。
+ * JSTの日付として文字列を組み立てること。
+ */
+export function quotaResetAt(date: Date = new Date()): string {
+  const shifted = new Date(date.getTime() + JST_OFFSET_MS);
+  const nextJstDate = new Date(
+    Date.UTC(shifted.getUTCFullYear(), shifted.getUTCMonth(), shifted.getUTCDate() + 1),
+  );
+  return `${nextJstDate.toISOString().slice(0, 10)}T00:00:00+09:00`;
+}

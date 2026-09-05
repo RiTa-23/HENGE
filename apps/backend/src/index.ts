@@ -1,8 +1,10 @@
 import { ping } from "@henge/shared";
 import { Hono } from "hono";
+import { adminRoutes } from "./routes/admin";
 import { generateRoutes } from "./routes/generate";
 import { sessionRoutes } from "./routes/sessions";
 import { themeRoutes } from "./routes/themes";
+import { usageRoutes } from "./routes/usage";
 
 /**
  * Hono Worker。外部には公開しない。
@@ -20,7 +22,9 @@ const routes = app
   )
   .route("/", themeRoutes)
   .route("/", sessionRoutes)
-  .route("/", generateRoutes);
+  .route("/", generateRoutes)
+  .route("/", usageRoutes)
+  .route("/", adminRoutes);
 
 export type AppType = typeof routes;
 

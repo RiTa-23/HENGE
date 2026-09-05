@@ -10,14 +10,14 @@
     }
   },
   "scripts": {
-    "dev": "wrangler dev",
+    "dev": "wrangler dev --persist-to ../../.wrangler/state",
     "deploy": "wrangler deploy",
     "build:types": "tsc -p tsconfig.build.json",
     "typecheck": "tsc --noEmit",
     "cf-typegen": "wrangler types",
     "test:workers": "vitest run",
     "db:generate": "drizzle-kit generate",
-    "db:migrate:local": "wrangler d1 migrations apply henge-db --local"
+    "db:migrate:local": "wrangler d1 migrations apply henge-db --local --persist-to ../../.wrangler/state"
   },
   "dependencies": {
     "@henge/shared": "workspace:*",

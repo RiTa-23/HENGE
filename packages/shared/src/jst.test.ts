@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import { nextJstMidnight, toJstDateString } from "./index";
+import { nextJstMidnight, quotaResetAt, toJstDateString } from "./index";
 
 describe("toJstDateString", () => {
   test("JSTの日付境界で切り替わる（UTCの0時ではない）", () => {
@@ -42,5 +42,15 @@ describe("nextJstMidnight", () => {
   test("返す時刻は必ず翌JST日の始まりになっている", () => {
     const now = new Date("2026-12-31T16:00:00Z"); // JST 2027-01-01 01:00
     expect(nextJstMidnight(now).toISOString()).toBe("2027-01-01T15:00:00.000Z");
+  });
+});
+
+describe("quotaResetAt", () => {
+  test("+09:00 付きのISO形式で返す（クライアントが案内文に組み立てる）", () => {
+    expect(quotaResetAt(new Date("2026-09-04T10:00:00Z"))).toBe("2026-09-05T00:00:00+09:00");
+  });
+
+  test("JST0時ちょうどでも「次の」0時を返す", () => {
+    expect(quotaResetAt(new Date("2026-09-04T15:00:00Z"))).toBe("2026-09-06T00:00:00+09:00");
   });
 });

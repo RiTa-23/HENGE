@@ -1,6 +1,6 @@
 # データモデル
 
-D1（SQLite）+ Drizzle ORM。Better Auth管理下のテーブル（`user` / `session` / `account` / `verification`）は自動生成されるため定義しない。
+D1（SQLite）+ Drizzle ORM。Better Auth管理下のテーブル（`user` / `session` / `account` / `verification`）の定義は `packages/shared/src/db/auth-schema.ts`（`@better-auth/cli generate` が出力したもの。手で書かない）。
 
 ## themes
 
@@ -135,7 +135,10 @@ D1のCASCADEはD1の中でしか効かない。KVを消し忘れると「削除�
 ## マイグレーション
 
 Drizzleのスキーマは `apps/backend/src/db/schema.ts`。Better Auth管理下のテーブルは
-`@better-auth/cli generate` が出力した `apps/backend/src/db/auth-schema.ts` を取り込む（手で書かない）。
+`@better-auth/cli generate` が出力した `packages/shared/src/db/auth-schema.ts` を取り込む（手で書かない）。
+
+**`better-auth` は `@better-auth/cli` と同じ系列に固定する**（現在はどちらも1.4系）。本体だけ上げると、CLIが未対応の列（1.7で追加された `account.issuer` など）をスキーマが持たないまま動き、**OAuthのコールバックで初めて500になる**。ブラウザで最後まで通さないと気付けないため、`apps/frontend/lib/auth-schema.test.ts` で「better-auth が要求する列が揃っているか」を検査している。本体を上げるときはCLIも同時に上げ、スキーマを再生成すること。
+両Workerから参照するため shared に置いている（アクセス権限の線引きは `docs/02-architecture.md`）。
 
 生成先は `apps/backend/migrations/`（wranglerの `migrations_dir` の既定値）。
 

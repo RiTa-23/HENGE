@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import { SiteHeader } from "@/components/SiteHeader";
-import { NewThemeForm } from "@/components/NewThemeForm";
+import { CreateThemeForm } from "@/components/CreateThemeForm";
 
 /** 作成画面は検索結果に出さない */
 export const metadata: Metadata = { robots: { index: false, follow: false } };
@@ -15,7 +15,7 @@ export default function NewThemePage() {
           テーマを決めると、そのテーマに沿った15問をその場で作ります。
           同じ名前のお題が既にあれば、それをそのまま使います（作り直しません）。
         </p>
-        <NewThemeForm />
+        <CreateThemeForm kind="theme" />
       </main>
     </>
   );

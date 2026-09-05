@@ -1,5 +1,5 @@
 [test]
 # `bun test` は D1/KV に依存しない純粋関数のテストだけを走らせる。
-# 対象ディレクトリは package.json の test スクリプトで1つずつ指定している。
-# 複数パスをまとめて渡すと、環境によって絞り込みが効かず
-# apps/backend の Workersテスト（cloudflare:test に依存）まで拾ってしまう。
+# 対象は各パッケージの test スクリプトで、そのディレクトリを作業ディレクトリにして実行する。
+# ルートからパスで絞り込む方法は環境によって効かず、apps/backend の
+# Workersテスト（cloudflare:test に依存）まで拾ってしまうため使わない。

@@ -1,7 +1,7 @@
 "use client";
 
 import { isApiError } from "@henge/shared";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useState } from "react";
 import { authClient } from "@/lib/api/auth-client";
 import { Shuriken } from "@/components/play/Shuriken";
 
@@ -10,10 +10,6 @@ interface CreatedTheme {
   /** false なら既存テーマの再利用（生成は走っていない） */
   created: boolean;
 }
-
-/** 生成中のときに送り直す間隔と、諦めるまでの上限 */
-const RETRY_INTERVAL_MS = 3_000;
-const MAX_WAIT_MS = 90_000;
 
 /**
  * テーマ作成。生成を伴うので認証が要る。
@@ -27,7 +23,6 @@ export function NewThemeForm() {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [created, setCreated] = useState<{ name: string; created: boolean } | null>(null);
-  const waitingSince = useRef<number | null>(null);
 
   /**
    * ブラウザバックで戻ってきたときに、生成中でもないのに手裏剣が回り続けるのを防ぐ。
@@ -69,23 +64,13 @@ export function NewThemeForm() {
     const body: unknown = await response.json();
 
     if (!response.ok) {
-      const code = isApiError(body) ? body.error.code : "UNKNOWN";
-
-      // **「生成中」はエラーではなく待ち。** 手裏剣を回したまま送り直す。
-      // 待てば解決すると分かっている状況で「もう一度お試しください」と
-      // 操作を押し付けない
-      if (code === "GENERATION_IN_PROGRESS") {
-        const since = waitingSince.current ?? Date.now();
-        waitingSince.current = since;
-        if (Date.now() - since < MAX_WAIT_MS) {
-          setTimeout(() => void create(), RETRY_INTERVAL_MS);
-          return;
-        }
-      }
-
       // 案内文はサーバーが組み立てたものをそのまま出す。QUOTA_EXCEEDED は
       // リセット時刻を含み、GENERATION_FAILED は名前の変更を促す
-      waitingSince.current = null;
+      //
+      // **ここで「生成中」の再送はしない。** POST /api/themes は
+      // GENERATION_IN_PROGRESS を返さない（ロックを取るのは
+      // POST /prompts/regenerate だけ）。仮に再送すると、1回ごとに
+      // GENERATION_RATE_LIMIT（5回/60秒）を消費して RATE_LIMITED に落ちる
       setError(isApiError(body) ? body.error.message : "お題を作れませんでした");
       setBusy(false);
       return;
@@ -95,7 +80,6 @@ export function NewThemeForm() {
     // 作った直後に遊びたいとは限らず、続けて別のお題を作りたいこともある。
     // 勝手に始めると、その時点でお題を1組消費してしまう
     const { theme, created: isNew } = body as CreatedTheme;
-    waitingSince.current = null;
     setCreated({ name: theme.name, created: isNew });
     setBusy(false);
   };
@@ -104,7 +88,6 @@ export function NewThemeForm() {
     event.preventDefault();
     setBusy(true);
     setError(null);
-    waitingSince.current = null;
     void create();
   };
 

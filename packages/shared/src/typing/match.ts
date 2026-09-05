@@ -123,9 +123,3 @@ export function romanDisplay(p: TypingProgress): { text: string; cursor: number 
     .join("");
   return { text: p.settled + current + future, cursor: cursorOf(p) };
 }
-
-/** 正確率（0〜1）。打鍵が1つも無いときは1とする */
-export function accuracy(p: TypingProgress): number {
-  const total = p.hitCount + p.missCount;
-  return total === 0 ? 1 : p.hitCount / total;
-}

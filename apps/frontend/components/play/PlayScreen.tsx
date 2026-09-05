@@ -65,15 +65,7 @@ function isTypingKey(event: KeyboardEvent): boolean {
   return [...event.key].length === 1;
 }
 
-export function PlayScreen({
-  themeId,
-  themeName,
-  promptCount,
-}: {
-  themeId: string;
-  themeName: string;
-  promptCount: number;
-}) {
+export function PlayScreen({ themeId, themeName }: { themeId: string; themeName: string }) {
   const { data: authSession } = authClient.useSession();
   const [phase, setPhase] = useState<Phase>({ name: "ready" });
   const [promptIndex, setPromptIndex] = useState(0);
@@ -151,10 +143,30 @@ export function PlayScreen({
 
   // 打鍵を拾う要素にフォーカスを当て続ける。外れると1打も拾えなくなる
   useEffect(() => {
-    if (phase.name === "playing" || phase.name === "ready") surface.current?.focus();
+    if (phase.name === "playing") surface.current?.focus();
   }, [phase.name]);
 
   const start = () => setAttempt((count) => count + 1);
+
+  /**
+   * 開始前のスペースは**画面全体で拾う**。
+   *
+   * フォーカスを当てた要素の keydown で拾うと、blur のたびに当て直すことになり、
+   * 同じ画面にある「一覧に戻る」へキーボードで到達できなくなる。開始前は打鍵を
+   * 1打も取りこぼさない必要が無いので、窓側で受けてフォーカスを自由にする。
+   */
+  useEffect(() => {
+    if (phase.name !== "ready") return;
+    const onKey = (event: KeyboardEvent) => {
+      // key と code の両方を見る。配列やIMEの状態によって key が空になることがある
+      if (event.key !== " " && event.code !== "Space") return;
+      // スペースでの画面スクロールを止める
+      event.preventDefault();
+      setAttempt((count) => count + 1);
+    };
+    globalThis.addEventListener("keydown", onKey);
+    return () => globalThis.removeEventListener("keydown", onKey);
+  }, [phase.name]);
 
   /**
    * 枯渇からの復帰。**ログインユーザーだけが使える**（クォータを1消費する）。
@@ -213,28 +225,15 @@ export function PlayScreen({
 
   if (phase.name === "ready") {
     return (
-      <div
-        ref={surface}
-        data-typing-surface=""
-        tabIndex={0}
-        onKeyDown={(event) => {
-          // key と code の両方を見る。配列やIMEの状態によって key が空になることがある
-          if (event.key !== " " && event.code !== "Space") return;
-          // スペースでの画面スクロールを止める
-          event.preventDefault();
-          start();
-        }}
-        onBlur={() => surface.current?.focus()}
-        className="flex min-h-dvh items-center justify-center p-6"
-      >
-        <div className="w-full max-w-lg rounded-lg border border-kin/60 bg-kinari/5 px-10 py-14 text-center">
-          <p className="text-sm tracking-[0.25em] text-kinari/60">{themeName}</p>
-          <h1 className="mt-3 font-mincho text-3xl tracking-widest text-kinari">
-            {PLAY_SIZE}問 ひと組
+      <div className="flex min-h-dvh items-center justify-center p-6">
+        <div className="w-full max-w-lg rounded-lg border border-kin/60 bg-kinari/5 px-10 py-16 text-center">
+          {/* 開始前に出すのはテーマ名だけ。総数を出しても遊べる残り数とは違ううえ、
+              15問ひと組は例外なく成り立つので添えても情報が増えない */}
+          <h1 className="font-mincho text-4xl leading-snug tracking-wider text-kinari">
+            {themeName}
           </h1>
-          <p className="mt-4 font-mono text-sm text-kinari/50">お題 {promptCount} 問</p>
 
-          <p className="mt-12 flex items-center justify-center gap-3 text-kinari">
+          <p className="mt-14 flex items-center justify-center gap-3 text-kinari">
             <span className="rounded-md border border-shu bg-shu/20 px-10 py-2 font-mono text-sm tracking-widest shadow-[0_0_10px_var(--color-shu)]">
               Space
             </span>

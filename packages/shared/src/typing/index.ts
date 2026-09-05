@@ -7,4 +7,4 @@ export {
 } from "./build";
 export { countKeystrokes, countKeystrokesFromKana } from "./keystrokes";
 export { KANA_TABLE, SYMBOLS } from "./table";
-export { accuracy, pressKey, romanDisplay, startTyping, type TypingProgress } from "./match";
+export { pressKey, romanDisplay, startTyping, type TypingProgress } from "./match";

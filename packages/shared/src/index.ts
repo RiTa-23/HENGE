@@ -8,7 +8,6 @@ export {
   type ThemeKind,
 } from "./normalize";
 export {
-  accuracy,
   buildRomanCandidates,
   countKeystrokes,
   countKeystrokesFromKana,

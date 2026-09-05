@@ -1,6 +1,6 @@
 import { describe, expect, test } from "bun:test";
 import { buildRomanCandidates } from "./build";
-import { accuracy, pressKey, romanDisplay, startTyping, type TypingProgress } from "./match";
+import { pressKey, romanDisplay, startTyping, type TypingProgress } from "./match";
 
 /** 読み仮名に対してローマ字を順に打ち込む */
 function type(kana: string, keys: string): TypingProgress {
@@ -204,20 +204,6 @@ describe("表示用のローマ字列と苦無の位置", () => {
 
   test("苦無はミスしても進まない", () => {
     expect(romanDisplay(type("しち", "shq")).cursor).toBe(2);
-  });
-});
-
-describe("正確率", () => {
-  test("打鍵が無ければ1", () => {
-    expect(accuracy(startTyping(buildRomanCandidates("か")))).toBe(1);
-  });
-
-  test("ミスなしなら1", () => {
-    expect(accuracy(type("かき", "kaki"))).toBe(1);
-  });
-
-  test("4打中1ミスなら0.8（延べ5打鍵）", () => {
-    expect(accuracy(type("かき", "kazki"))).toBeCloseTo(0.8);
   });
 });
 

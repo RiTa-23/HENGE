@@ -1,9 +1,10 @@
 import { PLAY_SIZE, STOCK_TARGET } from "@henge/shared";
 import { env, SELF } from "cloudflare:test";
 import { eq } from "drizzle-orm";
-import { beforeEach, describe, expect, it } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 import { createDb } from "../src/db/client";
 import { prompts, themes, user, userThemeProgress } from "../src/db/schema";
+import { themeLockKey } from "../src/kv/keys";
 
 const db = createDb(env.DB);
 
@@ -48,11 +49,22 @@ async function start(body: Record<string, unknown>) {
   return { status: res.status, body: (await res.json()) as Record<string, unknown> };
 }
 
+/** 背景補充がAIを呼ぶため、テストでは応答を差し替える（remoteBindings: false で実物は使えない） */
+function stubAi() {
+  vi.spyOn(env.AI, "run").mockResolvedValue({ response: "" } as never);
+  vi.spyOn(env.AI, "gateway").mockReturnValue({
+    patchLog: async () => {},
+  } as unknown as ReturnType<typeof env.AI.gateway>);
+}
+
 beforeEach(async () => {
+  vi.restoreAllMocks();
+  stubAi();
   await db.delete(prompts);
   await db.delete(userThemeProgress);
   await db.delete(themes);
   await db.delete(user);
+  await env.KV.delete(themeLockKey("t1"));
 });
 
 describe("配信", () => {
@@ -136,31 +148,42 @@ describe("オフセットの扱い", () => {
   });
 });
 
-describe("補充の要否判定", () => {
-  it("残りが30を下回り、ログインしていればキックする", async () => {
+describe("補充のキック", () => {
+  it("残りが30を下回り、ログインしていればキックしてクォータを消費する", async () => {
     await seed(44); // 15問配ると残り29
     const { body } = await start({ themeId: "t1", userId: "u1" });
     expect(body.remainingInPool).toBe(STOCK_TARGET - 1);
-    expect(body.needsRefill).toBe(true);
+    expect(body.quotaConsumed).toBe(true);
+    // ロックを取っている
+    expect(await env.KV.get(themeLockKey("t1"))).not.toBeNull();
   });
 
   it("残りがちょうど30ならキックしない（境界値）", async () => {
     await seed(45);
     const { body } = await start({ themeId: "t1", userId: "u1" });
     expect(body.remainingInPool).toBe(STOCK_TARGET);
-    expect(body.needsRefill).toBe(false);
+    expect(body.quotaConsumed).toBe(false);
   });
 
   it("匿名ではキックしない（在庫を消費するだけ）", async () => {
     await seed(44);
     const { body } = await start({ themeId: "t1", offset: 0 });
-    expect(body.needsRefill).toBe(false);
+    expect(body.quotaConsumed).toBe(false);
+    expect(await env.KV.get(themeLockKey("t1"))).toBeNull();
   });
 
   it("生成困難なテーマではキックしない", async () => {
     await seed(44, { generationStatus: "difficult" });
     const { body } = await start({ themeId: "t1", userId: "u1" });
-    expect(body.needsRefill).toBe(false);
+    expect(body.quotaConsumed).toBe(false);
+  });
+
+  it("すでにロックが取られていればキックせず、クォータも消費しない", async () => {
+    await seed(44);
+    await env.KV.put(themeLockKey("t1"), "1", { expirationTtl: 60 });
+
+    const { body } = await start({ themeId: "t1", userId: "u1" });
+    expect(body.quotaConsumed).toBe(false);
   });
 });
 
@@ -182,6 +205,15 @@ describe("枯渇", () => {
     await seed(14);
     await start({ themeId: "t1", userId: "u1" });
     expect(await db.select().from(userThemeProgress)).toHaveLength(0);
+  });
+
+  it("生成ロックがあれば GENERATION_IN_PROGRESS（本当に尽きたのと区別する）", async () => {
+    await seed(14);
+    await env.KV.put(themeLockKey("t1"), "1", { expirationTtl: 60 });
+
+    const { status, body } = await start({ themeId: "t1", offset: 0 });
+    expect(status).toBe(409);
+    expect((body.error as { code: string }).code).toBe("GENERATION_IN_PROGRESS");
   });
 
   it("存在しないテーマはエラーになる", async () => {

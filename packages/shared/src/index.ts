@@ -24,3 +24,12 @@ export {
   KEYSTROKE_MAX,
   KEYSTROKE_MIN,
 } from "./generation/validate";
+export {
+  apiError,
+  type ApiErrorBody,
+  ERROR_STATUS,
+  type ErrorCode,
+  isApiError,
+  statusFor,
+} from "./errors";
+export { PLAY_SIZE, STOCK_TARGET } from "./session";

@@ -2,6 +2,10 @@
 
 お題が毎回変わることで「慣れ」が生じない、日本語タイピング練習ツール。Cloudflare Workers上で動く。
 
+## このファイルについて
+
+`AGENTS.md` と `CLAUDE.md` は同じ実体（シンボリックリンク）。どのAIコーディングツールから読まれても内容は同じになる。以下では `AGENTS.md` と表記する。
+
 ## ドキュメントの読み方
 
 **全部読まないこと。** 作業に応じて必要なものだけ開く。
@@ -15,6 +19,19 @@
 | ローマ字入力・キーボード | `docs/06-typing-engine.md` |
 | 画面・スタイル | `docs/07-ui.md` |
 | 次に何をやるか | `docs/08-roadmap.md` |
+
+## 作業手順書
+
+型の決まった作業には手順書がある。**該当する作業をするときは、着手前に読むこと。**
+
+| 作業 | 読む |
+|---|---|
+| APIエンドポイントの追加・変更 | `.claude/skills/add-endpoint/SKILL.md` |
+| D1スキーマの変更・マイグレーション | `.claude/skills/d1-migration/SKILL.md` |
+| テストを書く | `.claude/skills/write-tests/SKILL.md` |
+| 変更のレビュー（特に他モデルが書いたもの） | `.claude/skills/review-invariants/SKILL.md` |
+
+置き場所が `.claude/` なのは Claude Code の慣習によるもので、**内容はツールに依存しない**。OpenCode からは `opencode.json` の `instructions` で読み込まれる。Claude Code からはスキルとして呼び出される。他のツールを使う場合は、上の表を見て手で開く。
 
 ## 開発コマンド
 
@@ -42,6 +59,7 @@ docs/            実装ドキュメント
 ## 絶対に守る不変条件
 
 破ると静かに壊れるもの。**変更する前に必ず該当ドキュメントを確認すること。**
+どのAIツール・どのモデルで作業する場合も、この11個は同じように適用される。
 
 1. **認証は Next.js Worker 側にのみ置く。** Hono側にBetter Authを実装しない。**Honoに公開ルートを生やさない**（外部非公開であることが、Next.jsで認証を完結させる前提になっている）
 2. **Service Bindings は HTTP方式**（`env.BACKEND.fetch`）。`WorkerEntrypoint`によるRPC方式に変えない。Hono RPCとSmart Placementの両方を失う

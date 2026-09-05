@@ -1,4 +1,5 @@
 [test]
 # `bun test` は D1/KV に依存しない純粋関数のテストだけを走らせる。
-# D1/KV に依存するテスト（apps/backend/test）は `bun run test:workers`（Vitest）側で動かす。
-root = "packages"
+# 対象は各パッケージの test スクリプトで、そのディレクトリを作業ディレクトリにして実行する。
+# ルートからパスで絞り込む方法は環境によって効かず、apps/backend の
+# Workersテスト（cloudflare:test に依存）まで拾ってしまうため使わない。

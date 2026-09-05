@@ -1,7 +1,8 @@
 import { ping } from "@henge/shared";
 import { Hono } from "hono";
-// 【一時的】検証用。Phase 4 で POST /themes が入ったら消す
-import { spike } from "./spike";
+import { generateRoutes } from "./routes/generate";
+import { sessionRoutes } from "./routes/sessions";
+import { themeRoutes } from "./routes/themes";
 
 /**
  * Hono Worker。外部には公開しない。
@@ -9,16 +10,18 @@ import { spike } from "./spike";
  */
 const app = new Hono<{ Bindings: Env }>();
 
-const routes = app.get("/health", (c) =>
-  c.json({
-    service: "henge-backend",
-    shared: ping("backend"),
-    ok: true,
-  }),
-);
+const routes = app
+  .get("/health", (c) =>
+    c.json({
+      service: "henge-backend",
+      shared: ping("backend"),
+      ok: true,
+    }),
+  )
+  .route("/", themeRoutes)
+  .route("/", sessionRoutes)
+  .route("/", generateRoutes);
 
 export type AppType = typeof routes;
-
-app.route("/", spike);
 
 export default app;

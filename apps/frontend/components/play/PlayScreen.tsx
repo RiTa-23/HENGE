@@ -8,6 +8,7 @@ import {
   romanDisplay,
   splitKanaUnits,
   startTyping,
+  type ThemeKind,
   type TypingProgress,
 } from "@henge/shared";
 import { useCallback, useEffect, useRef, useState } from "react";
@@ -19,6 +20,7 @@ import { ProgressDots } from "./ProgressDots";
 import { Result, type PlayStats } from "./Result";
 import { Scroll } from "./Scroll";
 import { readOffset, writeOffset } from "@/lib/play/offset";
+import { kindLabel, listHref } from "@/lib/ui/kind";
 
 interface Prompt {
   id: string;
@@ -65,8 +67,21 @@ function isTypingKey(event: KeyboardEvent): boolean {
   return [...event.key].length === 1;
 }
 
-export function PlayScreen({ themeId, themeName }: { themeId: string; themeName: string }) {
+/**
+ * 打鍵の画面。**テーマモードと含む文字モードで分けない。**
+ * 違うのは離脱先の一覧と、画面に出す呼び名（「このテーマ」／「この文字」）だけ。
+ */
+export function PlayScreen({
+  themeId,
+  themeName,
+  kind,
+}: {
+  themeId: string;
+  themeName: string;
+  kind: ThemeKind;
+}) {
   const { data: authSession } = authClient.useSession();
+  const backToList = listHref(kind);
   const [phase, setPhase] = useState<Phase>({ name: "ready" });
   const [promptIndex, setPromptIndex] = useState(0);
   const [progress, setProgress] = useState<TypingProgress>(() => startTyping([]));
@@ -245,7 +260,7 @@ export function PlayScreen({ themeId, themeName }: { themeId: string; themeName:
 
           <div className="mt-12 flex justify-center">
             <a
-              href="/themes"
+              href={backToList}
               className="rounded-md border border-kinari/20 px-8 py-2.5 tracking-widest text-kinari/80 transition-colors hover:border-kin hover:text-kinari"
             >
               一覧に戻る
@@ -281,12 +296,12 @@ export function PlayScreen({ themeId, themeName }: { themeId: string; themeName:
 
           {canRegenerate && (
             <p className="mt-5 text-sm leading-relaxed text-kinari/60">
-              このテーマのお題を作り足せます。本日の生成回数を1つ使います。
+              {kindLabel(kind)}のお題を作り足せます。本日の生成回数を1つ使います。
             </p>
           )}
           {exhausted && authSession === null && (
             <p className="mt-5 text-sm leading-relaxed text-kinari/60">
-              ログインすると、このテーマのお題を作り足して続けられます。
+              ログインすると、{kindLabel(kind)}のお題を作り足して続けられます。
             </p>
           )}
 
@@ -319,7 +334,7 @@ export function PlayScreen({ themeId, themeName }: { themeId: string; themeName:
               </button>
             )}
             <a
-              href="/themes"
+              href={backToList}
               className="rounded-md border border-kinari/20 px-6 py-2.5 tracking-widest text-kinari/80 transition-colors hover:border-kin hover:text-kinari"
             >
               ほかのお題を見る
@@ -337,7 +352,7 @@ export function PlayScreen({ themeId, themeName }: { themeId: string; themeName:
   }
 
   if (phase.name === "result") {
-    return <Result stats={stats} themeName={themeName} onRetry={start} />;
+    return <Result stats={stats} themeName={themeName} onRetry={start} listHref={backToList} />;
   }
 
   const prompt = phase.session.prompts[promptIndex];

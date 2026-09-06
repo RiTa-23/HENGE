@@ -4,12 +4,29 @@ import type { ThemeKind } from "@henge/shared";
  * 生成プロンプト。**全モデルで共通のものを1つだけ持つ。**
  *
  * 呼び出しはステートレスなので、2回目のバッチは1回目が何を作ったか知らない。
- * 既存お題を「これと似たものを作るな」という文脈として渡すことで重複を減らす。
- * 入力トークンの増加は1バッチあたり約4ニューロンで、効果に対して十分安い。
+ * 既存お題を「これと似たものを作るな」という文脈として渡す設計だったが、
+ * いまは外して試している（`INCLUDE_EXISTING_PROMPTS` 参照）。
  */
 
-/** 重複回避の文脈として渡す既存お題の件数 */
+/** 既存お題を何件遡って持ってくるか。プロンプトの文脈と、完全一致の重複除去に使う */
 export const EXISTING_CONTEXT_SIZE = 30;
+
+/**
+ * 既存お題をプロンプトに載せるか。**いまは載せない（2026-09-06 から試行中）。**
+ *
+ * 直近30件を「これと似た内容・似た言い回しは避けろ」という否定の文脈として
+ * 渡していたが、**モデルが内容ではなく形式の方に引きずられている疑いがある。**
+ * few-shot と同じで、否定で添えても例示は例示として効くため、お題の型
+ * （文の長さ・構文・主語の立て方）が既存に揃っていく。「慣れが生じない」ことが
+ * このサービスの目的なので、型が揃うのは重複そのものより悪い。
+ *
+ * **外しても同じ文が二度入ることはない。** 完全一致の重複は batch.ts の `seen`
+ * （`new Set(input.existing)`）が読み取得の前に無料で弾いており、そちらは
+ * 生きたまま。効き目が変わるのは「言い回しの近い別の文」だけ。
+ *
+ * 戻すときはここを true にする。判断は却下率・重複率の実測（Phase 8）で行う。
+ */
+const INCLUDE_EXISTING_PROMPTS: boolean = false;
 
 const SYSTEM = [
   "あなたは日本語タイピング練習用の短文を作る職人です。",
@@ -66,7 +83,7 @@ export function buildGenerationPrompt(input: {
 
   if (input.kind === "constraint") lines.push(...constraintRules(input.name, input.count));
 
-  if (input.existing.length > 0) {
+  if (INCLUDE_EXISTING_PROMPTS && input.existing.length > 0) {
     lines.push(
       "",
       "次はすでに作成済みの短文です。これらと似た内容・似た言い回しは避けてください。",

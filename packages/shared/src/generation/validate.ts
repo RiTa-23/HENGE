@@ -23,6 +23,21 @@ export function isTypableText(text: string): boolean {
   return TYPABLE_TEXT.test(text);
 }
 
+/**
+ * 漢字を1文字以上含むか。**ひらがなだけのお題を弾くために使う。**
+ *
+ * 打鍵そのものは読み仮名に対して行うので、表記がひらがなだけでも「打てる」。
+ * それでも弾くのは、画面に出るのが表記の方だからで、ひらがなだけの文は
+ * 日本語として不自然に見えるうえ、漢字かな混じり文を読みながら打つという
+ * 実際の練習からも外れる。
+ *
+ * カタカナは条件に入れない。「コーヒーをのむ。」のような文を通してしまうと、
+ * 結局ひらがなだけの見た目になるため。**漢字が1つあること**を条件にする。
+ */
+export function containsKanji(text: string): boolean {
+  return /[一-鿿]/u.test(text);
+}
+
 /** 打鍵数の下限・上限。この範囲を外れたお題は却下する */
 export const KEYSTROKE_MIN = 10;
 export const KEYSTROKE_MAX = 40;
@@ -37,5 +52,27 @@ export function isKeystrokeCountInRange(count: number): boolean {
  * 表記に現れていなくてよい。「座禅」は表記に「ざ」が無いが、読み「ざぜん」に含まれる。
  */
 export function includesConstraint(readingKana: string, constraintChar: string): boolean {
-  return normalizeConstraintChar(readingKana).includes(normalizeConstraintChar(constraintChar));
+  return countConstraint(readingKana, constraintChar) > 0;
+}
+
+/**
+ * 指定文字が読み仮名に何回現れるか。重なりは数えない（「ささ」に「ささ」は1回）。
+ *
+ * 却下の判定には使わない（1回でも入っていれば有効なお題）。**プロンプトの
+ * 「2回以上入れる」がどれだけ効いているかを測るため**に数える。
+ * 指示が効いているかどうかは、実際に出てきたお題を数えないと分からない。
+ */
+export function countConstraint(readingKana: string, constraintChar: string): number {
+  const kana = normalizeConstraintChar(readingKana);
+  const target = normalizeConstraintChar(constraintChar);
+  if (target === "") return 0;
+
+  let count = 0;
+  let from = 0;
+  for (;;) {
+    const at = kana.indexOf(target, from);
+    if (at === -1) return count;
+    count++;
+    from = at + target.length;
+  }
 }

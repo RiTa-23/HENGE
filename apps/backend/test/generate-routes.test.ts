@@ -26,7 +26,13 @@ function stubGeneration(lines: string[][], reading = "しのび") {
   });
 }
 
-/** 1ラウンドで15問揃う有効な応答。重複除去されるためテキストはすべてユニークにする */
+/**
+ * 1ラウンドで15問揃う有効な応答。
+ *
+ * テキストはすべてユニークにするだけでなく、**書き出しも散らす**。
+ * 同じ書き出しは2本までしか採らない（batch.ts の OPENING_MAX）ため、
+ * 全部を同じ語で始めると15問に届かず GENERATION_FAILED になる。
+ */
 function stubValidGeneration() {
   const nums = [
     "一",
@@ -50,7 +56,7 @@ function stubValidGeneration() {
     "十九",
     "二十",
   ];
-  stubGeneration([nums.map((n) => `忍びの道、${n}。`)], "しのびはやみをはしる。");
+  stubGeneration([nums.map((n) => `${n}の忍びが闇を走る。`)], "しのびはやみをはしる。");
 }
 
 const realFetch = globalThis.fetch.bind(globalThis);

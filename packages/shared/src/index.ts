@@ -25,6 +25,8 @@ export {
   UnsupportedKanaError,
 } from "./typing/index";
 export {
+  containsKanji,
+  countConstraint,
   includesConstraint,
   isKeystrokeCountInRange,
   isTypableText,

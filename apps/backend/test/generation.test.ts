@@ -76,7 +76,15 @@ const READINGS: Record<string, string> = {
   "影が揺れた。": "かげがゆれた。",
   "座禅を組む。": "ざぜんをくむ。",
   "静寂が満ちる。": "せいじゃくがみちる。",
-  あ: "あ",
+  // 打鍵数が下限（10打）に届かない素材。漢字を含めてあるのは、
+  // kanji の段で先に弾かれると keystroke の検査に届かないため
+  "影。": "かげ。",
+  "ざあざあとふるあめ。": "ざあざあとふるあめ。",
+  "ざあざあと雑音。": "ざあざあとざつおん。",
+  "しんしんと雪が降る。": "しんしんとゆきがふる。",
+  "しんしんと夜が更ける。": "しんしんとよるがふける。",
+  "しんしんと風が吹く。": "しんしんとかぜがふく。",
+  "しんしんと雨が続く。": "しんしんとあめがつづく。",
   "手裏剣が闇を裂いて標的を正確に射抜いた瞬間だった。":
     "しゅりけんがやみをさいてひょうてきをせいかくにいぬいたしゅんかんだった。",
 };
@@ -84,7 +92,8 @@ const READINGS: Record<string, string> = {
 /** AIの応答を差し替えた env。ラウンドごとに別の応答を返す */
 interface PatchedLog {
   score?: number;
-  metadata?: { rejected?: string };
+  /** メタデータは5件までなので、内訳は counts 1つに畳んで入れる（ai.ts 参照） */
+  metadata?: { counts?: string };
 }
 
 function envWithAiResponses(rounds: string[][], logs: PatchedLog[] = []): Env {
@@ -170,7 +179,7 @@ describe("generateBatch", () => {
 
   it("打鍵数が範囲外なら keystroke で却下する", async () => {
     const result = await generateBatch(
-      envWithAiResponses([["あ", "忍びは闇を走る。"], []]),
+      envWithAiResponses([["影。", "忍びは闇を走る。"], []]),
       input({ target: 2 }),
     );
 
@@ -186,6 +195,89 @@ describe("generateBatch", () => {
 
     expect(result.rejected.constraint).toBe(1);
     expect(result.valid.map((v) => v.text)).toEqual(["座禅を組む。"]);
+  });
+
+  it("ひらがなだけの文は kanji で却下する（読み取得を呼ばずに弾く）", async () => {
+    let readingCalls = 0;
+    const counting: GetReading = async (text) => {
+      readingCalls++;
+      return fakeReading(text);
+    };
+
+    const result = await generateBatch(
+      envWithAiResponses([["ざあざあとふるあめ。", "忍びは闇を走る。"], []]),
+      input({ target: 2, getReading: counting }),
+    );
+
+    expect(result.rejected.kanji).toBe(1);
+    expect(result.valid.map((v) => v.text)).toEqual(["忍びは闇を走る。"]);
+    expect(readingCalls).toBe(1); // 弾いた分は読み取得を呼ばない
+  });
+
+  it("含むモードでは、指定文字を2回以上含む採用数を記録する", async () => {
+    const logs: PatchedLog[] = [];
+    await generateBatch(
+      // 「ざぜんをくむ。」は1回、「ざあざあとざつおん。」は3回
+      envWithAiResponses([["座禅を組む。", "ざあざあと雑音。"], []], logs),
+      input({ kind: "constraint", name: "ざ", target: 2 }),
+    );
+
+    expect(logs[0]?.metadata?.counts).toContain("twice:1");
+  });
+
+  it("テーマモードでは2回以上の計測を記録しない（意味を持たないため）", async () => {
+    const logs: PatchedLog[] = [];
+    await generateBatch(envWithAiResponses([["忍びは闇を走る。"], []], logs), input({ target: 1 }));
+
+    expect(logs[0]?.metadata?.counts).not.toContain("twice");
+  });
+
+  it("同じ書き出しの文は上限までしか採らない（型の量産を止める）", async () => {
+    // 実測で起きた壊れ方の再現。「しんしんと〜」だけで21件中14件を埋めてきた。
+    // 完全一致ではないので seen は素通りし、そのままプールに入ってしまう
+    const result = await generateBatch(
+      envWithAiResponses([
+        [
+          "しんしんと雪が降る。",
+          "しんしんと夜が更ける。",
+          "しんしんと風が吹く。",
+          "しんしんと雨が続く。",
+        ],
+        [],
+      ]),
+      input({ target: 4 }),
+    );
+
+    expect(result.valid).toHaveLength(3);
+    expect(result.rejected.opening).toBe(1);
+  });
+
+  it("書き出しの重なりはラウンドをまたいで数える", async () => {
+    const result = await generateBatch(
+      envWithAiResponses([
+        ["しんしんと雪が降る。", "しんしんと夜が更ける。"],
+        ["しんしんと風が吹く。", "しんしんと雨が続く。"],
+      ]),
+      input({ target: 4 }),
+    );
+
+    expect(result.valid).toHaveLength(3);
+    expect(result.rejected.opening).toBe(1);
+  });
+
+  it("既存お題の書き出しは数えない（偏ったプールに塞がれて補充が失敗するため）", async () => {
+    // 止めたいのは「1回の生成が1つの型で埋まる」ことで、過去のプールに何本あるかは別の話。
+    // 既存を数えると、同じ書き出しが23本あるプール（実測）では補充が丸ごと失敗する
+    const result = await generateBatch(
+      envWithAiResponses([["しんしんと雪が降る。", "忍びは闇を走る。"], []]),
+      input({
+        target: 2,
+        existing: ["しんしんと夜が更ける。", "しんしんと風が吹く。", "しんしんと雨が続く。"],
+      }),
+    );
+
+    expect(result.valid.map((v) => v.text)).toEqual(["しんしんと雪が降る。", "忍びは闇を走る。"]);
+    expect(result.rejected.opening).toBe(0);
   });
 
   it("既存お題と重複するものは除外する", async () => {
@@ -213,9 +305,9 @@ describe("generateBatch", () => {
     );
 
     expect(logs).toHaveLength(2);
-    expect(logs[0]?.metadata?.rejected).toBe("charset:1,keystroke:0,constraint:0");
+    expect(logs[0]?.metadata?.counts).toBe("charset:1,kanji:0,opening:0,keystroke:0,constraint:0");
     // 累積を渡していれば charset:2 になる
-    expect(logs[1]?.metadata?.rejected).toBe("charset:1,keystroke:0,constraint:0");
+    expect(logs[1]?.metadata?.counts).toBe("charset:1,kanji:0,opening:0,keystroke:0,constraint:0");
   });
 
   it("有効なお題は読みと打鍵数を持って返る", async () => {

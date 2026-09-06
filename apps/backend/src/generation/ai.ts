@@ -109,14 +109,35 @@ export async function requestPrompts(
 export async function recordGenerationResult(
   env: Env,
   logId: string,
-  result: { requested: number; valid: number; rejected: Record<string, number> },
+  result: {
+    requested: number;
+    valid: number;
+    rejected: Record<string, number>;
+    /** 「含む」モードで、指定文字を2回以上含んだ採用お題の数。テーマモードでは undefined */
+    constraintTwice?: number;
+  },
 ): Promise<void> {
-  const rejected = Object.entries(result.rejected)
-    .map(([reason, count]) => `${reason}:${count}`)
+  /*
+   * **必ず1つのキーに畳んでから渡すこと。**
+   *
+   * AI Gateway のメタデータは1リクエストにつき5件までで、**超過分は黙って捨てられる**
+   * （docs/05-generation.md）。リクエスト時に themeId / kind / round / path で4件
+   * 使っているため、patchLog で使える枠は**残り1件だけ**。
+   *
+   * ここでキーを分けると、最適化モードのときだけ6件目が発生して、却下の内訳か
+   * 採用の計測のどちらかが消える。例外もログも出ないので、ダッシュボードを
+   * 開くまで気付けない。数を増やしたくなったらこの文字列に項目を足す。
+   */
+  const counts = Object.entries({
+    ...result.rejected,
+    // 却下ではなく採用側の計測。プロンプトの「2回以上入れる」が効いているかを見る
+    ...(result.constraintTwice === undefined ? {} : { twice: result.constraintTwice }),
+  })
+    .map(([label, count]) => `${label}:${count}`)
     .join(",");
 
   await env.AI.gateway("henge").patchLog(logId, {
     score: Math.round((result.valid / result.requested) * 100),
-    metadata: { rejected },
+    metadata: { counts },
   });
 }

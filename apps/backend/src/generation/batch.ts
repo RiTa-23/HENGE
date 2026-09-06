@@ -3,6 +3,8 @@
  * 2ラウンド目を回すか決めるため、並列化すると常に2ラウンド走ってしまう。
  */
 import {
+  containsKanji,
+  countConstraint,
   countKeystrokes,
   includesConstraint,
   isKeystrokeCountInRange,
@@ -25,6 +27,25 @@ import type { ModelId } from "./model";
 export const N_REQUEST = 20;
 export const MAX_ROUNDS = 2;
 
+/**
+ * 書き出しの重なりを見る文字数と、同じ書き出しを何本まで採るか。
+ *
+ * **プロンプトの言うことを聞かなかったときの歯止め。** 「し」を含む文を作れと
+ * 言うと、モデルは都合のいい語を1つ見つけて全部それで埋めてくる
+ * （実測で21件中14件が「しんしんと〜」だった）。完全一致ではないので `seen` は
+ * 素通りし、そのままプールに入ると「毎回違うお題」という前提が崩れる。
+ *
+ * **締めすぎると生成そのものが失敗する。** 3文字・2本で試したところ、
+ * 「ぴ」で40件中18件、「ぬ」で11件がここで落ち、15問に届かなかった（実測）。
+ * 指定文字を必ず入れさせる以上、書き出しはある程度似るのが自然で、
+ * それ自体は問題ではない。止めたいのは「1つの型で全部を埋める」ことだけ。
+ *
+ * 4文字・3本にしてある。「しんしんと〜」14件は3件まで削れる一方、
+ * 「しんぶん」「しんこう」「しんぱい」は先頭4文字が違うので互いに干渉しない。
+ */
+const OPENING_PREFIX_LENGTH = 4;
+const OPENING_MAX = 3;
+
 export interface ValidPrompt {
   text: string;
   readingKana: string;
@@ -35,6 +56,10 @@ export interface ValidPrompt {
 export interface RejectionCounts {
   /** 使用できない文字が含まれていた（読みにテーブル外のかなが残った場合を含む） */
   charset: number;
+  /** 漢字が1つも無い（ひらがなだけの文）*/
+  kanji: number;
+  /** 同じ書き出しの文が既に採用上限まである */
+  opening: number;
   /** 打鍵数が10〜40の範囲外 */
   keystroke: number;
   /** 「含む」モードで、指定文字が読み仮名に無かった */
@@ -77,8 +102,19 @@ export interface GenerateBatchInput {
  */
 export async function generateBatch(env: Env, input: GenerateBatchInput): Promise<BatchResult> {
   const valid: ValidPrompt[] = [];
-  const rejected: RejectionCounts = { charset: 0, keystroke: 0, constraint: 0 };
+  const rejected: RejectionCounts = {
+    charset: 0,
+    kanji: 0,
+    opening: 0,
+    keystroke: 0,
+    constraint: 0,
+  };
   const seen = new Set(input.existing);
+  // **既存お題は数えない。** 止めたいのは「1回の生成が1つの型で埋まる」ことで、
+  // 過去のプールに何本あるかは別の話。既存を数えると、偏った状態で作られた
+  // プール（実測で同じ書き出しが23本あった）に塞がれて補充が失敗する。
+  // ラウンドはまたいで数える（2ラウンド目で同じ型を作り直させない）
+  const openings = new Map<string, number>();
   let rounds = 0;
 
   for (let round = 1; round <= MAX_ROUNDS; round++) {
@@ -95,7 +131,7 @@ export async function generateBatch(env: Env, input: GenerateBatchInput): Promis
 
     const validBefore = valid.length;
     const rejectedBefore = { ...rejected };
-    await validateInto(texts, input, seen, valid, rejected);
+    await validateInto(texts, input, seen, openings, valid, rejected);
 
     if (logId !== undefined) {
       // ログは1リクエスト（＝1ラウンド）に紐づくため、採用数も却下数も
@@ -104,6 +140,7 @@ export async function generateBatch(env: Env, input: GenerateBatchInput): Promis
         requested: N_REQUEST,
         valid: valid.length - validBefore,
         rejected: { ...subtract(rejected, rejectedBefore) },
+        constraintTwice: countTwice(valid.slice(validBefore), input),
       }).catch(() => {
         // 計測の失敗で生成そのものを落とさない
       });
@@ -117,22 +154,43 @@ export async function generateBatch(env: Env, input: GenerateBatchInput): Promis
   return { valid, rejected, rounds, reachedTarget: valid.length >= input.target };
 }
 
+/**
+ * そのラウンドで採用したお題のうち、指定文字を**2回以上**含むものの数。
+ *
+ * 却下の条件ではない（1回でも入っていれば有効）。プロンプトの
+ * 「○個以上の文では2回以上入れる」がどれだけ効いているかを AI Gateway 側で
+ * 見るための計測値。**指示が効いているかは、出てきたお題を数えないと分からない。**
+ * テーマモードでは意味を持たないので undefined を返す。
+ */
+function countTwice(roundValid: ValidPrompt[], input: GenerateBatchInput): number | undefined {
+  if (input.kind !== "constraint") return undefined;
+  return roundValid.filter((prompt) => countConstraint(prompt.readingKana, input.name) >= 2).length;
+}
+
 function subtract(after: RejectionCounts, before: RejectionCounts): RejectionCounts {
   return {
     charset: after.charset - before.charset,
+    kanji: after.kanji - before.kanji,
+    opening: after.opening - before.opening,
     keystroke: after.keystroke - before.keystroke,
     constraint: after.constraint - before.constraint,
   };
+}
+
+/** 書き出しの重なりを見るためのキー。表記の先頭数文字 */
+function openingOf(text: string): string {
+  return [...text].slice(0, OPENING_PREFIX_LENGTH).join("");
 }
 
 async function validateInto(
   texts: string[],
   input: GenerateBatchInput,
   seen: Set<string>,
+  openings: Map<string, number>,
   valid: ValidPrompt[],
   rejected: RejectionCounts,
 ): Promise<void> {
-  // 重複と文字種は、読み取得の前に無料で弾く
+  // 重複・文字種・漢字の有無は、読み取得の前に無料で弾く（外部サブリクエストを使わない）
   const candidates = texts.filter((text) => {
     if (seen.has(text)) return false;
     seen.add(text);
@@ -140,6 +198,20 @@ async function validateInto(
       rejected.charset++;
       return false;
     }
+    // **ひらがなだけの文を通さない。** 打鍵は読み仮名に対して行うので「打てる」が、
+    // 画面に出るのは表記の方で、漢字かな混じり文を読みながら打つ練習から外れる
+    if (!containsKanji(text)) {
+      rejected.kanji++;
+      return false;
+    }
+    // **同じ書き出しを並べない。** 完全一致ではないので seen では拾えない
+    const opening = openingOf(text);
+    const used = openings.get(opening) ?? 0;
+    if (used >= OPENING_MAX) {
+      rejected.opening++;
+      return false;
+    }
+    openings.set(opening, used + 1);
     return true;
   });
 

@@ -11,7 +11,7 @@ import { playHref } from "@/lib/ui/kind";
 export const metadata: Metadata = {
   title: "タイピング最適化練習 | HENGE",
   description:
-    "「ざ」「ぎ」など苦手な音を必ず含む文章だけで練習できます。毎回違う文章が出るので、運指の弱点を文脈を変えながら詰められます。",
+    "指定した連接を必ず含む文章だけで練習できます。毎回違う文章が出るので、最適化した運指が特定の文章に紐づかず、実戦で出せるようになります。",
 };
 
 export const dynamic = "force-dynamic";
@@ -52,9 +52,10 @@ export default async function PracticePage({
         </div>
 
         <section className="mt-16">
-          <h2 className="text-sm tracking-[0.25em] text-kinari/50">よく詰まる音</h2>
+          <h2 className="text-sm tracking-[0.25em] text-kinari/50">代表的な最適化</h2>
           <p className="mt-3 text-sm text-kinari/50">
-            運営が用意した指定です。すでにお題がある音は、そのまま遊べます。
+            標準運指では同じ指が続く並びです。別々の指が続くよう運指を変えると速くなります。
+            すでにお題があるものは、そのまま遊べます。
           </p>
           <ul className="mt-6 grid gap-3 sm:grid-cols-2">
             {PRESETS.map((preset) => {

@@ -43,7 +43,7 @@ export default async function HomePage() {
           >
             <span className="font-mincho text-xl tracking-wide text-kinari">最適化練習</span>
             <span className="mt-3 block text-sm leading-relaxed text-kinari/60">
-              「ざ」など苦手な音を必ず含む文章だけで、運指の弱点を詰める。
+              指定した連接を必ず含む文章だけを出す。崩した運指を毎回違う文脈で固める。
             </span>
           </a>
         </div>

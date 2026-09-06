@@ -4,7 +4,7 @@ import { z } from "zod";
 /**
  * 入力検証は**公開APIの入口でだけ**行う。Hono側では行わない。
  *
- * `kind` によって許可する入力が変わる。含む文字がひらがな限定なのは、
+ * `kind` によって許可する入力が変わる。最適化する音がひらがな限定なのは、
  * 判定対象が読み仮名（ひらがな）のため。それ以外を指定しても永久に一致しない。
  */
 export const themeNameSchema = z
@@ -15,7 +15,7 @@ export const themeNameSchema = z
   // NFC正規化はバリデーションより先に行う必要があるため、isHiraganaOnly の中で行っている
   .refine(
     (value) => value.kind !== "constraint" || isHiraganaOnly(value.name),
-    "含む文字はひらがなだけを指定できます",
+    "最適化する音はひらがなだけを指定できます",
   );
 
 /** 匿名時のオフセット。改ざんは許容するが、範囲外の値は弾く */

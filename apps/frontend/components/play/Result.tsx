@@ -20,10 +20,13 @@ export function Result({
   stats,
   onRetry,
   themeName,
+  listHref,
 }: {
   stats: PlayStats;
   onRetry: () => void;
   themeName: string;
+  /** 離脱先の一覧。テーマなら /themes、最適化する音なら /practice */
+  listHref: string;
 }) {
   const items = [
     { label: "打鍵速度", value: keysPerSecond(stats).toFixed(1), unit: "打鍵/秒" },
@@ -66,7 +69,7 @@ export function Result({
             もう一度
           </button>
           <a
-            href="/themes"
+            href={listHref}
             className="rounded-md border border-kinari/20 px-8 py-3 font-gothic tracking-widest text-kinari/80 transition-colors hover:border-kin hover:text-kinari"
           >
             ほかのお題を見る

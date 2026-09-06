@@ -33,7 +33,7 @@ export async function findTheme(kind: ThemeKind, name: string): Promise<ThemeDet
   return ((await detail.json()) as { theme: ThemeDetail }).theme;
 }
 
-/** テーマ／含む文字の一覧。SSRのページが使う */
+/** テーマ／最適化する音の一覧。SSRのページが使う */
 export async function listThemes(params: {
   kind: ThemeKind;
   sort: "popular" | "recent";

@@ -11,8 +11,10 @@ export {
   buildRomanCandidates,
   countKeystrokes,
   countKeystrokesFromKana,
+  isImeKey,
   KANA_TABLE,
   katakanaToHiragana,
+  normalizeTypedKey,
   pressKey,
   type RomanCandidates,
   romanDisplay,
@@ -23,6 +25,8 @@ export {
   UnsupportedKanaError,
 } from "./typing/index";
 export {
+  containsKanji,
+  countConstraint,
   includesConstraint,
   isKeystrokeCountInRange,
   isTypableText,

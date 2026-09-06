@@ -15,7 +15,7 @@ describe("themeNameSchema", () => {
     expect(themeNameSchema.safeParse({ kind: "theme", name: "   " }).success).toBe(false);
   });
 
-  test("含む文字はひらがな1〜4文字", () => {
+  test("最適化する音はひらがな1〜4文字", () => {
     expect(themeNameSchema.safeParse({ kind: "constraint", name: "ざ" }).success).toBe(true);
     expect(themeNameSchema.safeParse({ kind: "constraint", name: "しゃりん" }).success).toBe(true);
     expect(themeNameSchema.safeParse({ kind: "constraint", name: "あいうえお" }).success).toBe(
@@ -23,7 +23,7 @@ describe("themeNameSchema", () => {
     );
   });
 
-  test("含む文字にひらがな以外は使えない（読み仮名と永久に一致しないため）", () => {
+  test("最適化する音にひらがな以外は使えない（読み仮名と永久に一致しないため）", () => {
     for (const name of ["ザ", "座", "za", "1", "ー", "あ い"]) {
       expect(themeNameSchema.safeParse({ kind: "constraint", name }).success).toBe(false);
     }

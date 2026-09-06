@@ -1,5 +1,7 @@
 import { describe, expect, test } from "bun:test";
 import {
+  containsKanji,
+  countConstraint,
   includesConstraint,
   isKeystrokeCountInRange,
   isTypableText,
@@ -78,5 +80,58 @@ describe("includesConstraint", () => {
   test("複数文字の指定にも対応する", () => {
     expect(includesConstraint("しゃりん", "しゃ")).toBe(true);
     expect(includesConstraint("しりん", "しゃ")).toBe(false);
+  });
+});
+
+/**
+ * ひらがなだけのお題を弾く。打鍵は読み仮名に対して行うので「打てる」が、
+ * 画面に出るのは表記の方で、漢字かな混じり文を読む練習から外れる。
+ */
+describe("containsKanji", () => {
+  test.each(["座禅を組む。", "手裏剣が闇を裂いた。", "コーヒーを飲む。", "人々が集まる。"])(
+    "%p は漢字を含む",
+    (text) => {
+      expect(containsKanji(text)).toBe(true);
+    },
+  );
+
+  test.each([
+    "ざぜんをくむ。",
+    "しゅりけんがやみをさいた。",
+    "コーヒーをのむ。",
+    "ざあざあふるあめ、",
+    "",
+  ])("%p は漢字を含まない", (text) => {
+    expect(containsKanji(text)).toBe(false);
+  });
+});
+
+/**
+ * 却下の条件ではなく**計測用**。「2回以上入れる」という指示が効いているかは、
+ * 出てきたお題を数えないと分からない。
+ */
+describe("countConstraint", () => {
+  test("読み仮名に現れた回数を数える", () => {
+    expect(countConstraint("ざぜんをくむ", "ざ")).toBe(1);
+    expect(countConstraint("ざあざあとざつおん", "ざ")).toBe(3);
+    expect(countConstraint("しゅりけん", "ざ")).toBe(0);
+  });
+
+  test("複数文字の指定も数えられる", () => {
+    expect(countConstraint("しゃりんがしゃべる", "しゃ")).toBe(2);
+  });
+
+  test("重なりは数えない", () => {
+    // 「ささささ」に「ささ」は2回。1文字ずつずらして数えると3回になってしまう
+    expect(countConstraint("ささささ", "ささ")).toBe(2);
+  });
+
+  test("空の指定は0（無限ループにしない）", () => {
+    expect(countConstraint("ざぜん", "")).toBe(0);
+  });
+
+  test("includesConstraint と食い違わない", () => {
+    expect(includesConstraint("ざぜん", "ざ")).toBe(countConstraint("ざぜん", "ざ") > 0);
+    expect(includesConstraint("しゅりけん", "ざ")).toBe(countConstraint("しゅりけん", "ざ") > 0);
   });
 });

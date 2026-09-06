@@ -1,9 +1,10 @@
 "use client";
 
-import { isApiError } from "@henge/shared";
+import { isApiError, isHiraganaOnly, type ThemeKind } from "@henge/shared";
 import { useEffect, useState } from "react";
 import { authClient } from "@/lib/api/auth-client";
 import { Shuriken } from "@/components/play/Shuriken";
+import { playHref } from "@/lib/ui/kind";
 
 interface CreatedTheme {
   theme: { name: string };
@@ -12,14 +13,54 @@ interface CreatedTheme {
 }
 
 /**
- * テーマ作成。生成を伴うので認証が要る。
+ * `kind` ごとに変わるのは**文言と入力の制限だけ**。作成の流れ（ログイン確認 →
+ * 生成待ち → 結果）はテーマも最適化する音も同じなので、フォームを2組持たない。
+ * DB上も同じテーブルで、APIも `kind` 1つで分岐している（docs/04-api.md）。
+ */
+const COPY = {
+  theme: {
+    label: "テーマ名（1〜30文字）",
+    placeholder: "忍びの心得",
+    maxLength: 30,
+    submit: "作る",
+    back: "テーマ作成に戻る",
+    /** ひらがな以外も通るので、クライアント側での事前検査は無い */
+    validate: (): string | null => null,
+  },
+  constraint: {
+    label: "最適化する音（ひらがな1〜4文字）",
+    placeholder: "ざ",
+    maxLength: 4,
+    submit: "この音で作る",
+    back: "別の音を指定する",
+    /**
+     * **ひらがな以外はここで止める。** サーバーも `VALIDATION_ERROR` で弾くが、
+     * 送ってしまうと `GENERATION_RATE_LIMIT`（5回/60秒）を1つ消費するため、
+     * 打ち間違いの数回で `RATE_LIMITED` に落ちる。判定規則そのものは
+     * `packages/shared` の `isHiraganaOnly` を共有していて、二重定義ではない
+     */
+    validate: (name: string): string | null =>
+      isHiraganaOnly(name) ? null : "最適化する音はひらがなだけを指定できます",
+  },
+} as const satisfies Record<ThemeKind, unknown>;
+
+/**
+ * テーマ／最適化する音の作成。生成を伴うので認証が要る。
  *
  * **ここは `<input>` を使ってよい。** IMEを避けるのは打鍵を拾うプレイ画面だけで、
  * テーマ名は日本語入力そのものが要る（不変条件7はタイピング判定の話）。
  */
-export function NewThemeForm() {
+export function CreateThemeForm({
+  kind,
+  initialName = "",
+}: {
+  kind: ThemeKind;
+  /** プリセットから飛んできたときに埋めておく文字 */
+  initialName?: string;
+}) {
+  const copy = COPY[kind];
   const { data: session, isPending } = authClient.useSession();
-  const [name, setName] = useState("");
+  const [name, setName] = useState(initialName);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [created, setCreated] = useState<{ name: string; created: boolean } | null>(null);
@@ -55,11 +96,11 @@ export function NewThemeForm() {
     );
   }
 
-  const create = async () => {
+  const create = async (trimmed: string) => {
     const response = await fetch("/api/themes", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ kind: "theme", name }),
+      body: JSON.stringify({ kind, name: trimmed }),
     });
     const body: unknown = await response.json();
 
@@ -86,9 +127,15 @@ export function NewThemeForm() {
 
   const submit = (event: React.FormEvent) => {
     event.preventDefault();
+    const trimmed = name.trim();
+    const invalid = copy.validate(trimmed);
+    if (invalid !== null) {
+      setError(invalid);
+      return;
+    }
     setBusy(true);
     setError(null);
-    void create();
+    void create(trimmed);
   };
 
   if (created !== null) {
@@ -106,7 +153,7 @@ export function NewThemeForm() {
 
         <div className="mt-10 flex flex-wrap justify-center gap-4">
           <a
-            href={`/play/${encodeURIComponent(created.name)}`}
+            href={playHref(kind, created.name)}
             className="rounded-md border border-shu bg-shu/15 px-8 py-3 tracking-widest text-kinari transition-colors hover:bg-shu/25"
           >
             プレイする
@@ -119,7 +166,7 @@ export function NewThemeForm() {
             }}
             className="rounded-md border border-kinari/20 px-8 py-3 tracking-widest text-kinari/80 transition-colors hover:border-kin hover:text-kinari"
           >
-            テーマ作成に戻る
+            {copy.back}
           </button>
         </div>
       </div>
@@ -139,15 +186,15 @@ export function NewThemeForm() {
   return (
     <form onSubmit={submit} className="mt-10">
       <label htmlFor="theme-name" className="block text-sm tracking-widest text-kinari/60">
-        テーマ名（1〜30文字）
+        {copy.label}
       </label>
       <input
         id="theme-name"
         value={name}
         onChange={(event) => setName(event.target.value)}
-        maxLength={30}
+        maxLength={copy.maxLength}
         required
-        placeholder="忍びの心得"
+        placeholder={copy.placeholder}
         className="mt-3 w-full rounded-md border border-kinari/20 bg-kinari/5 px-4 py-3 text-kinari outline-none focus:border-kin"
       />
 
@@ -162,7 +209,7 @@ export function NewThemeForm() {
         disabled={name.trim() === ""}
         className="mt-8 rounded-md border border-shu bg-shu/15 px-10 py-3 tracking-[0.2em] text-kinari transition-colors hover:bg-shu/25 disabled:border-kinari/15 disabled:bg-transparent disabled:text-kinari/30"
       >
-        作る
+        {copy.submit}
       </button>
     </form>
   );

@@ -3,6 +3,8 @@ import { LoginButton } from "@/components/LoginButton";
 
 /**
  * 共通ヘッダー。**管理画面へのリンクは置かない**（直接URLでのみアクセスする）。
+ *
+ * 2つのモード（テーマ／最適化）は排他なので、両方をここから辿れるようにする。
  */
 export function SiteHeader() {
   return (
@@ -12,6 +14,9 @@ export function SiteHeader() {
         <nav className="flex items-center gap-6 text-sm tracking-widest text-kinari/70">
           <a href="/themes" className="hover:text-kinari">
             お題一覧
+          </a>
+          <a href="/practice" className="hover:text-kinari">
+            最適化
           </a>
           <a href="/themes/new" className="hover:text-kinari">
             お題を作る

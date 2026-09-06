@@ -2,12 +2,15 @@
 
 import {
   isApiError,
+  isImeKey,
+  normalizeTypedKey,
   PLAY_SIZE,
   pressKey,
   type RomanCandidates,
   romanDisplay,
   splitKanaUnits,
   startTyping,
+  type ThemeKind,
   type TypingProgress,
 } from "@henge/shared";
 import { useCallback, useEffect, useRef, useState } from "react";
@@ -19,6 +22,7 @@ import { ProgressDots } from "./ProgressDots";
 import { Result, type PlayStats } from "./Result";
 import { Scroll } from "./Scroll";
 import { readOffset, writeOffset } from "@/lib/play/offset";
+import { kindLabel, listHref } from "@/lib/ui/kind";
 
 interface Prompt {
   id: string;
@@ -58,19 +62,41 @@ function nextKeysOf(progress: TypingProgress): NextKey[] {
   return [...letters].map((letter) => toNextKey(letter));
 }
 
-/** 打鍵として扱うキーか。修飾キー付きのショートカットは拾わない */
+/**
+ * 打鍵として扱うキーか。
+ *
+ * ここで見るのは修飾キーだけ。**どの文字を打鍵として受けるかは
+ * `normalizeTypedKey`（packages/shared）に任せる。** Shift は `！` `？` の
+ * 入力に要るので許す。
+ */
 function isTypingKey(event: KeyboardEvent): boolean {
-  if (event.ctrlKey || event.metaKey || event.altKey) return false;
-  // Shift は `！` `？` の入力に要るので許す。key が1文字のものだけ受ける
-  return [...event.key].length === 1;
+  return !(event.ctrlKey || event.metaKey || event.altKey);
 }
 
-export function PlayScreen({ themeId, themeName }: { themeId: string; themeName: string }) {
+/**
+ * 打鍵の画面。**テーマモードと最適化モードで分けない。**
+ * 違うのは離脱先の一覧と、画面に出す呼び名（「このテーマ」／「この音」）だけ。
+ */
+export function PlayScreen({
+  themeId,
+  themeName,
+  kind,
+}: {
+  themeId: string;
+  themeName: string;
+  kind: ThemeKind;
+}) {
   const { data: authSession } = authClient.useSession();
+  const backToList = listHref(kind);
   const [phase, setPhase] = useState<Phase>({ name: "ready" });
   const [promptIndex, setPromptIndex] = useState(0);
   const [progress, setProgress] = useState<TypingProgress>(() => startTyping([]));
   const [stats, setStats] = useState<PlayStats>({ hits: 0, misses: 0, elapsedMs: 0 });
+  /**
+   * 日本語入力のまま打たれたことがあるか。**一度でも見たら出しっぱなしにする。**
+   * 打つたびに出たり消えたりすると、打鍵に気を取られて読めない
+   */
+  const [imeDetected, setImeDetected] = useState(false);
   const startedAt = useRef<number>(0);
   const surface = useRef<HTMLDivElement>(null);
   // 生成中の待ち。attempt を増やすと load が走り直す
@@ -198,9 +224,22 @@ export function PlayScreen({ themeId, themeName }: { themeId: string; themeName:
 
   const onKeyDown = (event: React.KeyboardEvent<HTMLDivElement>) => {
     if (phase.name !== "playing" || !isTypingKey(event.nativeEvent)) return;
+
+    // **`event.key` をそのまま渡さない。** 候補テーブルは小文字のASCIIしか持たないため、
+    // Caps Lock の `"S"` や、かなで届いた `"し"` は**すべてミスとして数えられてしまう**。
+    // 「正しく打っているのに一文字も進まない」という、画面から原因の見えない壊れ方になる
+    const typed = normalizeTypedKey(event.key);
+    if (typed === null) {
+      // 打鍵として解釈できないものは**ミスに数えない**。原因が分かるものだけ画面で伝える
+      if (isImeKey(event.key)) {
+        event.preventDefault();
+        setImeDetected(true);
+      }
+      return;
+    }
     event.preventDefault();
 
-    const next = pressKey(progress, event.key);
+    const next = pressKey(progress, typed);
     if (!next.finished) {
       setProgress(next);
       return;
@@ -245,7 +284,7 @@ export function PlayScreen({ themeId, themeName }: { themeId: string; themeName:
 
           <div className="mt-12 flex justify-center">
             <a
-              href="/themes"
+              href={backToList}
               className="rounded-md border border-kinari/20 px-8 py-2.5 tracking-widest text-kinari/80 transition-colors hover:border-kin hover:text-kinari"
             >
               一覧に戻る
@@ -281,12 +320,12 @@ export function PlayScreen({ themeId, themeName }: { themeId: string; themeName:
 
           {canRegenerate && (
             <p className="mt-5 text-sm leading-relaxed text-kinari/60">
-              このテーマのお題を作り足せます。本日の生成回数を1つ使います。
+              {kindLabel(kind)}のお題を作り足せます。本日の生成回数を1つ使います。
             </p>
           )}
           {exhausted && authSession === null && (
             <p className="mt-5 text-sm leading-relaxed text-kinari/60">
-              ログインすると、このテーマのお題を作り足して続けられます。
+              ログインすると、{kindLabel(kind)}のお題を作り足して続けられます。
             </p>
           )}
 
@@ -319,7 +358,7 @@ export function PlayScreen({ themeId, themeName }: { themeId: string; themeName:
               </button>
             )}
             <a
-              href="/themes"
+              href={backToList}
               className="rounded-md border border-kinari/20 px-6 py-2.5 tracking-widest text-kinari/80 transition-colors hover:border-kin hover:text-kinari"
             >
               ほかのお題を見る
@@ -337,7 +376,7 @@ export function PlayScreen({ themeId, themeName }: { themeId: string; themeName:
   }
 
   if (phase.name === "result") {
-    return <Result stats={stats} themeName={themeName} onRetry={start} />;
+    return <Result stats={stats} themeName={themeName} onRetry={start} listHref={backToList} />;
   }
 
   const prompt = phase.session.prompts[promptIndex];
@@ -379,6 +418,12 @@ export function PlayScreen({ themeId, themeName }: { themeId: string; themeName:
       <div className="border-t border-kin/40 pt-6">
         <Keyboard nextKeys={nextKeysOf(progress)} />
       </div>
+
+      {imeDetected && (
+        <p className="mt-4 rounded-md border border-shu/50 bg-shu/10 px-4 py-3 text-center text-sm text-kinari">
+          日本語入力のままです。<strong>英数入力に切り替えてください。</strong>
+        </p>
+      )}
 
       <p className="mt-4 text-center font-mono text-xs text-kinari/40">
         {romanDisplay(progress).cursor} 打目 ／ ミス {progress.missCount}

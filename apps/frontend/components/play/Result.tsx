@@ -25,7 +25,7 @@ export function Result({
   stats: PlayStats;
   onRetry: () => void;
   themeName: string;
-  /** 離脱先の一覧。テーマなら /themes、含む文字なら /practice */
+  /** 離脱先の一覧。テーマなら /themes、最適化する音なら /practice */
   listHref: string;
 }) {
   const items = [

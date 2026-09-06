@@ -4,7 +4,7 @@ import { LoginButton } from "@/components/LoginButton";
 /**
  * 共通ヘッダー。**管理画面へのリンクは置かない**（直接URLでのみアクセスする）。
  *
- * 2つのモード（テーマ／含む文字）は排他なので、両方をここから辿れるようにする。
+ * 2つのモード（テーマ／最適化）は排他なので、両方をここから辿れるようにする。
  */
 export function SiteHeader() {
   return (
@@ -16,7 +16,7 @@ export function SiteHeader() {
             お題一覧
           </a>
           <a href="/practice" className="hover:text-kinari">
-            文字を含める
+            最適化
           </a>
           <a href="/themes/new" className="hover:text-kinari">
             お題を作る

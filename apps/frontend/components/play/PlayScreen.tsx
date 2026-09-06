@@ -74,8 +74,8 @@ function isTypingKey(event: KeyboardEvent): boolean {
 }
 
 /**
- * 打鍵の画面。**テーマモードと含む文字モードで分けない。**
- * 違うのは離脱先の一覧と、画面に出す呼び名（「このテーマ」／「この文字」）だけ。
+ * 打鍵の画面。**テーマモードと最適化モードで分けない。**
+ * 違うのは離脱先の一覧と、画面に出す呼び名（「このテーマ」／「この音」）だけ。
  */
 export function PlayScreen({
   themeId,

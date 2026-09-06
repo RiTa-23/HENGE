@@ -7,7 +7,7 @@ import { currentUserId } from "@/lib/api/session";
 
 export const dynamic = "force-dynamic";
 
-/** テーマ／含む文字の一覧。認証不要 */
+/** テーマ／最適化する音の一覧。認証不要 */
 export async function GET(request: Request) {
   const query = Object.fromEntries(new URL(request.url).searchParams);
   const parsed = themeListQuerySchema.safeParse(query);

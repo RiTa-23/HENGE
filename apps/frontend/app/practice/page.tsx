@@ -9,7 +9,7 @@ import { normalizeName } from "@henge/shared";
 import { playHref } from "@/lib/ui/kind";
 
 export const metadata: Metadata = {
-  title: "文字を含めるタイピング練習 | HENGE",
+  title: "タイピング最適化練習 | HENGE",
   description:
     "「ざ」「ぎ」など苦手な音を必ず含む文章だけで練習できます。毎回違う文章が出るので、運指の弱点を文脈を変えながら詰められます。",
 };
@@ -17,7 +17,7 @@ export const metadata: Metadata = {
 export const dynamic = "force-dynamic";
 
 /**
- * 含む文字一覧。テーマ一覧と**対称の構造**にする。
+ * 最適化練習の一覧。テーマ一覧と**対称の構造**にする。
  *
  * 掲載順は「待たずに遊べるもの」が先。生成済みの指定は既存プールから即座に
  * 配信できるが、未生成のものはログイン＋生成待ちが要る（テーマ作成と同じ扱い）。
@@ -40,7 +40,7 @@ export default async function PracticePage({
     <>
       <SiteHeader />
       <main className="mx-auto w-full max-w-5xl px-6 py-16">
-        <h1 className="font-mincho text-3xl tracking-wide text-kinari">文字を含めて打つ</h1>
+        <h1 className="font-mincho text-3xl tracking-wide text-kinari">最適化練習</h1>
         <p className="mt-6 max-w-2xl leading-loose text-kinari/70">
           指定した音を必ず含む文章だけが出ます。判定は
           <strong className="text-kinari">読み仮名</strong>

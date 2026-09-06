@@ -80,9 +80,7 @@ export function AdminThemeList() {
                 <span className="ml-3 text-xs tracking-widest text-kinari/40">生成困難</span>
               )}
             </td>
-            <td className="py-3 text-kinari/60">
-              {theme.kind === "theme" ? "テーマ" : "含む文字"}
-            </td>
+            <td className="py-3 text-kinari/60">{theme.kind === "theme" ? "テーマ" : "最適化"}</td>
             <td className="py-3 text-right font-mono text-kinari/70">{theme.promptCount}</td>
             <td className="py-3 text-right font-mono text-kinari/70">{theme.totalPlayCount}</td>
             <td className="py-3 text-right">

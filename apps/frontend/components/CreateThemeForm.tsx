@@ -14,7 +14,7 @@ interface CreatedTheme {
 
 /**
  * `kind` ごとに変わるのは**文言と入力の制限だけ**。作成の流れ（ログイン確認 →
- * 生成待ち → 結果）はテーマも含む文字も同じなので、フォームを2組持たない。
+ * 生成待ち → 結果）はテーマも最適化する音も同じなので、フォームを2組持たない。
  * DB上も同じテーブルで、APIも `kind` 1つで分岐している（docs/04-api.md）。
  */
 const COPY = {
@@ -28,11 +28,11 @@ const COPY = {
     validate: (): string | null => null,
   },
   constraint: {
-    label: "含める文字（ひらがな1〜4文字）",
+    label: "最適化する音（ひらがな1〜4文字）",
     placeholder: "ざ",
     maxLength: 4,
-    submit: "この文字で作る",
-    back: "別の文字を指定する",
+    submit: "この音で作る",
+    back: "別の音を指定する",
     /**
      * **ひらがな以外はここで止める。** サーバーも `VALIDATION_ERROR` で弾くが、
      * 送ってしまうと `GENERATION_RATE_LIMIT`（5回/60秒）を1つ消費するため、
@@ -40,12 +40,12 @@ const COPY = {
      * `packages/shared` の `isHiraganaOnly` を共有していて、二重定義ではない
      */
     validate: (name: string): string | null =>
-      isHiraganaOnly(name) ? null : "含める文字はひらがなだけを指定できます",
+      isHiraganaOnly(name) ? null : "最適化する音はひらがなだけを指定できます",
   },
 } as const satisfies Record<ThemeKind, unknown>;
 
 /**
- * テーマ／含む文字の作成。生成を伴うので認証が要る。
+ * テーマ／最適化する音の作成。生成を伴うので認証が要る。
  *
  * **ここは `<input>` を使ってよい。** IMEを避けるのは打鍵を拾うプレイ画面だけで、
  * テーマ名は日本語入力そのものが要る（不変条件7はタイピング判定の話）。

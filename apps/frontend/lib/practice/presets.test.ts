@@ -4,7 +4,7 @@ import { isValidPreset, PRESETS, presetCreateHref } from "./presets";
 /**
  * プリセットは運営が手で足すリストなので、**混入は静かに通る**。
  * カタカナや長音符「ー」を1つ足すと、画面上は普通のボタンに見えるのに、
- * 押した人だけが `VALIDATION_ERROR` に当たる（含む文字はひらがなのみ）。
+ * 押した人だけが `VALIDATION_ERROR` に当たる（最適化する音はひらがなのみ）。
  *
  * 検証規則は `lib/api/schema.ts` の `themeNameSchema`（constraint は1〜4文字＋
  * ひらがなのみ）と同じものをここでも見る。

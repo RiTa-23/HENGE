@@ -41,7 +41,7 @@ export default async function HomePage() {
             href="/practice"
             className="rounded-md border border-kinari/15 bg-kinari/5 px-8 py-7 transition-colors hover:border-shu/60"
           >
-            <span className="font-mincho text-xl tracking-wide text-kinari">文字を含めて打つ</span>
+            <span className="font-mincho text-xl tracking-wide text-kinari">最適化練習</span>
             <span className="mt-3 block text-sm leading-relaxed text-kinari/60">
               「ざ」など苦手な音を必ず含む文章だけで、運指の弱点を詰める。
             </span>

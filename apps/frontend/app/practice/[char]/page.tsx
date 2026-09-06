@@ -13,13 +13,13 @@ export async function generateMetadata({
   const char = decodePageParam((await params).char);
   if (char === null) return {};
   return {
-    title: `「${char}」を含むタイピング練習 | HENGE`,
+    title: `「${char}」のタイピング最適化練習 | HENGE`,
     description: `読み仮名に「${char}」を含む文章だけを打つ練習。毎回違う文章が出るので、${char}の運指を文脈を変えながら詰められます。`,
   };
 }
 
 /**
- * 含む文字の練習ページ。テーマ詳細（/themes/[name]）と対称の構造で、
+ * 最適化練習の詳細ページ。テーマ詳細（/themes/[name]）と対称の構造で、
  * **行き止まりにせず「はじめる」を主役に置く**。
  */
 export default async function PracticeDetailPage({
@@ -40,7 +40,7 @@ export default async function PracticeDetailPage({
     <>
       <SiteHeader />
       <main className="mx-auto w-full max-w-3xl px-6 py-20">
-        <p className="text-sm tracking-[0.25em] text-kinari/50">含む文字</p>
+        <p className="text-sm tracking-[0.25em] text-kinari/50">最適化する音</p>
         <h1 className="mt-2 font-mincho text-4xl tracking-wide text-kinari">{theme.name}</h1>
         <p className="mt-6 leading-loose text-kinari/70">
           読み仮名に「{theme.name}」を含む文章だけが出ます。表記に現れていなくても構いません。
@@ -67,7 +67,7 @@ export default async function PracticeDetailPage({
 
         <p className="mt-10 text-sm text-kinari/50">
           <a href="/practice" className="hover:text-kinari">
-            ほかの文字を見る →
+            ほかの音を見る →
           </a>
         </p>
       </main>

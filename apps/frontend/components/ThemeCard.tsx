@@ -2,10 +2,10 @@ import type { ThemeSummary } from "@/lib/api/themes";
 import { playHref } from "@/lib/ui/kind";
 
 /**
- * 一覧のテーマ／含む文字1件。**押すとプレイに直行する**（詳細を経由させない）。
+ * 一覧のテーマ／最適化する音1件。**押すとプレイに直行する**（詳細を経由させない）。
  * 詳細は検索エンジンからの着地ページで、回遊の途中に挟むものではない。
  *
- * リンク先は `playHref` に任せる。含む文字は `?kind=constraint` を伴わないと、
+ * リンク先は `playHref` に任せる。最適化する音は `?kind=constraint` を伴わないと、
  * 同名のテーマ（一意制約が `(kind, normalized_name)` なので共存できる）を開く。
  */
 export function ThemeCard({ theme }: { theme: ThemeSummary }) {

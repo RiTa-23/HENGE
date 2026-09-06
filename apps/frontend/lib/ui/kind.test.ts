@@ -2,7 +2,7 @@ import { describe, expect, it } from "bun:test";
 import { detailHref, kindLabel, listHref, parseThemeKind, playHref } from "./kind";
 
 /**
- * テーマ「ざ」と含む文字「ざ」は一意制約上**共存できる**ため、名前だけでは
+ * テーマ「ざ」と最適化する音「ざ」は一意制約上**共存できる**ため、名前だけでは
  * どちらを開くか決まらない。URLの kind を落とすと、静かに別のプールを開く。
  */
 describe("parseThemeKind", () => {
@@ -23,7 +23,7 @@ describe("playHref", () => {
     expect(playHref("theme", "忍びの心得")).toBe(`/play/${encodeURIComponent("忍びの心得")}`);
   });
 
-  it("含む文字は kind=constraint を付ける", () => {
+  it("最適化する音は kind=constraint を付ける", () => {
     expect(playHref("constraint", "ざ")).toBe(`/play/${encodeURIComponent("ざ")}?kind=constraint`);
   });
 
@@ -34,7 +34,7 @@ describe("playHref", () => {
 });
 
 describe("detailHref", () => {
-  it("テーマは /themes/[name]、含む文字は /practice/[char]", () => {
+  it("テーマは /themes/[name]、最適化する音は /practice/[char]", () => {
     expect(detailHref("theme", "忍びの心得")).toBe(`/themes/${encodeURIComponent("忍びの心得")}`);
     expect(detailHref("constraint", "ざ")).toBe(`/practice/${encodeURIComponent("ざ")}`);
   });
@@ -45,6 +45,6 @@ describe("listHref / kindLabel", () => {
     expect(listHref("theme")).toBe("/themes");
     expect(listHref("constraint")).toBe("/practice");
     expect(kindLabel("theme")).toBe("このテーマ");
-    expect(kindLabel("constraint")).toBe("この文字");
+    expect(kindLabel("constraint")).toBe("この音");
   });
 });

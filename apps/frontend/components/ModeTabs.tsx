@@ -14,13 +14,17 @@ export function ModeTabs({ current }: { current: ThemeKind }) {
   ] as const;
 
   return (
-    <div className="flex gap-2" role="tablist">
+    /*
+     * **タブではなくナビゲーション。** role="tab" を付けると読み上げは
+     * 「タブ2個中1個目」になるが、実際は押すとページごと遷移する。
+     * 対応する tabpanel も無い。aria-current="page" が実態に合う
+     */
+    <nav className="flex gap-2" aria-label="練習モード">
       {modes.map((mode) => (
         <a
           key={mode.kind}
           href={mode.href}
-          role="tab"
-          aria-selected={mode.kind === current}
+          aria-current={mode.kind === current ? "page" : undefined}
           className={
             mode.kind === current
               ? "rounded-md border border-kin bg-kinari/5 px-6 py-2 text-sm tracking-widest text-kinari"
@@ -30,6 +34,6 @@ export function ModeTabs({ current }: { current: ThemeKind }) {
           {mode.label}
         </a>
       ))}
-    </div>
+    </nav>
   );
 }

@@ -44,17 +44,23 @@ async function seed() {
   }
 }
 
-/** Yahoo ルビ振りAPI の応答を差し替える（外部サブリクエストを消費しない） */
+/** Yahoo ルビ振りAPI の応答を差し替える（外部サブリクエストを消費しない）。
+ * 本文の q（元の文）から読みを引く。**テーマ名まで文と同じ読みを返すと、
+ * テーマ名の読みで始まる文が全部弾かれて**補充が0件になる */
 function stubYahooReading() {
-  vi.spyOn(globalThis, "fetch").mockImplementation(
-    async () =>
-      new Response(
-        JSON.stringify({
-          result: { word: [{ surface: AI_TEXT, furigana: AI_READING }] },
-        }),
-        { status: 200, headers: { "content-type": "application/json" } },
-      ),
-  );
+  const readings: Record<string, string> = {
+    [AI_TEXT]: AI_READING,
+    忍びの心得: "しのびのこころえ。",
+  };
+  vi.spyOn(globalThis, "fetch").mockImplementation(async (input, init) => {
+    const raw = typeof init?.body === "string" ? init.body : "{}";
+    const text = (JSON.parse(raw) as { params?: { q?: string } }).params?.q ?? "";
+    const furigana = readings[text] ?? text;
+    return new Response(JSON.stringify({ result: { word: [{ surface: text, furigana }] } }), {
+      status: 200,
+      headers: { "content-type": "application/json" },
+    });
+  });
 }
 
 function stubAi(response: unknown) {

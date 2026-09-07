@@ -89,10 +89,12 @@ const READINGS: Record<string, string> = {
     "しゅりけんがやみをさいてひょうてきをせいかくにいぬいたしゅんかんだった。",
   // テーマ語の一極集中の再現用。テーマ「魚」の文は読みが「ぎょ」で始まる
   "魚は海と川にいる。": "ぎょはうみとかわにいる。",
-  "魚は泳ぎます。": "ぎょはおよぎます。",
-  "魚の仲間にサメがいる。": "ぎょのなかまにさめがいる。",
-  "魚は川をさかのぼる。": "ぎょはかわをさかのぼる。",
+  "川には魚がいる。": "かわにさかながいる。",
   "川底に沈む船。": "かわそこにしずむふね。",
+  // 読みでテーマ語から始まる文。表記にはテーマ名「忍び」が現れない
+  忍び: "しのび",
+  "しのびの道は遠し。": "しのびのみちはとおし。",
+  "影に潜む。": "かげにひそむ。",
   // 読みの先頭2かなが同じ文。表記は「型は／型が／型を／型に」と1文字目しか同じでない
   "型は力だ。": "かたはちからだ。",
   "型が道を開く。": "かたがみちをひらく。",
@@ -186,7 +188,7 @@ describe("generateBatch", () => {
     );
 
     expect(result.rejected.charset).toBe(1);
-    expect(readingCalls).toBe(1); // 弾いた分は読み取得を呼ばない
+    expect(readingCalls).toBe(2); // 弾いた分は読み取得を呼ばない（+テーマ名の読み取得1回）
   });
 
   it("打鍵数が範囲外なら keystroke で却下する", async () => {
@@ -223,7 +225,7 @@ describe("generateBatch", () => {
 
     expect(result.rejected.kanji).toBe(1);
     expect(result.valid.map((v) => v.text)).toEqual(["忍びは闇を走る。"]);
-    expect(readingCalls).toBe(1); // 弾いた分は読み取得を呼ばない
+    expect(readingCalls).toBe(2); // 弾いた分は読み取得を呼ばない（+テーマ名の読み取得1回）
   });
 
   it("含むモードでは、指定文字を2回以上含む採用数を記録する", async () => {
@@ -277,25 +279,31 @@ describe("generateBatch", () => {
     expect(result.rejected.opening).toBe(1);
   });
 
-  it("テーマ名を含む文は上限までしか採らない（テーマモード）", async () => {
-    // テーマ「魚」で「魚は〜」「魚の〜」が並んだ実態の再現。
-    // 上限を超えた分は読み取得の前に弾く
+  it("テーマ名で始まる文は採らない（テーマモード）", async () => {
+    // テーマ「魚」で「魚は〜」が並んだ実態の再現。1文ごとに判定できる
+    // 局所ルールとして、文頭のテーマ語を弾く
     const result = await generateBatch(
       envWithAiResponses([
-        [
-          "魚は海と川にいる。",
-          "魚は泳ぎます。",
-          "魚の仲間にサメがいる。",
-          "魚は川をさかのぼる。",
-          "川底に沈む船。",
-        ],
+        ["魚は海と川にいる。", "川には魚がいる。", "魚は川をさかのぼる。", "川底に沈む船。"],
         [],
       ]),
       input({ kind: "theme", name: "魚", target: 4 }),
     );
 
-    expect(result.valid.map((v) => v.text)).not.toContain("魚は川をさかのぼる。");
-    expect(result.rejected.themeName).toBe(1);
+    expect(result.valid.map((v) => v.text)).toEqual(["川には魚がいる。", "川底に沈む船。"]);
+    expect(result.rejected.themeStart).toBe(2);
+  });
+
+  it("読みでテーマ語から始まる文も採らない（表記に名前が現れないとき）", async () => {
+    // テーマ「TypeScript」で「タイプスクリプトは〜」が20文並んだ実態の再現。
+    // 表記にはテーマ名が現れないため、テーマ名の読みとの照合で弾く
+    const result = await generateBatch(
+      envWithAiResponses([["忍びの心得を持て。", "しのびの道は遠し。", "影に潜む。"], []]),
+      input({ kind: "theme", name: "忍び", target: 3 }),
+    );
+
+    expect(result.valid.map((v) => v.text)).toEqual(["影に潜む。"]);
+    expect(result.rejected.themeStart).toBe(2);
   });
 
   it("テーマ名を含む文の上限は、「含む」モードでは適用しない", async () => {
@@ -306,6 +314,7 @@ describe("generateBatch", () => {
     );
 
     expect(result.rejected.themeName).toBe(0);
+    expect(result.rejected.themeStart).toBe(0);
     expect(result.valid).toHaveLength(2);
   });
 
@@ -366,11 +375,11 @@ describe("generateBatch", () => {
 
     expect(logs).toHaveLength(2);
     expect(logs[0]?.metadata?.counts).toBe(
-      "charset:1,kanji:0,opening:0,keystroke:0,constraint:0,themeName:0,start:0",
+      "charset:1,kanji:0,opening:0,keystroke:0,constraint:0,themeStart:0,themeName:0,start:0",
     );
     // 累積を渡していれば charset:2 になる
     expect(logs[1]?.metadata?.counts).toBe(
-      "charset:1,kanji:0,opening:0,keystroke:0,constraint:0,themeName:0,start:0",
+      "charset:1,kanji:0,opening:0,keystroke:0,constraint:0,themeStart:0,themeName:0,start:0",
     );
   });
 

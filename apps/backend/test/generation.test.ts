@@ -1,5 +1,6 @@
 import { buildRomanCandidates } from "@henge/shared";
 import { env } from "cloudflare:test";
+import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 import { generateBatch, type GenerateBatchInput } from "../src/generation/batch";
 import {
@@ -46,6 +47,16 @@ describe("resolveModel", () => {
 
   it("既定は llama-4-scout（テーマ語の偏りが最も少なく、日本語も自然。2026-09-07の実測）", () => {
     expect(DEFAULT_MODEL).toBe("@cf/meta/llama-4-scout-17b-16e-instruct");
+  });
+
+  it("wrangler.jsonc の GENERATION_MODEL は既定モデルと一致する", () => {
+    // **切り替えは二重管理になる。** モデルは model.ts の DEFAULT_MODEL と
+    // wrangler.jsonc の vars の両方に現れる。片方だけ変えると、コードの変更が
+    // 静かに無視される（実測: DEFAULT_MODEL を llama-4-scout に替えても、
+    // vars に残った qwen3 が動き続けた）。不一致はここで落とす
+    const raw = readFileSync(new URL("../wrangler.jsonc", import.meta.url), "utf8");
+    const config = JSON.parse(raw.replace(/\/\/.*$/gm, ""));
+    expect(config.vars.GENERATION_MODEL).toBe(DEFAULT_MODEL);
   });
 });
 

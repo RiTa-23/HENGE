@@ -177,6 +177,8 @@ MVPの実装はYahoo! JLP ルビ振りAPI（POST限定・JSON-RPC 2.0・1日50,0
 
 モデルごとの設定は `MODELS`（`model.ts`）に持ち、環境変数かパラメータで切り替えられる。パイプラインの中でモデル名による分岐は書かない。**追加は1行で済む形。**
 
+**切り替えは二重管理になることに注意。** モデルは `model.ts` の `DEFAULT_MODEL` と `wrangler.jsonc` の `vars.GENERATION_MODEL` の両方に現れ、**vars が優先される**。片方だけ変えるとコードの変更が静かに無視される（実測: 既定を llama-4-scout に替えても vars に残った qwen3 が動き続けた）。不一致はモデル構成テストが落とす。
+
 ### モデル比較の実測（2026-09-07、テーマ「魚」20件）
 
 テーマ語が文頭に並ぶ（docsの「テーマ語の一極集中」）いちばん難しいケースで、実際の生成プロンプトを各モデルに投げて比較した。測定には `scripts/model-compare.ts` を使う（実際の `buildGenerationPrompt` をそのまま送り、消費ニューロンと所要時間を記録する。トークンは wrangler の OAuth で REST API を叩く）。

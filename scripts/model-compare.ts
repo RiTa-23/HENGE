@@ -28,6 +28,12 @@ const { system, user } = buildGenerationPrompt({
   count: 20,
   existing: [],
 });
+// 第3引数が "hint" のとき、2ラウンド目相当のフィードバックを添える。
+// 前回の却下理由を伝えて再生成させる想定の測定
+const userFinal =
+  process.argv[3] === "hint"
+    ? `${user}\n\n前回の20文のうち、多くがテーマの名前で始まっていたため拒否されました。どの文もテーマの名前（とその読み）で書き始めないでください。書き出しは「名物は」「歴史は」「人々は」のように名前以外の語から始めてください。`
+    : user;
 
 const MODELS: { id: string; suffix?: string; maxTokens?: number }[] = [
   { id: "@cf/meta/llama-4-scout-17b-16e-instruct" },
@@ -54,6 +60,7 @@ function evaluate(text: string): {
   const noKanji = sentences.filter((s) => !/[一-鿿]/u.test(s)).length;
   const hiragana = (s: string) => [...s].filter((c) => /[ぁ-ゖー]/u.test(c)).length;
   const kanaLengths = sentences.map(hiragana);
+
   return { sentences, themeStart, badChar, noKanji, kanaLengths };
 }
 
@@ -63,7 +70,7 @@ for (const model of MODELS) {
   const suffix = model.suffix ?? "";
   const messages = [
     { role: "system", content: system },
-    { role: "user", content: `${user}\n${suffix}`.trimEnd() },
+    { role: "user", content: `${userFinal}\n${suffix}`.trimEnd() },
   ];
   const started = Date.now();
   let result: unknown;
@@ -110,6 +117,7 @@ for (const model of MODELS) {
         `文字種違反:${evaluation.badChar}`,
         `漢字なし:${evaluation.noKanji}`,
         `平均かな字数:${avgKana}`,
+        `長すぎ(35打超の目安):${evaluation.kanaLengths.filter((n) => n * 2 + 1 > 35).length}`,
       ].join(" "),
     );
     writeFileSync(

@@ -93,6 +93,8 @@ const READINGS: Record<string, string> = {
   // 打鍵数が下限（10打）に届かない素材。漢字を含めてあるのは、
   // kanji の段で先に弾かれると keystroke の検査に届かないため
   "影。": "かげ。",
+  "雨。": "あめ。",
+  "月。": "つき。",
   "ざあざあとふるあめ。": "ざあざあとふるあめ。",
   "ざあざあと雑音。": "ざあざあとざつおん。",
   "しんしんと雪が降る。": "しんしんとゆきがふる。",
@@ -124,13 +126,23 @@ interface PatchedLog {
   metadata?: { counts?: string };
 }
 
-function envWithAiResponses(rounds: string[][], logs: PatchedLog[] = []): Env {
+function envWithAiResponses(
+  rounds: string[][],
+  logs: PatchedLog[] = [],
+  /** AIに送られたリクエスト（ヒント付きの2ラウンド目を検査するため） */
+  inputs: { messages: { role: string; content: string }[] }[] = [],
+): Env {
   // run は this 経由で状態を読む。レシーバを切り離して呼ばれたら落ちるようにして、
   // 本物の env.AI と同じ壊れ方をさせる（bind漏れを検出するため）
   const ai = {
     rounds,
     call: 0,
-    async run(this: { rounds: string[][]; call: number }) {
+    async run(
+      this: { rounds: string[][]; call: number },
+      _model: string,
+      input: { messages: { role: string; content: string }[] },
+    ) {
+      inputs.push(input);
       return { response: (this.rounds[this.call++] ?? []).join("\n") };
     },
     aiGatewayLogId: "log-id",
@@ -346,6 +358,48 @@ describe("generateBatch", () => {
 
     expect(result.valid.map((v) => v.text)).not.toContain("型に惑わされるな。");
     expect(result.rejected.start).toBe(1);
+  });
+
+  it("2ラウンド目には、前回の却下理由のフィードバックを添える", async () => {
+    // テーマ「魚」で文頭にテーマ語が並んだ実態の再現。直前の失敗への
+    // フィードバックは、初手の指示より効く（docs/05-generation.md）
+    const inputs: { messages: { role: string; content: string }[] }[] = [];
+    const result = await generateBatch(
+      envWithAiResponses(
+        [
+          ["魚は海と川にいる。", "魚は川をさかのぼる。", "魚は海で泳ぐ。"],
+          ["川には魚がいる。", "川底に沈む船。"],
+        ],
+        [],
+        inputs,
+      ),
+      input({ kind: "theme", name: "魚", target: 2 }),
+    );
+
+    expect(result.valid).toHaveLength(2);
+    // 1ラウンド目にはヒントが無く、2ラウンド目には文頭禁止のフィードバックが乗る
+    expect(inputs[0]?.messages[1]?.content).not.toContain("前回の短文は");
+    expect(inputs[1]?.messages[1]?.content).toContain("テーマの名前「魚」以外の語から書き始めて");
+  });
+
+  it("却下が軽微ならフィードバックは添えない", async () => {
+    const inputs: { messages: { role: string; content: string }[] }[] = [];
+    await generateBatch(
+      envWithAiResponses([["忍びは闇を走る。"], ["影が揺れた。"]], [], inputs),
+      input({ target: 2 }),
+    );
+
+    expect(inputs[1]?.messages[1]?.content).not.toContain("前回の短文は");
+  });
+
+  it("打鍵数の却下が dominant なら長さのフィードバックを添える", async () => {
+    const inputs: { messages: { role: string; content: string }[] }[] = [];
+    await generateBatch(
+      envWithAiResponses([["影。", "雨。", "月。"], ["忍びは闇を走る。"]], [], inputs),
+      input({ target: 1 }),
+    );
+
+    expect(inputs[1]?.messages[1]?.content).toContain("8〜14文字程度に収めて");
   });
 
   it("既存お題の書き出しは数えない（偏ったプールに塞がれて補充が失敗するため）", async () => {

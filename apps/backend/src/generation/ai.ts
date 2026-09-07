@@ -54,12 +54,16 @@ export async function requestPrompts(
     metadata: GenerationMetadata;
     /** モデルの設定を上書きする場合のみ指定する（検証用）。通常は MODELS から引く */
     promptSuffix?: string;
+    /** 2ラウンド目に添える、前回の却下理由へのフィードバック。batch.ts が組み立てる */
+    hint?: string;
   },
 ): Promise<AiCallResult> {
   const { system, user } = buildGenerationPrompt(input);
   // モデル固有の指示は MODELS から引く。呼び出し側がモデルの事情を知らなくて済む
   const config = modelConfig(input.model);
   const suffix = input.promptSuffix ?? config.promptSuffix;
+  // ヒントは条件のあと、モデル固有の指示の前に置く（suffix は常に末尾）
+  const userWithHint = input.hint === undefined ? user : `${user}\n\n${input.hint}`;
 
   // Workers AI の型はモデルごとのオーバーロードになっているため、
   // モデルIDを値（配列の要素）として持つ設計とは両立しない。
@@ -79,7 +83,7 @@ export async function requestPrompts(
         { role: "system", content: system },
         {
           role: "user",
-          content: suffix === undefined ? user : `${user}\n${suffix}`,
+          content: suffix === undefined ? userWithHint : `${userWithHint}\n${suffix}`,
         },
       ],
       // 既定は2000。推論モデルは思考だけでこれを使い切り、本文が空のまま返る

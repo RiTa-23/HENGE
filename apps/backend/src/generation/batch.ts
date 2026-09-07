@@ -153,6 +153,7 @@ export async function generateBatch(env: Env, input: GenerateBatchInput): Promis
     themeNameCount: 0,
   };
   let rounds = 0;
+  let hint: string | undefined;
 
   // 文頭のテーマ語を判定するための、テーマ名の読み。読めない名前
   // （アルファベットなど。ルビ振りAPIがエラーを返す）でも生成は続行し、
@@ -178,6 +179,7 @@ export async function generateBatch(env: Env, input: GenerateBatchInput): Promis
       count: N_REQUEST,
       existing: input.existing,
       metadata: { themeId: input.themeId, kind: input.kind, round, path: input.path },
+      hint,
     });
 
     const validBefore = valid.length;
@@ -187,10 +189,11 @@ export async function generateBatch(env: Env, input: GenerateBatchInput): Promis
     if (logId !== undefined) {
       // ログは1リクエスト（＝1ラウンド）に紐づくため、採用数も却下数も
       // **そのラウンド分だけ**を渡す。累積を渡すと2ラウンド目で1ラウンド目が二重計上される
+      const roundRejected = subtract(rejected, rejectedBefore);
       const record = recordGenerationResult(env, logId, {
         requested: N_REQUEST,
         valid: valid.length - validBefore,
-        rejected: { ...subtract(rejected, rejectedBefore) },
+        rejected: { ...roundRejected },
         constraintTwice: countTwice(valid.slice(validBefore), input),
       }).catch(() => {
         // 計測の失敗で生成そのものを落とさない
@@ -200,6 +203,10 @@ export async function generateBatch(env: Env, input: GenerateBatchInput): Promis
     }
 
     if (valid.length >= input.target) break;
+    // 次のラウンドがあるなら、直前の却下理由を伝える。**全体を数えさせる初手の
+    // 指示より、直前の失敗へのフィードバックの方が効く**（テーマ語の偏りは
+    // これで救われる。docs/05-generation.md）
+    if (round < MAX_ROUNDS) hint = retryHint(subtract(rejected, rejectedBefore), input.name);
   }
 
   return { valid, rejected, rounds, reachedTarget: valid.length >= input.target };
@@ -229,6 +236,48 @@ function subtract(after: RejectionCounts, before: RejectionCounts): RejectionCou
     themeName: after.themeName - before.themeName,
     start: after.start - before.start,
   };
+}
+
+/**
+ * 2ラウンド目に添えるフィードバック。直前ラウンドの却下内訳のうち
+ * **最も多い理由**に対して、どう直せば受け入れられるかを1文で伝える。
+ *
+ * 初手の指示で頼むより、直前の失敗へのフィードバックの方が効く
+ * （テーマ語の偏りはこれで救われた。実測: ヒント無しで文頭テーマ語13/20、
+ * ヒント付きで6〜10/20）。同一カテゴリが3件以上のときだけ出す。
+ * 軽微な却下にまで反応すると、指示が次々に足されて主旨が散らかる。
+ */
+function retryHint(delta: RejectionCounts, name: string): string | undefined {
+  const candidates: [number, string][] = [
+    [
+      delta.themeStart,
+      `テーマの名前（とその読み）で始まる文は受け付けられません。すべての文を、テーマの名前「${name}」以外の語から書き始めてください（名前は文の途中にだけ使う）`,
+    ],
+    [
+      delta.themeName,
+      `テーマ名を含む文が多すぎました。名前は文の途中にだけ使い、できるだけ少なくしてください`,
+    ],
+    [
+      delta.keystroke,
+      "長さが範囲外の文は受け付けられません。1文はひらがなに直して8〜14文字程度に収めてください（カタカナ語を多く置くと打鍵数が膨らみます）",
+    ],
+    [
+      delta.charset,
+      "使えない文字を含む文は受け付けられません。ひらがな・カタカナ・漢字と、記号は「、」「。」「ー」「！」「？」だけを使ってください（アルファベット・数字・空白は書かない）",
+    ],
+    [
+      delta.constraint,
+      `指定文字が読みに含まれない文は受け付けられません。どの文も、その読み仮名に「${name}」を必ず入れてください`,
+    ],
+    [
+      delta.start,
+      "読みの頭が同じ文は上限までしか受け付けられません。文の切り出し方（主語・修飾語・場所）を毎回変えてください",
+    ],
+    [delta.kanji, "ひらがなだけの文は受け付けられません。各文に漢字を1つ以上使ってください"],
+  ];
+
+  const top = candidates.reduce((best, current) => (current[0] > best[0] ? current : best));
+  return top[0] >= 3 ? `前回の短文は次の理由で多くが拒否されました。${top[1]}` : undefined;
 }
 
 /** 書き出しの重なりを見るためのキー。表記の先頭数文字 */

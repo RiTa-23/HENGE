@@ -14,6 +14,7 @@ MVP実装に必要な情報だけをまとめたもの。設計時の議論・�
 | [06-typing-engine.md](06-typing-engine.md) | ローマ字入力エンジン、IME対策 | Phase 6 |
 | [07-ui.md](07-ui.md) | 配色・書体・忍者モチーフ、画面一覧 | Phase 6 |
 | [08-roadmap.md](08-roadmap.md) | Phase 0〜8 | 進行中は常に |
+| [09-share.md](09-share.md) | X投稿（シェア）とOGP | シェア機能の実装時 |
 
 ## この文書群の編集方針
 

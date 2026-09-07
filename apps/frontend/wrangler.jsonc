@@ -4,6 +4,14 @@
   "main": ".open-next/worker.js",
   "compatibility_date": "2026-08-22", // vitest-pool-workers 同梱の workerd の上限に合わせる（これより新しいとテストが起動しない）
   "compatibility_flags": ["nodejs_compat", "global_fetch_strictly_public"],
+  // **ベータ運用のフラグ。** "true" の間はベータ版：運営アカウント以外は
+  // 最適化練習とお題の新規生成が「調整中」になり、既存プールのプレイと補充生成だけができる。
+  // 運営アカウント（ADMIN_EMAILS）は何も変わらない。
+  // **"true" 以外（または削除）にして再デプロイすれば公開版に戻る。**
+  // 判定は lib/beta/beta.ts に集約する。
+  "vars": {
+    "BETA_MODE": "true",
+  },
   "assets": {
     "directory": ".open-next/assets",
     "binding": "ASSETS",

@@ -75,7 +75,7 @@ CloudflareにはRPC方式（`WorkerEntrypoint`のメソッドを直接呼ぶ）�
 | フロントエンド | Next.js（`@opennextjs/cloudflare`）、独立Worker |
 | バックエンド | Hono、独立Worker |
 | Worker間通信 | Service Bindings（HTTP方式）＋ Hono RPC `hc` |
-| AI生成 | Workers AI（`llama-4-scout-17b-16e` 既定。`qwen3-30b` 等に切り替え可能）、AI Gateway経由 |
+| AI生成 | Workers AI（`qwen3-30b-a3b` 既定。`llama-4-scout-17b-16e` 等に切り替え可能）、AI Gateway経由 |
 | データ | D1（Drizzle ORM）＋ KV |
 | 認証 | Better Auth（Googleプロバイダのみ） |
 | 入力検証 | Zod |

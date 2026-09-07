@@ -28,13 +28,15 @@ export interface ModelConfig {
 }
 
 export const MODELS = {
-  // 既定。日本語の品質・指示遵守が最も良く、速度・コストも実用域
-  // （実測 4.2〜5.5秒 / 26〜35 neurons。テーマ語で始まる文は0〜9/20で、
-  // 超過分は検証が弾く。docs/05-generation.md のモデル比較を参照）
-  "@cf/meta/llama-4-scout-17b-16e-instruct": {},
-  // 旧既定。速く安いが、**テーマ語で文を始める指示違反が直らない**
-  // （実測 18〜20/20。思考ありでも18/20）。
+  // 既定。速く安く安定（実測 0.9〜1.6秒 / 3.7〜4.2 neurons）。
+  // **テーマ語で文を始める指示違反が直らない**（実測 18〜20/20）ため、
+  // 総称名のテーマ（魚など）では文頭禁止の検証とぶつかり生成が
+  // 失敗しうる。llama-4-scout は指示に従うが、検証の閾値との詰めが
+  // 残っていたため、安定性を優先してこちらへ戻した（2026-09-08、docs/05）
   "@cf/qwen/qwen3-30b-a3b-fp8": { promptSuffix: "/no_think" },
+  // 指示遵守・日本語品質は上（文頭テーマ語 0〜9/20。4.2〜5.5秒 / 26〜35 neurons）。
+  // 検証の閾値を緩めたうえで再度候補にする
+  "@cf/meta/llama-4-scout-17b-16e-instruct": {},
   // 品質は最も高いが遅く高価（実測 24〜132秒 / 96〜215 neurons）
   // 思考が長いため上限を大きく取る。8件で最大5,878トークン使った実測がある
   "@cf/zai-org/glm-4.7-flash": { maxTokens: 16_000 },
@@ -50,7 +52,7 @@ export type ModelId = keyof typeof MODELS;
  */
 export const DEFAULT_MAX_TOKENS = 4000;
 
-export const DEFAULT_MODEL: ModelId = "@cf/meta/llama-4-scout-17b-16e-instruct";
+export const DEFAULT_MODEL: ModelId = "@cf/qwen/qwen3-30b-a3b-fp8";
 
 /** 環境変数で切り替える。未指定・未知の値なら既定のモデルを使う */
 export function resolveModel(value: string | undefined): ModelId {

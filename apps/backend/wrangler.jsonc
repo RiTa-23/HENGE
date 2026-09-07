@@ -16,7 +16,7 @@
   // **model.ts の DEFAULT_MODEL とずらさないこと**（ずれるとコードの変更が
   // 静かに無視される。モデル構成テストが不一致を検出する）
   "vars": {
-    "GENERATION_MODEL": "@cf/meta/llama-4-scout-17b-16e-instruct",
+    "GENERATION_MODEL": "@cf/qwen/qwen3-30b-a3b-fp8",
   },
   // D1 / KV / Workers AI へのアクセスは Hono Worker に閉じる。
   // Next.js Worker 側からは直接触らない。

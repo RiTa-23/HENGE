@@ -87,6 +87,18 @@ const READINGS: Record<string, string> = {
   "しんしんと雨が続く。": "しんしんとあめがつづく。",
   "手裏剣が闇を裂いて標的を正確に射抜いた瞬間だった。":
     "しゅりけんがやみをさいてひょうてきをせいかくにいぬいたしゅんかんだった。",
+  // テーマ語の一極集中の再現用。テーマ「魚」の文は読みが「ぎょ」で始まる
+  "魚は海と川にいる。": "ぎょはうみとかわにいる。",
+  "魚は泳ぎます。": "ぎょはおよぎます。",
+  "魚の仲間にサメがいる。": "ぎょのなかまにさめがいる。",
+  "魚は川をさかのぼる。": "ぎょはかわをさかのぼる。",
+  "川底に沈む船。": "かわそこにしずむふね。",
+  // 読みの先頭2かなが同じ文。表記は「型は／型が／型を／型に」と1文字目しか同じでない
+  "型は力だ。": "かたはちからだ。",
+  "型が道を開く。": "かたがみちをひらく。",
+  "型を学ぶ。": "かたをまなぶ。",
+  "型に惑わされるな。": "かたにまどわされるな。",
+  "船は進む。": "ふねはすすむ。",
 };
 
 /** AIの応答を差し替えた env。ラウンドごとに別の応答を返す */
@@ -265,6 +277,54 @@ describe("generateBatch", () => {
     expect(result.rejected.opening).toBe(1);
   });
 
+  it("テーマ名を含む文は上限までしか採らない（テーマモード）", async () => {
+    // テーマ「魚」で「魚は〜」「魚の〜」が並んだ実態の再現。
+    // 上限を超えた分は読み取得の前に弾く
+    const result = await generateBatch(
+      envWithAiResponses([
+        [
+          "魚は海と川にいる。",
+          "魚は泳ぎます。",
+          "魚の仲間にサメがいる。",
+          "魚は川をさかのぼる。",
+          "川底に沈む船。",
+        ],
+        [],
+      ]),
+      input({ kind: "theme", name: "魚", target: 4 }),
+    );
+
+    expect(result.valid.map((v) => v.text)).not.toContain("魚は川をさかのぼる。");
+    expect(result.rejected.themeName).toBe(1);
+  });
+
+  it("テーマ名を含む文の上限は、「含む」モードでは適用しない", async () => {
+    // 指定文字を含むのは「含む」モードの仕様。ここで上限をかけると本末転倒
+    const result = await generateBatch(
+      envWithAiResponses([["座禅を組む。", "ざあざあと雑音。"], []]),
+      input({ kind: "constraint", name: "ざ", target: 2 }),
+    );
+
+    expect(result.rejected.themeName).toBe(0);
+    expect(result.valid).toHaveLength(2);
+  });
+
+  it("読みの先頭2かなが同じ文は上限までしか採らない（表記が違っても）", async () => {
+    // テーマ「TypeScript」で「型は〜」「型が〜」が並んだ実態の再現。
+    // 表記の先頭文字では「型は／型が」が2文字目で分かれて拾えない。
+    // 読み仮名（かたは／かたが）で見ると「かた」でまとまる
+    const result = await generateBatch(
+      envWithAiResponses([
+        ["型は力だ。", "型が道を開く。", "型を学ぶ。", "型に惑わされるな。", "船は進む。"],
+        [],
+      ]),
+      input({ kind: "theme", name: "海", target: 4 }),
+    );
+
+    expect(result.valid.map((v) => v.text)).not.toContain("型に惑わされるな。");
+    expect(result.rejected.start).toBe(1);
+  });
+
   it("既存お題の書き出しは数えない（偏ったプールに塞がれて補充が失敗するため）", async () => {
     // 止めたいのは「1回の生成が1つの型で埋まる」ことで、過去のプールに何本あるかは別の話。
     // 既存を数えると、同じ書き出しが23本あるプール（実測）では補充が丸ごと失敗する
@@ -305,9 +365,13 @@ describe("generateBatch", () => {
     );
 
     expect(logs).toHaveLength(2);
-    expect(logs[0]?.metadata?.counts).toBe("charset:1,kanji:0,opening:0,keystroke:0,constraint:0");
+    expect(logs[0]?.metadata?.counts).toBe(
+      "charset:1,kanji:0,opening:0,keystroke:0,constraint:0,themeName:0,start:0",
+    );
     // 累積を渡していれば charset:2 になる
-    expect(logs[1]?.metadata?.counts).toBe("charset:1,kanji:0,opening:0,keystroke:0,constraint:0");
+    expect(logs[1]?.metadata?.counts).toBe(
+      "charset:1,kanji:0,opening:0,keystroke:0,constraint:0,themeName:0,start:0",
+    );
   });
 
   it("有効なお題は読みと打鍵数を持って返る", async () => {

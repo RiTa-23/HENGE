@@ -46,6 +46,34 @@ export const MAX_ROUNDS = 2;
 const OPENING_PREFIX_LENGTH = 4;
 const OPENING_MAX = 3;
 
+/**
+ * テーマ名を文中に使える文の上限（**テーマモードのみ**）。
+ *
+ * テーマ「魚」で生成すると「魚は海と川にいる」「魚は泳ぎます」のように
+ * **テーマ名が文頭に並んだ**。モデルはテーマを1語に要約して、その語で
+ * 全部の文を組み立てる。プロンプトで「最大2文」と頼み、検証は1文ぶんの
+ * 余裕を持たせて3本にする（OPENING_MAX と同じ考え方）。
+ *
+ * **「含む」モードでは使わない。** 指定文字を含むのは仕様であり、
+ * ここで上限をかけると本末転倒。
+ */
+const THEME_NAME_MAX = 3;
+
+/**
+ * 読み仮名の先頭2かなが同じ文の上限。
+ *
+ * **テーマ名の検査では拾えない型がある。** テーマ「TypeScript」では
+ * アルファベットが使えないためモデルが「型」と書き、
+ * 「型は〜」「型が〜」と並べた。型はテーマ名と一致しない。
+ *
+ * キーを**読み仮名の先頭2かな**にするのは、表記では「型は／型が」が
+ * 2文字目で分かれてしまうため。読みなら「かたは／かたが」が
+ * 「かた」でまとまる。3本までは許す（締めすぎると生成そのものが
+ * 失敗する。OPENING_MAX と同じ理由）。
+ */
+const START_PREFIX_LENGTH = 2;
+const START_MAX = 3;
+
 export interface ValidPrompt {
   text: string;
   readingKana: string;
@@ -64,6 +92,10 @@ export interface RejectionCounts {
   keystroke: number;
   /** 「含む」モードで、指定文字が読み仮名に無かった */
   constraint: number;
+  /** テーマ名を含む文が採用上限を超えた（テーマモードのみ） */
+  themeName: number;
+  /** 読み仮名の先頭2かなが同じ文が採用上限を超えた */
+  start: number;
 }
 
 export interface BatchResult {
@@ -108,13 +140,19 @@ export async function generateBatch(env: Env, input: GenerateBatchInput): Promis
     opening: 0,
     keystroke: 0,
     constraint: 0,
+    themeName: 0,
+    start: 0,
   };
   const seen = new Set(input.existing);
   // **既存お題は数えない。** 止めたいのは「1回の生成が1つの型で埋まる」ことで、
   // 過去のプールに何本あるかは別の話。既存を数えると、偏った状態で作られた
   // プール（実測で同じ書き出しが23本あった）に塞がれて補充が失敗する。
   // ラウンドはまたいで数える（2ラウンド目で同じ型を作り直させない）
-  const openings = new Map<string, number>();
+  const state: ValidateState = {
+    openings: new Map(),
+    startPrefixes: new Map(),
+    themeNameCount: 0,
+  };
   let rounds = 0;
 
   for (let round = 1; round <= MAX_ROUNDS; round++) {
@@ -131,7 +169,7 @@ export async function generateBatch(env: Env, input: GenerateBatchInput): Promis
 
     const validBefore = valid.length;
     const rejectedBefore = { ...rejected };
-    await validateInto(texts, input, seen, openings, valid, rejected);
+    await validateInto(texts, input, seen, state, valid, rejected);
 
     if (logId !== undefined) {
       // ログは1リクエスト（＝1ラウンド）に紐づくため、採用数も却下数も
@@ -174,6 +212,8 @@ function subtract(after: RejectionCounts, before: RejectionCounts): RejectionCou
     opening: after.opening - before.opening,
     keystroke: after.keystroke - before.keystroke,
     constraint: after.constraint - before.constraint,
+    themeName: after.themeName - before.themeName,
+    start: after.start - before.start,
   };
 }
 
@@ -182,11 +222,23 @@ function openingOf(text: string): string {
   return [...text].slice(0, OPENING_PREFIX_LENGTH).join("");
 }
 
+/** 書き出しの重なりを見るためのキー。読み仮名の先頭2かな */
+function startPrefixOf(readingKana: string): string {
+  return [...readingKana].slice(0, START_PREFIX_LENGTH).join("");
+}
+
+/** ラウンドをまたいで保持する検証の状態。openings / startPrefixes / テーマ名の採用数 */
+interface ValidateState {
+  openings: Map<string, number>;
+  startPrefixes: Map<string, number>;
+  themeNameCount: number;
+}
+
 async function validateInto(
   texts: string[],
   input: GenerateBatchInput,
   seen: Set<string>,
-  openings: Map<string, number>,
+  state: ValidateState,
   valid: ValidPrompt[],
   rejected: RejectionCounts,
 ): Promise<void> {
@@ -206,12 +258,21 @@ async function validateInto(
     }
     // **同じ書き出しを並べない。** 完全一致ではないので seen では拾えない
     const opening = openingOf(text);
-    const used = openings.get(opening) ?? 0;
+    const used = state.openings.get(opening) ?? 0;
     if (used >= OPENING_MAX) {
       rejected.opening++;
       return false;
     }
-    openings.set(opening, used + 1);
+    state.openings.set(opening, used + 1);
+    // **テーマ名の使いすぎを止める。** テーマ「魚」で15文すべてが「魚は〜」に
+    // なった。テーマモードのみ（「含む」モードは指定文字を含むのが仕様）
+    if (input.kind === "theme" && text.includes(input.name)) {
+      if (state.themeNameCount >= THEME_NAME_MAX) {
+        rejected.themeName++;
+        return false;
+      }
+      state.themeNameCount++;
+    }
     return true;
   });
 
@@ -240,6 +301,16 @@ async function validateInto(
       rejected.constraint++;
       continue;
     }
+    // **読みの頭が同じ文を並べない。** テーマ「TypeScript」で「型は〜」「型が〜」が
+    // 並んだ。表記の先頭では「型は／型が」が2文字目で分かれて拾えないため、
+    // 読み仮名（かたは／かたが →「かた」）で見る
+    const startPrefix = startPrefixOf(reading.kana);
+    const usedStart = state.startPrefixes.get(startPrefix) ?? 0;
+    if (usedStart >= START_MAX) {
+      rejected.start++;
+      continue;
+    }
+    state.startPrefixes.set(startPrefix, usedStart + 1);
 
     valid.push({
       text,

@@ -7,8 +7,11 @@ import { themeIdKey, themeLockKey } from "../src/kv/keys";
 
 const db = createDb(env.DB);
 
+/** 文ごとの読み。ルビ振りAPIのスタブが本文から引く */
+const READINGS: Record<string, string> = {};
+
 /** AIの応答と読み取得を差し替える。外部APIは呼ばない */
-function stubGeneration(lines: string[][], reading = "しのび") {
+function stubGeneration(lines: string[][]) {
   let call = 0;
   vi.spyOn(env.AI, "run").mockImplementation(async () => ({
     response: (lines[call++] ?? []).join("\n"),
@@ -16,47 +19,54 @@ function stubGeneration(lines: string[][], reading = "しのび") {
   vi.spyOn(env.AI, "gateway").mockReturnValue({
     patchLog: async () => {},
   } as unknown as ReturnType<typeof env.AI.gateway>);
-  vi.spyOn(globalThis, "fetch").mockImplementation(async (input) => {
+  vi.spyOn(globalThis, "fetch").mockImplementation(async (input, init) => {
     const url = String(input);
     // Yahoo API だけを差し替える。Worker自身への fetch は素通しする
     if (!url.includes("yahooapis")) return realFetch(input as RequestInfo);
+    // リクエスト本文の q（元の文）から読みを引く。**全文に同じ読みを返しては
+    // いけない** — 読みベースの検証（先頭2かなの重複）で全量が1グループに
+    // なって15問に届かなくなる。本物のルビ振りAPIは文ごとに違う読みを返す
+    const raw = typeof init?.body === "string" ? init.body : "{}";
+    const text = (JSON.parse(raw) as { params?: { q?: string } }).params?.q ?? "";
     return Response.json({
-      result: { word: [{ surface: "しのび", furigana: reading }] },
+      result: { word: [{ surface: "しのび", furigana: READINGS[text] ?? text }] },
     });
   });
 }
 
 /**
- * 1ラウンドで15問揃う有効な応答。
+ * 1ラウンドで15問以上揃う、**書き出しと読みの頭がばらけた**有効な応答。
  *
- * テキストはすべてユニークにするだけでなく、**書き出しも散らす**。
- * 同じ書き出しは2本までしか採らない（batch.ts の OPENING_MAX）ため、
- * 全部を同じ語で始めると15問に届かず GENERATION_FAILED になる。
+ * 全文が同じテンプレ（「Nの忍びが〜」＋同じ読み）だと、テーマ語の一極集中と
+ * 同じ形になり、テーマ名・先頭2かなの検証で1グループに潰されて15問に届かない。
+ * テーマ「忍びの心得」らしく、文ごとに違う側面・違う切り出し方にしてある。
+ * 打鍵数はすべて35打以内、読みの先頭2かなは最大2文までしか重複しない。
  */
 function stubValidGeneration() {
-  const nums = [
-    "一",
-    "二",
-    "三",
-    "四",
-    "五",
-    "六",
-    "七",
-    "八",
-    "九",
-    "十",
-    "十一",
-    "十二",
-    "十三",
-    "十四",
-    "十五",
-    "十六",
-    "十七",
-    "十八",
-    "十九",
-    "二十",
+  const pairs: [string, string][] = [
+    ["忍びは月夜に消える。", "しのびはつきよにきえる。"],
+    ["心を澄ませば道は開く。", "こころをすませばみちはひらく。"],
+    ["影に潜み息を殺す。", "かげにひそみいきをころす。"],
+    ["覚えは剣より鋭い。", "おぼえはけんよりするどい。"],
+    ["風の音で敵を知る。", "かぜのおとでてきをしる。"],
+    ["墨を研ぎ、心を練る。", "すみをとぎ、こころをねる。"],
+    ["灯りを消して夜を渡る。", "あかりをけしてよるをわたる。"],
+    ["雪に足跡を残さない。", "ゆきにそくせきをのこさない。"],
+    ["水流に逆らわず進む。", "すいりゅうにさからわずすすむ。"],
+    ["忍装束は闇に溶ける。", "しのびしょうぞくはやみにとける。"],
+    ["任務は夜が明ける前だ。", "にんむはよるがあけるまえだ。"],
+    ["竹林で息を整える。", "ちくりんでいきをととのえる。"],
+    ["鉤縄を屋根に掛けた。", "かぎなわをやねにかけた。"],
+    ["呼吸は川の流れに合わせる。", "こきゅうはかわのながれにあわせる。"],
+    ["敵地では名を捨てる。", "てきちではなをすてる。"],
+    ["五感を閉ざし、心眼を開く。", "ごかんをとざし、しんがんをひらく。"],
+    ["図太さは修練で育つ。", "ずぶさはしゅれんでそだつ。"],
+    ["一撃を逃さず決める。", "いちげきをのがさずきめる。"],
+    ["煙に紛れて屋根を渡る。", "けむりにまぎれてやねをわたる。"],
+    ["修行の道に終わりはない。", "しゅぎょうのみちにおわりはない。"],
   ];
-  stubGeneration([nums.map((n) => `${n}の忍びが闇を走る。`)], "しのびはやみをはしる。");
+  Object.assign(READINGS, Object.fromEntries(pairs));
+  stubGeneration([pairs.map(([text]) => text)]);
 }
 
 const realFetch = globalThis.fetch.bind(globalThis);

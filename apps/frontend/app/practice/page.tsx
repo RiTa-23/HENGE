@@ -3,15 +3,20 @@ import { CreateThemeForm } from "@/components/CreateThemeForm";
 import { ModeTabs } from "@/components/ModeTabs";
 import { SiteHeader } from "@/components/SiteHeader";
 import { ThemeCard } from "@/components/ThemeCard";
+import { ogFields } from "@/lib/og";
 import { PRESETS, presetCreateHref } from "@/lib/practice/presets";
 import { listThemes } from "@/lib/api/themes";
 import { normalizeName } from "@henge/shared";
 import { playHref } from "@/lib/ui/kind";
 
+const TITLE = "タイピング最適化練習 | HENGE";
+const DESCRIPTION =
+  "指定した連接を必ず含む文章だけで練習できます。毎回違う文章が出るので、最適化した運指が特定の文章に紐づかず、実戦で出せるようになります。";
+
 export const metadata: Metadata = {
-  title: "タイピング最適化練習 | HENGE",
-  description:
-    "指定した連接を必ず含む文章だけで練習できます。毎回違う文章が出るので、最適化した運指が特定の文章に紐づかず、実戦で出せるようになります。",
+  title: TITLE,
+  description: DESCRIPTION,
+  ...ogFields(TITLE, DESCRIPTION),
 };
 
 export const dynamic = "force-dynamic";

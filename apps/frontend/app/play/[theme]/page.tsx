@@ -1,8 +1,9 @@
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import { PlayScreen } from "@/components/play/PlayScreen";
+import { siteUrl } from "@/lib/og";
 import { decodePageParam, findTheme } from "@/lib/api/themes";
-import { parseThemeKind } from "@/lib/ui/kind";
+import { detailHref, parseThemeKind } from "@/lib/ui/kind";
 
 /** プレイ画面は検索結果に出さない（着地ページはテーマ詳細） */
 export const metadata: Metadata = { robots: { index: false, follow: false } };
@@ -34,5 +35,12 @@ export default async function PlayPage({
   const found = await findTheme(themeKind, name);
   if (found === null) notFound();
 
-  return <PlayScreen themeId={found.id} themeName={found.name} kind={themeKind} />;
+  // 結果のX投稿の共有先。**プレイ画面ではなく着地ページ（詳細）**に誘導する
+  // （docs/09-share.md）。絶対URLが必要なので、ここ（サーバー側）で組み立てる。
+  // 組み立ては detailHref に集約。手で /play や /themes を書かない
+  const shareUrl = new URL(detailHref(themeKind, found.name), await siteUrl()).toString();
+
+  return (
+    <PlayScreen themeId={found.id} themeName={found.name} kind={themeKind} shareUrl={shareUrl} />
+  );
 }

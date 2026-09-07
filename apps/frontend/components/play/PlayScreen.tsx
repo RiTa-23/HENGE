@@ -82,10 +82,13 @@ export function PlayScreen({
   themeId,
   themeName,
   kind,
+  shareUrl,
 }: {
   themeId: string;
   themeName: string;
   kind: ThemeKind;
+  /** 結果のX投稿で共有するURL（着地ページの絶対URL）。サーバー側で組み立てて渡す */
+  shareUrl: string;
 }) {
   const { data: authSession } = authClient.useSession();
   const backToList = listHref(kind);
@@ -416,6 +419,8 @@ export function PlayScreen({
         themeName={themeName}
         onRetry={start}
         listHref={backToList}
+        kind={kind}
+        shareUrl={shareUrl}
       />
     );
   }

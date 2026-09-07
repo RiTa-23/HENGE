@@ -48,6 +48,8 @@ HENGEで「忍びの心得」を打った。
 | `og:description` | 既存の description を流用する |
 | `og:type` | `website` |
 
+`metadataBase` は `BETTER_AUTH_URL` を基準にする。これはBetter AuthのbaseURLだが、本番ではデプロイURL（Google OAuthのコールバックに登録する公開URL）と同一のため、サイトの基準URLとしてそのまま使える。レイアウトで1回定義すれば全ページに継承される。**openGraph / twitter は浅くマージされるため、独自に定義するページは `lib/og.ts` の `ogFields()` でそろえて書く。**
+
 対象ページ:
 
 | ページ | og:title | 備考 |
@@ -58,9 +60,19 @@ HENGEで「忍びの心得」を打った。
 | `/practice/[char]` | `「ざ」のタイピング最適化練習 \| HENGE` | 同上 |
 | `/play/[theme]` | 基本OGのみ | noindexのまま。シェア対象ではない |
 
-実装はApp Routerのmetadata APIにOGPフィールドを足すだけ。SSR/SSGのHTMLにメタタグが載るため、OpenNextでも追加の仕組みは不要。`metadataBase` は本番URLを基準に設定する（相対 `og:image` を絶対URLに解決するために必須）。
+実装はApp Routerのmetadata APIにOGPフィールドを足すだけ。SSR/SSGのHTMLにメタタグが載るため、OpenNextでも追加の仕組みは不要。
 
-**OG画像のアセットをどう用意するかは実装時に決める**（手描きで書き出すか、スクリプトで生成するか）。ブランドの4色（docs/07-ui.md）で描く点だけここに決めておく。
+**OG画像は `scripts/generate-og.html` の源から生成する。** サイトの4色（docs/07-ui.md）と、ロゴと同じ筆の下線を使う。再生成の手順:
+
+```bash
+"/Applications/Google Chrome.app/Contents/MacOS/Google Chrome" \
+  --headless=new --disable-gpu --hide-scrollbars --window-size=1200,630 \
+  --virtual-time-budget=10000 \
+  --screenshot="$(pwd)/apps/frontend/public/og.png" \
+  "file://$(pwd)/scripts/generate-og.html"
+```
+
+`--virtual-time-budget` はWebフォント（Google Fonts CDN）の読み込み待ち。源のHTMLを書き換えたらこのコマンドで og.png を作り直す。
 
 ## やらないこと
 

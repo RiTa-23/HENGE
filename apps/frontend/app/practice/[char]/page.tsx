@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import { SiteHeader } from "@/components/SiteHeader";
+import { ogFields } from "@/lib/og";
 import { decodePageParam, findTheme } from "@/lib/api/themes";
 import { playHref } from "@/lib/ui/kind";
 
@@ -12,9 +13,13 @@ export async function generateMetadata({
 }): Promise<Metadata> {
   const char = decodePageParam((await params).char);
   if (char === null) return {};
+  const title = `「${char}」のタイピング最適化練習 | HENGE`;
+  const description = `読み仮名に「${char}」を含む文章だけを打つ練習。毎回違う文章が出るので、${char}の運指を文脈を変えながら詰められます。`;
+  // シェアの着地ページのため、カードが確実に出るようにする（docs/09-share.md）
   return {
-    title: `「${char}」のタイピング最適化練習 | HENGE`,
-    description: `読み仮名に「${char}」を含む文章だけを打つ練習。毎回違う文章が出るので、${char}の運指を文脈を変えながら詰められます。`,
+    title,
+    description,
+    ...ogFields(title, description),
   };
 }
 

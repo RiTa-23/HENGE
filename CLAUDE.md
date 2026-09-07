@@ -19,6 +19,7 @@
 | ローマ字入力・キーボード | `docs/06-typing-engine.md` |
 | 画面・スタイル | `docs/07-ui.md` |
 | 次に何をやるか | `docs/08-roadmap.md` |
+| シェア（X投稿）・OGPまわり | `docs/09-share.md` |
 
 ## 作業手順書
 

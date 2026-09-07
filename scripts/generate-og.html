@@ -1,0 +1,63 @@
+<!doctype html>
+<html lang="ja">
+  <head>
+    <meta charset="utf-8" />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      rel="stylesheet"
+      href="https://fonts.googleapis.com/css2?family=Shippori+Mincho:wght@700&family=Zen+Kaku+Gothic+New:wght@500&display=swap"
+    />
+    <style>
+      /* サイトの4色トークン（docs/07-ui.md）。1200x630 = OG画像の標準サイズ */
+      body {
+        margin: 0;
+        width: 1200px;
+        height: 630px;
+        background: #15171d;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+      }
+      .inner {
+        text-align: center;
+      }
+      .logo {
+        font-family: "Shippori Mincho", serif;
+        font-weight: 700;
+        font-size: 170px;
+        line-height: 1;
+        letter-spacing: 0.18em;
+        margin-left: 0.18em; /* 字間で末尾に出た余白の分を戻す */
+        color: #ece2cf;
+      }
+      .underline {
+        display: block;
+        width: 560px;
+        height: 34px;
+        margin: 12px auto 0;
+      }
+      .tagline {
+        margin-top: 56px;
+        font-family: "Zen Kaku Gothic New", sans-serif;
+        font-weight: 500;
+        font-size: 34px;
+        letter-spacing: 0.2em;
+        color: rgba(236, 226, 207, 0.75);
+      }
+    </style>
+  </head>
+  <body>
+    <div class="inner">
+      <div class="logo">HENGE</div>
+      <!-- 筆の下線。Logo / HeroLogo と同じ一筆 -->
+      <svg class="underline" viewBox="0 0 120 8" preserveAspectRatio="none" aria-hidden="true">
+        <path
+          d="M2 5 C 24 1.5, 60 1, 92 3 C 104 3.8, 112 4.6, 118 5.6 C 110 5.2, 96 5, 80 5.2 C 52 5.6, 22 6.4, 2 5 Z"
+          fill="#d24a25"
+        />
+      </svg>
+      <div class="tagline">お題が毎回生まれる、日本語タイピングの修行場</div>
+    </div>
+  </body>
+</html>

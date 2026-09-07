@@ -60,7 +60,7 @@ export interface RejectionCounts {
   kanji: number;
   /** 同じ書き出しの文が既に採用上限まである */
   opening: number;
-  /** 打鍵数が10〜40の範囲外 */
+  /** 打鍵数が10〜35の範囲外 */
   keystroke: number;
   /** 「含む」モードで、指定文字が読み仮名に無かった */
   constraint: number;

@@ -168,3 +168,99 @@ export async function appendPrompts(
   await db.batch(asBatch(inserts));
   return from + items.length - 1;
 }
+
+export interface AdminPrompt {
+  id: string;
+  text: string;
+  readingKana: string;
+  keystrokeCount: number;
+  sequenceNumber: number;
+  model: string | null;
+  createdAt: number;
+}
+
+/** 管理画面のお題一覧。既定の取得件数 */
+export const PROMPT_LIST_LIMIT_DEFAULT = 50;
+
+/**
+ * テーマ1つ分のお題を生成順で返す。**管理画面専用。**
+ *
+ * 配信用の `fetchPromptPage` と分けているのは、見せたいものが違うため。
+ * 管理者は中身を確認して直すので、読み仮名・打鍵数・連番・生成モデルが要る。
+ * 一方プレイ画面はローマ字候補が要るが、連番やモデル名は使わない。
+ */
+export async function listPromptsForAdmin(
+  db: Db,
+  themeId: string,
+  page: { limit: number; cursor: number },
+): Promise<{ prompts: AdminPrompt[]; nextCursor: number | null }> {
+  const rows = await db
+    .select({
+      id: prompts.id,
+      text: prompts.text,
+      readingKana: prompts.readingKana,
+      keystrokeCount: prompts.keystrokeCount,
+      sequenceNumber: prompts.sequenceNumber,
+      model: prompts.model,
+      createdAt: prompts.createdAt,
+    })
+    .from(prompts)
+    .where(eq(prompts.themeId, themeId))
+    .orderBy(prompts.sequenceNumber)
+    .limit(page.limit + 1)
+    .offset(page.cursor);
+
+  const hasMore = rows.length > page.limit;
+  return {
+    prompts: hasMore ? rows.slice(0, page.limit) : rows,
+    nextCursor: hasMore ? page.cursor + page.limit : null,
+  };
+}
+
+/** お題1件と、それが属するテーマの種別・名前。編集時の「含む」検査に要る */
+export async function getPromptWithTheme(
+  db: Db,
+  promptId: string,
+): Promise<{ id: string; themeId: string; kind: ThemeKind; themeName: string } | null> {
+  const [row] = await db
+    .select({
+      id: prompts.id,
+      themeId: prompts.themeId,
+      kind: themes.kind,
+      themeName: themes.name,
+    })
+    .from(prompts)
+    .innerJoin(themes, eq(themes.id, prompts.themeId))
+    .where(eq(prompts.id, promptId))
+    .limit(1);
+  return row ?? null;
+}
+
+/**
+ * お題の本文を差し替える。**読みと打鍵数も必ず一緒に更新する。**
+ *
+ * 本文だけ変えると、打鍵判定は古い読みのまま行われる。画面に出ている文と
+ * 打つべきローマ字が食い違い、**何を打っても進まないお題**ができあがる。
+ * 呼び出し側で読みを取り直してから渡すこと。
+ */
+export async function updatePromptText(
+  db: Db,
+  promptId: string,
+  next: { text: string; readingKana: string; readingRomanJson: string; keystrokeCount: number },
+): Promise<void> {
+  await db.update(prompts).set(next).where(eq(prompts.id, promptId));
+}
+
+/**
+ * お題を1件消す。連番は詰め直さない。
+ *
+ * 詰め直すとテーマ内の全行を書き換えることになり、その間に補充が走ると採番が
+ * 衝突する。配信は行数で位置を数えているので（`fetchPromptPage`）、穴が
+ * 空いたままでも壊れない。
+ */
+export async function deletePrompt(db: Db, promptId: string): Promise<boolean> {
+  const [row] = await db.select({ id: prompts.id }).from(prompts).where(eq(prompts.id, promptId));
+  if (row === undefined) return false;
+  await db.delete(prompts).where(eq(prompts.id, promptId));
+  return true;
+}

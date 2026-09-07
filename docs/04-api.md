@@ -25,6 +25,9 @@
 | GET | `/api/me` | 必須 | ユーザー情報・本日の生成残数 |
 | GET | `/api/admin/themes` | 管理者 | 管理用一覧 |
 | DELETE | `/api/admin/themes/[id]` | 管理者 | 削除（prompts・KVも連鎖） |
+| GET | `/api/admin/themes/[id]/prompts` | 管理者 | テーマ1つ分のお題一覧（管理用） |
+| PATCH | `/api/admin/prompts/[id]` | 管理者 | お題本文の編集（読み・打鍵数はサーバーで取り直す） |
+| DELETE | `/api/admin/prompts/[id]` | 管理者 | お題の削除（連番は詰め直さない） |
 | GET | `/api/admin/users` | 管理者 | ユーザー一覧（閲覧のみ） |
 
 テーマと含む文字は同じエンドポイントで`kind`により分岐する。DB上も同じテーブルのため。
@@ -94,6 +97,25 @@
 // DELETE /api/admin/themes/[id]
 { "deleted": true, "themeId": "..." }
 
+// GET /api/admin/themes/[id]/prompts?limit=&cursor=
+// テーマ内のお題を生成順（連番順）で返す。編集の判断材料として
+// 読み仮名・打鍵数・生成モデルを含む（プレイ用のレスポンスとは持つ情報が違う）
+{ "prompts": [{ "id": "...", "text": "手裏剣が闇を裂いた。",
+                "readingKana": "しゅりけんがやみをさいた。", "keystrokeCount": 25,
+                "sequenceNumber": 1, "model": "@cf/...", "createdAt": 1757000000 }],
+  "nextCursor": 50 }
+
+// PATCH /api/admin/prompts/[id]
+// リクエストは本文のみ。読み仮名の取得（`getReading()`）をやり直し、
+// 生成時と同じ検査（文字種・漢字・打鍵数10〜40・「含む」文字）を通してから
+// 読み・ローマ字・打鍵数を一緒に更新する。本文だけ差し替えると
+// 「画面の文と打つべきローマ字が食い違う」お題になるため
+{ "id": "...", "text": "手裏剣が闇を裂いた。",
+  "readingKana": "しゅりけんがやみをさいた。", "keystrokeCount": 25 }
+
+// DELETE /api/admin/prompts/[id]
+{ "deleted": true, "promptId": "..." }
+
 // GET /api/admin/users?limit=&cursor=
 // 閲覧のみ。更新・削除の口は持たない
 // createdAt は認証テーブル（Better Auth）の列でミリ秒精度のため、themes と違い ISO 文字列で返る
@@ -103,6 +125,8 @@
 ```
 
 **削除では `prompts` / `user_theme_progress` がFKのCASCADEで消えるが、KVは消えない。** Hono側で `theme:<kind>:<normalized_name>` と `theme:<id>:lock` を明示的に削除する。消し忘れると、削除したテーマがキャッシュ経由で復活したように見える。
+
+**お題を1件消すと連番に穴が空くが、詰め直さない。** 配信・管理一覧は連番を並び順として使うだけで位置を行数で数える（`OFFSET`）。詰め直すとテーマ内の全行を書き換えることになり、並行して走った補充の採番と衝突しうる。穴の影響は「以降のお題が1つずつ手前にずれる」だけで済む。一方、次の採番は `MAX(sequence_number) + 1`。件数（`COUNT`）で採番すると、穴が空いたテーマで既存の番号と衝突する。
 
 未ログインは `UNAUTHORIZED`、ログイン済みの非管理者は `FORBIDDEN` を返す。`FORBIDDEN` の文言は `NOT_FOUND` と同じ「見つかりません」で、権限が無いのか存在しないのかを区別させない。
 
@@ -127,6 +151,9 @@
 | GET | `/usage/:userId` | 当日の生成回数（Next.js側のクォータ判定の材料） |
 | GET | `/admin/themes` | 管理用一覧 |
 | DELETE | `/admin/themes/:id` | 削除 |
+| GET | `/admin/prompts` | テーマ1つ分のお題一覧（`themeId` / `limit` / `cursor` をクエリで受ける） |
+| PATCH | `/admin/prompts` | 編集（`id` と本文を本文で受ける）。読み取得をやり直し、検査後に読み・ローマ字・打鍵数を更新 |
+| DELETE | `/admin/prompts/:id` | お題1件の削除。連番は詰め直さない |
 | GET | `/admin/users` | ユーザー一覧 |
 
 **加算（`incrementUsage`）はルートとして露出しない。** 同期生成・バックグラウンド補充のいずれも、生成処理の成功直後にHono内部から直接呼ぶ。バックグラウンド補充は `waitUntil` 内で動くためNext.jsからは観測できず、HTTP経由の加算ルートは設計上使えない。

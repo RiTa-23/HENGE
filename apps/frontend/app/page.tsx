@@ -35,8 +35,15 @@ export default async function HomePage() {
             まだ存在しない文章を、打つ。
           </p>
           <p className="mx-auto mt-4 max-w-xl leading-loose text-kinari/70">
-            指定したテーマから、AIがお題をその場でつくります。打ったお題は二度と回ってこないので、
-            暗記ではなくその場で打つ力が鍛えられます。15問ひと組で、ログインしなくても遊べます。
+            {/* 文の区切りで改行する。自動折返しに任せると「回っ／てこない」のように
+                句の途中で切れる。br はデスクトップだけ効かせ、モバイルは自然な流れに戻す */}
+            指定したテーマから、AIがお題をその場でつくります。
+            <br className="hidden sm:inline" />
+            打ったお題は二度と回ってこないので、
+            <br className="hidden sm:inline" />
+            暗記ではなくその場で打つ力が鍛えられます。
+            <br className="hidden sm:inline" />
+            15問ひと組で、ログインしなくても遊べます。
           </p>
         </section>
 

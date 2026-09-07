@@ -104,6 +104,27 @@ export function PlayScreen({
   const waitingSince = useRef<number | null>(null);
   const retryTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
+  /** 1問目から打ち始める。取得直後と、中断からの再開の両方で使う */
+  const beginPlay = (session: SessionResponse) => {
+    setPromptIndex(0);
+    setStats({ hits: 0, misses: 0, elapsedMs: 0 });
+    startedAt.current = performance.now();
+    setProgress(startTyping(session.prompts[0]?.readingRoman ?? []));
+    setPhase({ name: "playing", session });
+  };
+
+  /**
+   * 途中でやめて開始前へ戻る。**取得済みのお題は捨てる。**
+   *
+   * 持ち回して再開できるようにすると、**一度お題を見たうえで同じ15問を打ち直せて
+   * しまう。** 暗記による有利を作らないことがこのサービスの前提なので、見たお題を
+   * 再配布しない。オフセットは受け取った時点で消費が確定している（docs/04-api.md）
+   * ため、やめた分の在庫は戻らない。それは中断の代償として受け入れる。
+   */
+  const quit = () => {
+    setPhase((current) => (current.name === "playing" ? { name: "ready" } : current));
+  };
+
   const load = useCallback(async () => {
     setPhase({ name: "loading" });
     const response = await fetch("/api/sessions/start", {
@@ -146,11 +167,7 @@ export function PlayScreen({
     const session = body as SessionResponse;
     // **返された時点で消費が確定する。** 中断しても巻き戻さない
     writeOffset(themeId, session.nextOffset);
-    setPromptIndex(0);
-    setStats({ hits: 0, misses: 0, elapsedMs: 0 });
-    startedAt.current = performance.now();
-    setProgress(startTyping(session.prompts[0]?.readingRoman ?? []));
-    setPhase({ name: "playing", session });
+    beginPlay(session);
   }, [themeId]);
 
   // **開始するまで sessions/start を呼ばない。** 呼んだ時点でオフセットの消費が
@@ -223,7 +240,17 @@ export function PlayScreen({
   };
 
   const onKeyDown = (event: React.KeyboardEvent<HTMLDivElement>) => {
-    if (phase.name !== "playing" || !isTypingKey(event.nativeEvent)) return;
+    if (phase.name !== "playing") return;
+
+    // **Esc は打鍵より先に見る。** normalizeTypedKey は打てない文字として捨てるので、
+    // ここで拾わないと画面のボタンからしかやめられない
+    if (event.key === "Escape") {
+      event.preventDefault();
+      quit();
+      return;
+    }
+
+    if (!isTypingKey(event.nativeEvent)) return;
 
     // **`event.key` をそのまま渡さない。** 候補テーブルは小文字のASCIIしか持たないため、
     // Caps Lock の `"S"` や、かなで届いた `"し"` は**すべてミスとして数えられてしまう**。
@@ -395,9 +422,25 @@ export function PlayScreen({
     >
       <header className="flex items-start justify-between border-b border-kin/40 pb-4">
         <Logo />
-        <span className="rounded-full border border-kinari/15 bg-kinari/5 px-4 py-1 text-xs tracking-widest text-kinari/70">
-          {themeName}
-        </span>
+        <div className="flex items-center gap-3">
+          <span className="rounded-full border border-kinari/15 bg-kinari/5 px-4 py-1 text-xs tracking-widest text-kinari/70">
+            {themeName}
+          </span>
+          {/*
+            打鍵を拾う要素の中に置く。外に出すと、押した時点でフォーカスが
+            surface から外れ、onBlur の当て直しと競合する。
+            **朱は使わない。** 朱は「今すぐ打つべきもの」だけの色で、
+            やめるボタンに使うとキーボードのハイライトと役割がぶつかる
+          */}
+          <button
+            type="button"
+            onClick={quit}
+            className="rounded-full border border-kinari/15 px-4 py-1 text-xs tracking-widest text-kinari/50 transition-colors hover:border-kin hover:text-kinari"
+          >
+            やめる
+            <span className="ml-2 font-mono text-kinari/40">Esc</span>
+          </button>
+        </div>
       </header>
 
       <div className="flex flex-1 flex-col justify-center gap-8 py-8">

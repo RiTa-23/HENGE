@@ -41,7 +41,13 @@ export function ThemeMark({ className }: { className?: string }) {
   );
 }
 
-/** 最適化練習。**鍵盤2つと、その間を弧を描いて渡る運指。** 指の通り道を組み替えるモード */
+/**
+ * 最適化練習。**三つ巴。** 音が連なって回りながら次へ次へと渡る＝連接の紋。
+ *
+ * 初案は鍵盤2つと運指の弧だったが、実機で見ると「何を表しているか分からない」
+ * ため却下。武家の紋の体裁そのものが和風の第一印象として効く。なお一筆ずつの
+ * 幅は同じ（stroke）で、頭だけを塗りつぶす。頭の向きに回転の流れが出る。
+ */
 export function PracticeMark({ className }: { className?: string }) {
   return (
     <svg
@@ -54,11 +60,18 @@ export function PracticeMark({ className }: { className?: string }) {
       strokeLinejoin="round"
       aria-hidden="true"
     >
-      {/* 打つ順に鍵盤を渡る弧。同じ指が続く並びを、別々の指に組み替える */}
-      <path d="M18 34 C 18 16, 46 16, 46 30" />
-      <path d="M40 26 L46 31 L39 34" />
-      <rect x="9" y="36" width="18" height="14" rx="3" />
-      <rect x="37" y="36" width="18" height="14" rx="3" />
+      <g>
+        <circle cx="32" cy="13" r="3.5" fill="currentColor" stroke="none" />
+        <path d="M32 13 A 19 19 0 0 1 50.7 35.3" />
+      </g>
+      <g transform="rotate(120 32 32)">
+        <circle cx="32" cy="13" r="3.5" fill="currentColor" stroke="none" />
+        <path d="M32 13 A 19 19 0 0 1 50.7 35.3" />
+      </g>
+      <g transform="rotate(240 32 32)">
+        <circle cx="32" cy="13" r="3.5" fill="currentColor" stroke="none" />
+        <path d="M32 13 A 19 19 0 0 1 50.7 35.3" />
+      </g>
     </svg>
   );
 }

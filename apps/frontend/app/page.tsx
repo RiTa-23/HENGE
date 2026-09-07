@@ -25,13 +25,18 @@ export default async function HomePage() {
         <section className="text-center">
           <HeroLogo />
           <h1 className="mx-auto mt-10 max-w-2xl font-mincho text-4xl leading-relaxed tracking-wide text-kinari">
-            お題が毎回変わる、
+            お題が毎回生まれる、
             <br />
             日本語タイピングの修行場
           </h1>
-          <p className="mx-auto mt-6 max-w-xl leading-loose text-kinari/70">
-            同じ文章を繰り返さないので「慣れ」が起きません。15問ひと組で打ちます。
-            ログインしなくても遊べます。
+          {/* リード文は説明より一撃で伝えたいので、本文より大きい明朝で独立させる。
+              h1 に何のサイトか（インデックス対象のため）を任せ、ここに差分の芯を置く */}
+          <p className="mx-auto mt-8 font-mincho text-xl tracking-wide text-kinari">
+            まだ存在しない文章を、打つ。
+          </p>
+          <p className="mx-auto mt-4 max-w-xl leading-loose text-kinari/70">
+            指定したテーマから、AIがお題をその場でつくります。打ったお題は二度と回ってこないので、
+            暗記ではなくその場で打つ力が鍛えられます。15問ひと組で、ログインしなくても遊べます。
           </p>
         </section>
 

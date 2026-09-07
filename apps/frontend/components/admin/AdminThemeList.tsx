@@ -1,6 +1,7 @@
 "use client";
 
 import { isApiError } from "@henge/shared";
+import Link from "next/link";
 import { useCallback, useEffect, useState } from "react";
 
 interface AdminTheme {
@@ -75,7 +76,12 @@ export function AdminThemeList() {
         {themes.map((theme) => (
           <tr key={theme.id} className="border-b border-kinari/5">
             <td className="py-3 font-mincho text-base text-kinari">
-              {theme.name}
+              <Link
+                href={`/admin/themes/${encodeURIComponent(theme.id)}?name=${encodeURIComponent(theme.name)}`}
+                className="hover:underline"
+              >
+                {theme.name}
+              </Link>
               {theme.generationStatus === "difficult" && (
                 <span className="ml-3 text-xs tracking-widest text-kinari/40">生成困難</span>
               )}

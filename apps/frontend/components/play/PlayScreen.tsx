@@ -22,6 +22,7 @@ import { ProgressDots } from "./ProgressDots";
 import { Result, type PlayStats } from "./Result";
 import { Scroll } from "./Scroll";
 import { readOffset, writeOffset } from "@/lib/play/offset";
+import { mergeMissedKeys } from "@/lib/play/misses";
 import { kindLabel, listHref } from "@/lib/ui/kind";
 
 interface Prompt {
@@ -92,6 +93,8 @@ export function PlayScreen({
   const [promptIndex, setPromptIndex] = useState(0);
   const [progress, setProgress] = useState<TypingProgress>(() => startTyping([]));
   const [stats, setStats] = useState<PlayStats>({ hits: 0, misses: 0, elapsedMs: 0 });
+  /** 15問を通した苦手キー。問題ごとの集計をここへ畳む */
+  const [missedKeys, setMissedKeys] = useState<ReadonlyMap<string, number>>(() => new Map());
   /**
    * 日本語入力のまま打たれたことがあるか。**一度でも見たら出しっぱなしにする。**
    * 打つたびに出たり消えたりすると、打鍵に気を取られて読めない
@@ -103,6 +106,28 @@ export function PlayScreen({
   const [attempt, setAttempt] = useState(0);
   const waitingSince = useRef<number | null>(null);
   const retryTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  /** 1問目から打ち始める。取得直後と、中断からの再開の両方で使う */
+  const beginPlay = (session: SessionResponse) => {
+    setPromptIndex(0);
+    setStats({ hits: 0, misses: 0, elapsedMs: 0 });
+    setMissedKeys(new Map());
+    startedAt.current = performance.now();
+    setProgress(startTyping(session.prompts[0]?.readingRoman ?? []));
+    setPhase({ name: "playing", session });
+  };
+
+  /**
+   * 途中でやめて開始前へ戻る。**取得済みのお題は捨てる。**
+   *
+   * 持ち回して再開できるようにすると、**一度お題を見たうえで同じ15問を打ち直せて
+   * しまう。** 暗記による有利を作らないことがこのサービスの前提なので、見たお題を
+   * 再配布しない。オフセットは受け取った時点で消費が確定している（docs/04-api.md）
+   * ため、やめた分の在庫は戻らない。それは中断の代償として受け入れる。
+   */
+  const quit = () => {
+    setPhase((current) => (current.name === "playing" ? { name: "ready" } : current));
+  };
 
   const load = useCallback(async () => {
     setPhase({ name: "loading" });
@@ -146,11 +171,7 @@ export function PlayScreen({
     const session = body as SessionResponse;
     // **返された時点で消費が確定する。** 中断しても巻き戻さない
     writeOffset(themeId, session.nextOffset);
-    setPromptIndex(0);
-    setStats({ hits: 0, misses: 0, elapsedMs: 0 });
-    startedAt.current = performance.now();
-    setProgress(startTyping(session.prompts[0]?.readingRoman ?? []));
-    setPhase({ name: "playing", session });
+    beginPlay(session);
   }, [themeId]);
 
   // **開始するまで sessions/start を呼ばない。** 呼んだ時点でオフセットの消費が
@@ -223,7 +244,17 @@ export function PlayScreen({
   };
 
   const onKeyDown = (event: React.KeyboardEvent<HTMLDivElement>) => {
-    if (phase.name !== "playing" || !isTypingKey(event.nativeEvent)) return;
+    if (phase.name !== "playing") return;
+
+    // **Esc は打鍵より先に見る。** normalizeTypedKey は打てない文字として捨てるので、
+    // ここで拾わないと画面のボタンからしかやめられない
+    if (event.key === "Escape") {
+      event.preventDefault();
+      quit();
+      return;
+    }
+
+    if (!isTypingKey(event.nativeEvent)) return;
 
     // **`event.key` をそのまま渡さない。** 候補テーブルは小文字のASCIIしか持たないため、
     // Caps Lock の `"S"` や、かなで届いた `"し"` は**すべてミスとして数えられてしまう**。
@@ -249,6 +280,8 @@ export function PlayScreen({
     const hits = stats.hits + next.hitCount;
     const misses = stats.misses + next.missCount;
     const upcoming = promptIndex + 1;
+    // missedKeys は問題ごとに作り直されるので、ここで通算へ足す
+    setMissedKeys((total) => mergeMissedKeys(total, next.missedKeys));
 
     if (upcoming >= phase.session.prompts.length) {
       setStats({ hits, misses, elapsedMs: performance.now() - startedAt.current });
@@ -376,7 +409,15 @@ export function PlayScreen({
   }
 
   if (phase.name === "result") {
-    return <Result stats={stats} themeName={themeName} onRetry={start} listHref={backToList} />;
+    return (
+      <Result
+        stats={stats}
+        missedKeys={missedKeys}
+        themeName={themeName}
+        onRetry={start}
+        listHref={backToList}
+      />
+    );
   }
 
   const prompt = phase.session.prompts[promptIndex];
@@ -395,9 +436,25 @@ export function PlayScreen({
     >
       <header className="flex items-start justify-between border-b border-kin/40 pb-4">
         <Logo />
-        <span className="rounded-full border border-kinari/15 bg-kinari/5 px-4 py-1 text-xs tracking-widest text-kinari/70">
-          {themeName}
-        </span>
+        <div className="flex items-center gap-3">
+          <span className="rounded-full border border-kinari/15 bg-kinari/5 px-4 py-1 text-xs tracking-widest text-kinari/70">
+            {themeName}
+          </span>
+          {/*
+            打鍵を拾う要素の中に置く。外に出すと、押した時点でフォーカスが
+            surface から外れ、onBlur の当て直しと競合する。
+            **朱は使わない。** 朱は「今すぐ打つべきもの」だけの色で、
+            やめるボタンに使うとキーボードのハイライトと役割がぶつかる
+          */}
+          <button
+            type="button"
+            onClick={quit}
+            className="rounded-full border border-kinari/15 px-4 py-1 text-xs tracking-widest text-kinari/50 transition-colors hover:border-kin hover:text-kinari"
+          >
+            やめる
+            <span className="ml-2 font-mono text-kinari/40">Esc</span>
+          </button>
+        </div>
       </header>
 
       <div className="flex flex-1 flex-col justify-center gap-8 py-8">

@@ -116,6 +116,19 @@ describe("外来語のかな", () => {
     expect(accepts("てぃ", 0, "thi")).toBe(true);
   });
 
+  // 「ジェット」「ジェスチャー」など頻出なのに抜けていた。テーブルを整理したときに
+  // 黙って消えないよう、分解入力まで含めて固定する
+  test("じぇ は je / zye / jye、分解入力もできる", () => {
+    expect(accepts("じぇ", 0, "je")).toBe(true);
+    expect(accepts("じぇ", 0, "zye")).toBe(true);
+    expect(accepts("じぇ", 0, "jye")).toBe(true);
+    expect(accepts("じぇ", 0, "jixe")).toBe(true);
+  });
+
+  test("ぢぇ は dye", () => {
+    expect(accepts("ぢぇ", 0, "dye")).toBe(true);
+  });
+
   test("うぃ・うぇ・ゔ", () => {
     expect(accepts("うぃ", 0, "wi")).toBe(true);
     expect(accepts("うぇ", 0, "we")).toBe(true);

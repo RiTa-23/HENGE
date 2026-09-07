@@ -60,7 +60,7 @@ CREATE INDEX themes_kind_created ON themes (kind, created_at DESC);
 | `text` | TEXT | NOT NULL | 漢字かな混じりの本文 |
 | `reading_kana` | TEXT | NOT NULL | ひらがなの読み |
 | `reading_roman_json` | TEXT | NOT NULL | かな→ローマ字候補配列のJSON |
-| `keystroke_count` | INTEGER | NOT NULL | 打鍵数（10〜40） |
+| `keystroke_count` | INTEGER | NOT NULL | 打鍵数（10〜35） |
 | `source` | TEXT | NOT NULL | `'workers_ai'` |
 | `model` | TEXT | NULL可 | 生成に使ったモデル名 |
 | `sequence_number` | INTEGER | NOT NULL | テーマ内で1始まりの連番 |

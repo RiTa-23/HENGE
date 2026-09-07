@@ -38,9 +38,9 @@ export function containsKanji(text: string): boolean {
   return /[一-鿿]/u.test(text);
 }
 
-/** 打鍵数の下限・上限。この範囲を外れたお題は却下する */
+/** 打鍵数の下限・上限。この範囲を外れたお題は却下する。上限≒ローマ字35文字 */
 export const KEYSTROKE_MIN = 10;
-export const KEYSTROKE_MAX = 40;
+export const KEYSTROKE_MAX = 35;
 
 export function isKeystrokeCountInRange(count: number): boolean {
   return count >= KEYSTROKE_MIN && count <= KEYSTROKE_MAX;

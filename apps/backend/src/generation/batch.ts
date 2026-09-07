@@ -47,18 +47,6 @@ const OPENING_PREFIX_LENGTH = 4;
 const OPENING_MAX = 3;
 
 /**
- * テーマ名を文中に使える文の上限（**テーマモードのみ**）。
- *
- * テーマ名で**始まる**文は別の検査（`themeStart`）で1文ごとに弾く。ここは
- * **文中**での連続使用の上限。「博多の〜」が20文並んだ実測では、文頭検査が
- * ない状態でこの上限だけが効き、3本に削られて15問に届かなかった。
- *
- * **「含む」モードでは使わない。** 指定文字を含むのは仕様であり、
- * ここで上限をかけると本末転倒。
- */
-const THEME_NAME_MAX = 3;
-
-/**
  * 読み仮名の先頭2かなが同じ文の上限。
  *
  * テーマ語で始まる文は `themeStart` で1文ごとに弾くが、この検査は
@@ -66,6 +54,10 @@ const THEME_NAME_MAX = 3;
  * が並んだ）を拾う。表記の先頭では「型は／型が」が2文字目で分かれるため、
  * キーは**読み仮名の先頭2かな**（かたは／かたが→「かた」）。3本までは
  * 許す（締めすぎると生成そのものが失敗する。OPENING_MAX と同じ理由）。
+ *
+ * なおテーマ名が**文中**に含まれる文は数えない。止めたいのは文頭の一極集中で、
+ * 文中の使用は文ごとに内容が違うため自然（実測: 「魚を食べると健康になる。」
+ * のような自然な文が文中上限で弾かれた）。文頭は themeStart が1文ごとに見る。
  */
 const START_PREFIX_LENGTH = 2;
 const START_MAX = 3;
@@ -90,8 +82,6 @@ export interface RejectionCounts {
   constraint: number;
   /** テーマ名（またはその読み）で始まる文（テーマモードのみ） */
   themeStart: number;
-  /** テーマ名を含む文が採用上限を超えた（テーマモードのみ） */
-  themeName: number;
   /** 読み仮名の先頭2かなが同じ文が採用上限を超えた */
   start: number;
 }
@@ -139,7 +129,6 @@ export async function generateBatch(env: Env, input: GenerateBatchInput): Promis
     keystroke: 0,
     constraint: 0,
     themeStart: 0,
-    themeName: 0,
     start: 0,
   };
   const seen = new Set(input.existing);
@@ -150,7 +139,6 @@ export async function generateBatch(env: Env, input: GenerateBatchInput): Promis
   const state: ValidateState = {
     openings: new Map(),
     startPrefixes: new Map(),
-    themeNameCount: 0,
   };
   let rounds = 0;
   let hint: string | undefined;
@@ -233,7 +221,6 @@ function subtract(after: RejectionCounts, before: RejectionCounts): RejectionCou
     keystroke: after.keystroke - before.keystroke,
     constraint: after.constraint - before.constraint,
     themeStart: after.themeStart - before.themeStart,
-    themeName: after.themeName - before.themeName,
     start: after.start - before.start,
   };
 }
@@ -252,10 +239,6 @@ function retryHint(delta: RejectionCounts, name: string): string | undefined {
     [
       delta.themeStart,
       `テーマの名前（とその読み）で始まる文は受け付けられません。すべての文を、テーマの名前「${name}」以外の語から書き始めてください（名前は文の途中にだけ使う）`,
-    ],
-    [
-      delta.themeName,
-      `テーマ名を含む文が多すぎました。名前は文の途中にだけ使い、できるだけ少なくしてください`,
     ],
     [
       delta.keystroke,
@@ -290,11 +273,10 @@ function startPrefixOf(readingKana: string): string {
   return [...readingKana].slice(0, START_PREFIX_LENGTH).join("");
 }
 
-/** ラウンドをまたいで保持する検証の状態。openings / startPrefixes / テーマ名の採用数 */
+/** ラウンドをまたいで保持する検証の状態。書き出し・読みの頭の採用数 */
 interface ValidateState {
   openings: Map<string, number>;
   startPrefixes: Map<string, number>;
-  themeNameCount: number;
 }
 
 async function validateInto(
@@ -334,16 +316,6 @@ async function validateInto(
       return false;
     }
     state.openings.set(opening, used + 1);
-    // **テーマ名の文中での使いすぎを止める。** 文頭検査で始まりは防いだうえで、
-    // 途中での連続使用を3本までに制限する。テーマモードのみ（「含む」モードは
-    // 指定文字を含むのが仕様）
-    if (input.kind === "theme" && text.includes(input.name)) {
-      if (state.themeNameCount >= THEME_NAME_MAX) {
-        rejected.themeName++;
-        return false;
-      }
-      state.themeNameCount++;
-    }
     return true;
   });
 

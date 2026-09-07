@@ -332,14 +332,14 @@ describe("generateBatch", () => {
     expect(result.rejected.themeStart).toBe(2);
   });
 
-  it("テーマ名を含む文の上限は、「含む」モードでは適用しない", async () => {
-    // 指定文字を含むのは「含む」モードの仕様。ここで上限をかけると本末転倒
+  it("テーマ語の検査は「含む」モードでは適用しない", async () => {
+    // 指定文字を含む・指定文字で始まるのは「含む」モードの仕様。
+    // テーマ名の文頭検査を適用すると本末転倒
     const result = await generateBatch(
       envWithAiResponses([["座禅を組む。", "ざあざあと雑音。"], []]),
       input({ kind: "constraint", name: "ざ", target: 2 }),
     );
 
-    expect(result.rejected.themeName).toBe(0);
     expect(result.rejected.themeStart).toBe(0);
     expect(result.valid).toHaveLength(2);
   });
@@ -443,11 +443,11 @@ describe("generateBatch", () => {
 
     expect(logs).toHaveLength(2);
     expect(logs[0]?.metadata?.counts).toBe(
-      "charset:1,kanji:0,opening:0,keystroke:0,constraint:0,themeStart:0,themeName:0,start:0",
+      "charset:1,kanji:0,opening:0,keystroke:0,constraint:0,themeStart:0,start:0",
     );
     // 累積を渡していれば charset:2 になる
     expect(logs[1]?.metadata?.counts).toBe(
-      "charset:1,kanji:0,opening:0,keystroke:0,constraint:0,themeStart:0,themeName:0,start:0",
+      "charset:1,kanji:0,opening:0,keystroke:0,constraint:0,themeStart:0,start:0",
     );
   });
 

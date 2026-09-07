@@ -1,6 +1,8 @@
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
+import { AdjustingView } from "@/components/Adjusting";
 import { PlayScreen } from "@/components/play/PlayScreen";
+import { betaLimitedPage } from "@/lib/api/admin-page";
 import { decodePageParam, findTheme } from "@/lib/api/themes";
 import { parseThemeKind } from "@/lib/ui/kind";
 
@@ -31,6 +33,12 @@ export default async function PlayPage({
   if (name === null) notFound();
 
   const themeKind = parseThemeKind(kind);
+  // **ベータ版では最適化練習ごと公開しない。** テーマモードのプレイは制限しない
+  // （運営が生成したお題をそのまま遊べる）
+  if (themeKind === "constraint" && (await betaLimitedPage())) {
+    return <AdjustingView what="最適化練習" />;
+  }
+
   const found = await findTheme(themeKind, name);
   if (found === null) notFound();
 

@@ -1,16 +1,36 @@
-import { and, desc, eq, gte, lte, sql } from "drizzle-orm";
+import { desc, eq, sql } from "drizzle-orm";
 import type { Db } from "./client";
 import { prompts, themes } from "./schema";
 import type { ValidPrompt } from "../generation/batch";
 import type { ThemeKind } from "@henge/shared";
 
-/** テーマ内の総生成数。`MAX(sequence_number)` で取れる */
+/**
+ * テーマ内のお題の数。**`COUNT(*)` で数える（`MAX(sequence_number)` ではない）。**
+ *
+ * 管理画面からお題を1件消すと連番に穴が空く。最大値で数えると穴の分だけ在庫を
+ * 多く見積もり、配信側は「在庫はあるのに15問揃わない」状態になって、そのテーマが
+ * 遊べなくなる。実際に配れる数を数えること。
+ */
 export async function countPrompts(db: Db, themeId: string): Promise<number> {
+  const [row] = await db
+    .select({ count: sql<number>`count(*)` })
+    .from(prompts)
+    .where(eq(prompts.themeId, themeId));
+  return row?.count ?? 0;
+}
+
+/**
+ * 次に採番する `sequence_number`。**こちらは `MAX + 1`。**
+ *
+ * 件数（`COUNT`）で採番すると、削除で穴が空いたテーマに追加したときに既存の番号と
+ * 衝突して一意制約に当たる。「いくつあるか」と「次に何番を振るか」は別物。
+ */
+export async function nextSequenceNumber(db: Db, themeId: string): Promise<number> {
   const [row] = await db
     .select({ max: sql<number | null>`max(${prompts.sequenceNumber})` })
     .from(prompts)
     .where(eq(prompts.themeId, themeId));
-  return row?.max ?? 0;
+  return (row?.max ?? 0) + 1;
 }
 
 export interface PlayablePrompt {
@@ -21,14 +41,21 @@ export interface PlayablePrompt {
 }
 
 /**
- * 連番の範囲でお題を取る。`prompts_theme_seq` インデックス1本で賄う。
- * 範囲は両端を含む（from 〜 to）。
+ * 生成順に並べて、オフセットの位置から `limit` 件取る。
+ *
+ * **連番の「値」で範囲指定しない（`BETWEEN from AND to` にしない）。** 管理画面から
+ * お題を1件消すと連番に穴が空き、その穴を含むブロックだけ15件に満たなくなる。
+ * 配信側はそれを在庫切れと解釈するため、**1件の削除でそのテーマが遊べなくなる。**
+ * 並び順にだけ連番を使い、位置は行数で数えることで穴に強くする。
+ *
+ * 削除の影響は「以降のお題が1つずつ手前にずれる」だけになる。まだ遊んでいない
+ * ユーザーには関係がなく、進んでいるユーザーも1問ずれるだけで済む。
  */
-export async function fetchPromptRange(
+export async function fetchPromptPage(
   db: Db,
   themeId: string,
-  from: number,
-  to: number,
+  offset: number,
+  limit: number,
 ): Promise<PlayablePrompt[]> {
   const rows = await db
     .select({
@@ -38,13 +65,10 @@ export async function fetchPromptRange(
       readingRomanJson: prompts.readingRomanJson,
     })
     .from(prompts)
-    .where(
-      and(
-        eq(prompts.themeId, themeId),
-        gte(prompts.sequenceNumber, from),
-        lte(prompts.sequenceNumber, to),
-      ),
-    );
+    .where(eq(prompts.themeId, themeId))
+    .orderBy(prompts.sequenceNumber)
+    .limit(limit)
+    .offset(offset);
 
   return rows.map((row) => ({
     id: row.id,
@@ -138,7 +162,7 @@ export async function appendPrompts(
   model: string,
 ): Promise<number> {
   if (items.length === 0) return 0;
-  const from = (await countPrompts(db, themeId)) + 1;
+  const from = await nextSequenceNumber(db, themeId);
   const rows = toRows(themeId, model, from, items);
   const inserts = chunk(rows, INSERT_CHUNK_SIZE).map((part) => db.insert(prompts).values(part));
   await db.batch(asBatch(inserts));

@@ -1,10 +1,13 @@
 import { env } from "cloudflare:test";
-import { beforeEach, expect, it } from "vitest";
+import { beforeEach, describe, expect, it } from "vitest";
+import { eq } from "drizzle-orm";
 import { createDb } from "../src/db/client";
 import {
   appendPrompts,
   countPrompts,
+  fetchPromptPage,
   insertThemeWithPrompts,
+  nextSequenceNumber,
   recentPromptTexts,
 } from "../src/db/prompts";
 import { prompts, themes } from "../src/db/schema";
@@ -90,4 +93,48 @@ it("生成に使ったモデル名を残す", async () => {
 
   const [row] = await db.select().from(prompts);
   expect(row?.model).toBe("@cf/zai-org/glm-4.7-flash");
+});
+
+/**
+ * 管理画面からお題を1件消すと連番に穴が空く。
+ *
+ * **これで配信が壊れてはいけない。** 連番の「値」で範囲指定していた頃は、穴を含む
+ * 15問ブロックだけ件数が足りず、配信側がそれを在庫切れと解釈していた。
+ * その結果、1件の削除でテーマ全体が「使い切りました」になり、そのブロックに
+ * 到達したユーザーは二度と遊べなくなる。
+ */
+describe("連番に穴が空いた場合", () => {
+  const many = (count: number) =>
+    Array.from({ length: count }, (_, index) => item(`お題${index + 1}`));
+
+  beforeEach(async () => {
+    await insertThemeWithPrompts(db, theme, many(20), "model-x");
+    // 5番目を消して穴を作る
+    await db.delete(prompts).where(eq(prompts.sequenceNumber, 5));
+  });
+
+  it("countPrompts は実際に配れる数を返す（最大値ではない）", async () => {
+    // MAX(sequence_number) なら20。実際に残っているのは19件
+    expect(await countPrompts(db, theme.id)).toBe(19);
+  });
+
+  it("穴をまたいでも欠けずに取れる", async () => {
+    const page = await fetchPromptPage(db, theme.id, 0, 15);
+
+    expect(page).toHaveLength(15);
+    // 5番目が消えた分、6番目が繰り上がる
+    expect(page.map((p) => p.text)).not.toContain("お題5");
+    expect(page[4]?.text).toBe("お題6");
+  });
+
+  it("採番は MAX+1 のまま（件数で採ると既存と衝突する）", async () => {
+    // COUNT で採ると20になり、既にある20番と衝突して一意制約に当たる
+    expect(await nextSequenceNumber(db, theme.id)).toBe(21);
+  });
+
+  it("穴が空いた後でも追記できる", async () => {
+    await appendPrompts(db, theme.id, [item("追加分")], "model-x");
+
+    expect(await countPrompts(db, theme.id)).toBe(20);
+  });
 });

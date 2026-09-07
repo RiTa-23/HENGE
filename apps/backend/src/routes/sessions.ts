@@ -1,7 +1,7 @@
 import { PLAY_SIZE, STOCK_TARGET } from "@henge/shared";
 import { type Context, Hono } from "hono";
 import { createDb } from "../db/client";
-import { fetchPromptRange, type PlayablePrompt } from "../db/prompts";
+import { fetchPromptPage, type PlayablePrompt } from "../db/prompts";
 import { getPlayOffset, setPlayOffset } from "../db/progress";
 import { getThemeDetail, incrementPlayCount } from "../db/themes";
 import { kickRefill } from "../generation/refill";
@@ -47,13 +47,9 @@ export const sessionRoutes = new Hono<{ Bindings: Env }>().post("/sessions/start
   // 在庫が1プレイ分に満たない。**「生成中」と「本当に尽きた」を区別する**
   if (theme.promptCount - offset < PLAY_SIZE) return exhausted(c, body.themeId);
 
-  const prompts: PlayablePrompt[] = await fetchPromptRange(
-    db,
-    body.themeId,
-    offset + 1,
-    offset + PLAY_SIZE,
-  );
-  // 連番に歯抜けがある場合。設計上は起きないが、起きたときに黙って短く配らない
+  const prompts: PlayablePrompt[] = await fetchPromptPage(db, body.themeId, offset, PLAY_SIZE);
+  // promptCount と実際に取れた数がずれた場合。並行して削除が走ったときに起こりうる。
+  // 黙って短く配らない
   if (prompts.length < PLAY_SIZE) return exhausted(c, body.themeId);
 
   const nextOffset = offset + PLAY_SIZE;

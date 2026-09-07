@@ -44,8 +44,8 @@ describe("resolveModel", () => {
     );
   });
 
-  it("既定は qwen3（速度・コスト・品質のバランスが最も良い）", () => {
-    expect(DEFAULT_MODEL).toBe("@cf/qwen/qwen3-30b-a3b-fp8");
+  it("既定は llama-4-scout（テーマ語の偏りが最も少なく、日本語も自然。2026-09-07の実測）", () => {
+    expect(DEFAULT_MODEL).toBe("@cf/meta/llama-4-scout-17b-16e-instruct");
   });
 });
 

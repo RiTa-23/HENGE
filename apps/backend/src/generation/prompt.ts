@@ -58,9 +58,17 @@ function rules(count: number): string[] {
  * 文面は「博多の名物は〜」→「名物は〜」と語を落とすだけで回収できる。
  */
 function themeRules(name: string): string[] {
-  return [
+  const rules = [
     `- どの文も、テーマの名前「${name}」（とその読み）で書き始めない。名前は文の途中にだけ使う`,
   ];
+  // 名前がアルファベットのテーマ。モデルは名前をそのまま書きたがるが、
+  // アルファベットは文字種検査で却下されるため、カタカナ読みに置き換えさせる
+  if (/[a-zA-Z]/u.test(name)) {
+    rules.push(
+      "- アルファベットは絶対に書かない。テーマの名前はカタカナの読み（例: TypeScript→タイプスクリプト）に置き換えて、文の途中にだけ使う",
+    );
+  }
+  return rules;
 }
 
 /**

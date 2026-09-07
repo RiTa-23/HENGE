@@ -1,0 +1,52 @@
+{
+  "model": "@cf/meta/llama-4-scout-17b-16e-instruct",
+  "elapsed": "5.1",
+  "data": {
+    "result": {
+      "choices": [
+        {
+          "finish_reason": "stop",
+          "index": 0,
+          "logprobs": null,
+          "message": {
+            "annotations": null,
+            "audio": null,
+            "content": "福岡市にある博多区は、古くから栄えた町です。\n九州地方で一番大きな都市です。\n博多湾に面した港町として有名です。\n福岡県の県庁所在地は福岡市です。\n博多で有名な食べ物は、とんこつラーメンです。\n博多の伝統的な工芸品には、博多織があります。\n博多は、古くから商工業が盛んな地域です。\n博多の歴史は、平安時代にさかのぼります。\n博多には、多くの観光スポットがあります。\n博多の交通の便が良いため、旅行者にも人気です。\n博多の人々は、温かい気候と親しみやすい性格です。\n博多の文化は、古くから受け継がれています。\n博多の食文化は、非常に豊かです。\n博多の歴史的建造物には、太宰府天満宮があります。\n博多の自然環境は、豊かな緑に恵まれています。\n博多の産業は、商業と工業が中心です。\n博多の交通機関には、地下鉄とバスがあります。\n博多の教育機関には、多くの大学があります。\n博多の医療機関は、最新の設備が整っています。\n博多の生活環境は、非常に快適です。",
+            "function_call": null,
+            "reasoning": null,
+            "refusal": null,
+            "role": "assistant"
+          },
+          "routed_experts": null,
+          "stop_reason": null,
+          "token_ids": null
+        }
+      ],
+      "created": 1788798194,
+      "ec_transfer_params": null,
+      "id": "chatcmpl-1a6374f0-3f40-49b0-a634-088f21a8bd0f",
+      "kv_transfer_params": null,
+      "metrics": null,
+      "model": "@cf/meta/llama-4-scout-17b-16e-instruct",
+      "object": "chat.completion",
+      "prompt_logprobs": null,
+      "prompt_text": null,
+      "prompt_token_ids": null,
+      "response": "福岡市にある博多区は、古くから栄えた町です。\n九州地方で一番大きな都市です。\n博多湾に面した港町として有名です。\n福岡県の県庁所在地は福岡市です。\n博多で有名な食べ物は、とんこつラーメンです。\n博多の伝統的な工芸品には、博多織があります。\n博多は、古くから商工業が盛んな地域です。\n博多の歴史は、平安時代にさかのぼります。\n博多には、多くの観光スポットがあります。\n博多の交通の便が良いため、旅行者にも人気です。\n博多の人々は、温かい気候と親しみやすい性格です。\n博多の文化は、古くから受け継がれています。\n博多の食文化は、非常に豊かです。\n博多の歴史的建造物には、太宰府天満宮があります。\n博多の自然環境は、豊かな緑に恵まれています。\n博多の産業は、商業と工業が中心です。\n博多の交通機関には、地下鉄とバスがあります。\n博多の教育機関には、多くの大学があります。\n博多の医療機関は、最新の設備が整っています。\n博多の生活環境は、非常に快適です。",
+      "service_tier": null,
+      "tool_calls": [],
+      "usage": {
+        "prompt_tokens": 313,
+        "completion_tokens": 275,
+        "total_tokens": 588,
+        "prompt_tokens_details": {
+          "cached_tokens": 0
+        },
+        "neurons": 28.932727813720703
+      }
+    },
+    "success": true,
+    "errors": [],
+    "messages": []
+  }
+}

@@ -62,3 +62,15 @@ export async function betaLimitation(request: Request): Promise<boolean> {
   if (!isBetaMode(env.BETA_MODE)) return false;
   return isBetaLimitedUser(env.BETA_MODE, await currentSession(request), env.ADMIN_EMAILS);
 }
+
+/**
+ * ロゴの横に出す「ベータ版」の表示をすべきか。
+ *
+ * **運営アカウントにも見せる。** 制限（betaLimitation）は「この利用者に機能を
+ * 出してよいか」の判定だが、こちらは「サイトがベータ運用中か」の表明で、
+ * 見る人によって変わらない。セッションも引かず env だけを見る。
+ */
+export async function betaBadgeVisible(): Promise<boolean> {
+  const { env } = await getCloudflareContext({ async: true });
+  return isBetaMode(env.BETA_MODE);
+}

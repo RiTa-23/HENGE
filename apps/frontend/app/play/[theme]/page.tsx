@@ -4,6 +4,7 @@ import { AdjustingView } from "@/components/Adjusting";
 import { PlayScreen } from "@/components/play/PlayScreen";
 import { betaLimitedPage } from "@/lib/api/admin-page";
 import { decodePageParam, findTheme } from "@/lib/api/themes";
+import { betaBadgeVisible } from "@/lib/beta/beta";
 import { parseThemeKind } from "@/lib/ui/kind";
 
 /** プレイ画面は検索結果に出さない（着地ページはテーマ詳細） */
@@ -42,5 +43,8 @@ export default async function PlayPage({
   const found = await findTheme(themeKind, name);
   if (found === null) notFound();
 
-  return <PlayScreen themeId={found.id} themeName={found.name} kind={themeKind} />;
+  // ロゴの横の「ベータ版」。運営にも見せる（サイトの状態の表明。lib/beta/beta.ts）
+  const beta = await betaBadgeVisible();
+
+  return <PlayScreen themeId={found.id} themeName={found.name} kind={themeKind} beta={beta} />;
 }

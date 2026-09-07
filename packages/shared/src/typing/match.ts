@@ -24,6 +24,14 @@ export interface TypingProgress {
   readonly misses: ReadonlySet<number>;
   /** ミス打鍵の延べ回数。正確率の計算に使う（misses.size とは別物） */
   readonly missCount: number;
+  /**
+   * ミスした位置で**打つべきだった文字**と、その回数。
+   *
+   * 実際に押された誤りのキーではなく、**画面で苦無が指していた文字**を数える。
+   * 「何を打ち損ねるか」は運指の弱点そのものだが、「代わりに何を押したか」は
+   * 隣接キーの取り違えでばらけるだけで、練習の手がかりにならない。
+   */
+  readonly missedKeys: ReadonlyMap<string, number>;
   /** 正しく受理された打鍵の回数 */
   readonly hitCount: number;
   readonly finished: boolean;
@@ -44,6 +52,7 @@ export function startTyping(units: RomanCandidates): TypingProgress {
     settled: "",
     misses: new Set(),
     missCount: 0,
+    missedKeys: new Map(),
     hitCount: 0,
     finished: units.length === 0,
   };
@@ -71,7 +80,14 @@ function cursorOf(p: TypingProgress): number {
 function recordMiss(p: TypingProgress): TypingProgress {
   const misses = new Set(p.misses);
   misses.add(cursorOf(p));
-  return { ...p, misses, missCount: p.missCount + 1 };
+
+  // 表示は最短候補で出しているので、苦無が指していた文字も最短候補から取る。
+  // 候補が複数残っていても（`F`/`H` のような並列）、画面で見えていたのは1つ
+  const expected = p.matches.length === 0 ? undefined : shortest(p.matches)[p.input.length];
+  const missedKeys = new Map(p.missedKeys);
+  if (expected !== undefined) missedKeys.set(expected, (missedKeys.get(expected) ?? 0) + 1);
+
+  return { ...p, misses, missCount: p.missCount + 1, missedKeys };
 }
 
 /**

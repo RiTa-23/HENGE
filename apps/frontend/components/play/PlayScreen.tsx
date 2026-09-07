@@ -22,6 +22,7 @@ import { ProgressDots } from "./ProgressDots";
 import { Result, type PlayStats } from "./Result";
 import { Scroll } from "./Scroll";
 import { readOffset, writeOffset } from "@/lib/play/offset";
+import { mergeMissedKeys } from "@/lib/play/misses";
 import { kindLabel, listHref } from "@/lib/ui/kind";
 
 interface Prompt {
@@ -92,6 +93,8 @@ export function PlayScreen({
   const [promptIndex, setPromptIndex] = useState(0);
   const [progress, setProgress] = useState<TypingProgress>(() => startTyping([]));
   const [stats, setStats] = useState<PlayStats>({ hits: 0, misses: 0, elapsedMs: 0 });
+  /** 15問を通した苦手キー。問題ごとの集計をここへ畳む */
+  const [missedKeys, setMissedKeys] = useState<ReadonlyMap<string, number>>(() => new Map());
   /**
    * 日本語入力のまま打たれたことがあるか。**一度でも見たら出しっぱなしにする。**
    * 打つたびに出たり消えたりすると、打鍵に気を取られて読めない
@@ -108,6 +111,7 @@ export function PlayScreen({
   const beginPlay = (session: SessionResponse) => {
     setPromptIndex(0);
     setStats({ hits: 0, misses: 0, elapsedMs: 0 });
+    setMissedKeys(new Map());
     startedAt.current = performance.now();
     setProgress(startTyping(session.prompts[0]?.readingRoman ?? []));
     setPhase({ name: "playing", session });
@@ -276,6 +280,8 @@ export function PlayScreen({
     const hits = stats.hits + next.hitCount;
     const misses = stats.misses + next.missCount;
     const upcoming = promptIndex + 1;
+    // missedKeys は問題ごとに作り直されるので、ここで通算へ足す
+    setMissedKeys((total) => mergeMissedKeys(total, next.missedKeys));
 
     if (upcoming >= phase.session.prompts.length) {
       setStats({ hits, misses, elapsedMs: performance.now() - startedAt.current });
@@ -403,7 +409,15 @@ export function PlayScreen({
   }
 
   if (phase.name === "result") {
-    return <Result stats={stats} themeName={themeName} onRetry={start} listHref={backToList} />;
+    return (
+      <Result
+        stats={stats}
+        missedKeys={missedKeys}
+        themeName={themeName}
+        onRetry={start}
+        listHref={backToList}
+      />
+    );
   }
 
   const prompt = phase.session.prompts[promptIndex];

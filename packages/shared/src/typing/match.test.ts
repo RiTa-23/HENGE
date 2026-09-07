@@ -214,3 +214,60 @@ describe("完了後の打鍵", () => {
     expect(pressKey(done, "z")).toBe(done);
   });
 });
+
+/**
+ * 苦手キーの集計。**打つべきだった文字**を数える（実際に押した誤りのキーではない）。
+ * 「何を打ち損ねるか」は運指の弱点そのものだが、「代わりに何を押したか」は
+ * 隣接キーの取り違えでばらけるだけで、練習の手がかりにならない。
+ */
+/** 1打ずつ流し込んで、途中の状態を返す */
+function play(kana: string, keys: string[]) {
+  let progress = startTyping(buildRomanCandidates(kana));
+  for (const key of keys) progress = pressKey(progress, key);
+  return progress;
+}
+
+describe("missedKeys", () => {
+  test("最初は空", () => {
+    expect([...startTyping(buildRomanCandidates("か")).missedKeys]).toEqual([]);
+  });
+
+  test("打ち損ねた文字を数える（押した誤りのキーではない）", () => {
+    // 「か」= ka。1打目に x を押したら、打つべきだったのは k
+    const progress = play("か", ["x"]);
+
+    expect([...progress.missedKeys]).toEqual([["k", 1]]);
+  });
+
+  test("同じ文字で繰り返しミスすると回数が増える", () => {
+    const progress = play("か", ["x", "y", "z"]);
+
+    expect(progress.missedKeys.get("k")).toBe(3);
+    expect(progress.missCount).toBe(3);
+  });
+
+  test("位置が進めば別の文字として数える", () => {
+    // k は通り、2打目の a を打ち損ねる
+    const progress = play("か", ["x", "k", "q"]);
+
+    expect([...progress.missedKeys].toSorted()).toEqual([
+      ["a", 1],
+      ["k", 1],
+    ]);
+  });
+
+  test("かなをまたいで積み上がる", () => {
+    // 「かき」= kaki。各かなの1打目でミスする
+    const progress = play("かき", ["x", "k", "a", "x", "k", "i"]);
+
+    expect(progress.missedKeys.get("k")).toBe(2);
+    expect(progress.finished).toBe(true);
+  });
+
+  test("候補が複数あるときは画面に出ている最短候補で数える", () => {
+    // 「し」は si / shi / ci。表示は最短の si なので、打ち損ねた文字は s
+    const progress = play("し", ["x"]);
+
+    expect([...progress.missedKeys]).toEqual([["s", 1]]);
+  });
+});

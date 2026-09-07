@@ -1,4 +1,5 @@
 import { PLAY_SIZE } from "@henge/shared";
+import { topMissedKeys } from "@/lib/play/misses";
 import {
   accuracyRatio,
   etypingScore,
@@ -16,18 +17,25 @@ export type { PlayStats };
  * スコアは e-typing と同じ算出方法（WPM ×（正確率）^3 の切り捨て）。
  * 計算は lib/play/score.ts にあり、そちらでテストしている。
  */
+/** 出す苦手キーの数。多すぎると「どれから直すか」が決められなくなる */
+const MISSED_KEY_LIMIT = 6;
+
 export function Result({
   stats,
+  missedKeys,
   onRetry,
   themeName,
   listHref,
 }: {
   stats: PlayStats;
+  /** 打ち損ねた文字と回数。15問の通算 */
+  missedKeys: ReadonlyMap<string, number>;
   onRetry: () => void;
   themeName: string;
   /** 離脱先の一覧。テーマなら /themes、最適化する音なら /practice */
   listHref: string;
 }) {
+  const missed = topMissedKeys(missedKeys, MISSED_KEY_LIMIT);
   const items = [
     { label: "打鍵速度", value: keysPerSecond(stats).toFixed(1), unit: "打鍵/秒" },
     { label: "正確率", value: `${Math.floor(accuracyRatio(stats) * 100)}`, unit: "%" },
@@ -59,6 +67,27 @@ export function Result({
             </div>
           ))}
         </dl>
+
+        {missed.length > 0 && (
+          <div className="mt-12">
+            <p className="text-center text-xs tracking-[0.3em] text-kinari/50">打ち損ねたキー</p>
+            {/*
+              押した誤りのキーではなく**打つべきだった文字**を出す。
+              「何を打ち損ねるか」が運指の弱点そのもので、次に何を直せばよいかに繋がる
+            */}
+            <ul className="mt-4 flex flex-wrap items-center justify-center gap-3">
+              {missed.map((item) => (
+                <li
+                  key={item.key}
+                  className="flex items-baseline gap-2 rounded-md border border-kinari/15 bg-kinari/5 px-4 py-2"
+                >
+                  <span className="font-mono text-xl uppercase text-kinari">{item.key}</span>
+                  <span className="font-mono text-xs text-kinari/50">{item.count}</span>
+                </li>
+              ))}
+            </ul>
+          </div>
+        )}
 
         <div className="mt-12 flex flex-wrap items-center justify-center gap-4">
           <button

@@ -7,13 +7,19 @@
  * 「ミスでもないのに撒菱がある」ように見える。紋は**新しい線画**で描く。
  *
  * 紋は装飾ではなく識別の役割。**どちらのモードで何が起きるかを一瞬で伝える**
- * ため、それぞれのモードの.play画面と対応づけられる形にする。
+ * ため、それぞれのモードのプレイ画面と対応づけられる形にする。
  *
  * 線画は stroke で描き、`currentColor` を使う。色はカード側が制御する
  * （ホバーで浮かせる。ここで色を決めない）。
  */
 
-/** テーマで打つ。**巻物と文章の線。** 題材の文章を通しで読んで打つモード */
+/**
+ * テーマで打つ。**巻物。** 題材の文章を通しで読んで打つモード。
+ *
+ * 「何のアイコンか分からない」とならないよう、巻物の構成要素をそのまま描く:
+ * **両端の軸（丸い円柱）と、軸より細く外側に飛び出るキャップ、間に広がる紙。**
+ * キャップが軸より細いのはプレイ画面の巻物（docs/07-ui.md）と同じ構え。
+ */
 export function ThemeMark({ className }: { className?: string }) {
   return (
     <svg
@@ -26,27 +32,28 @@ export function ThemeMark({ className }: { className?: string }) {
       strokeLinejoin="round"
       aria-hidden="true"
     >
-      {/* 巻かれた軸（上下にキャップ）と、広げた紙 */}
-      <path d="M14 16 v32" />
-      <path d="M50 16 v32" />
-      <circle cx="14" cy="13" r="3" />
-      <circle cx="14" cy="51" r="3" />
-      <circle cx="50" cy="13" r="3" />
-      <circle cx="50" cy="51" r="3" />
-      <rect x="14" y="18" width="36" height="28" />
-      {/* 読み進める文章の行 */}
-      <path d="M23 28 h18" />
-      <path d="M23 36 h12" />
+      {/* 両端の軸（丸みのある円柱） */}
+      <rect x="10" y="12" width="12" height="40" rx="6" />
+      <rect x="42" y="12" width="12" height="40" rx="6" />
+      {/* 軸より細く、上下に飛び出るキャップ */}
+      <rect x="12" y="6" width="8" height="7" rx="2" />
+      <rect x="12" y="51" width="8" height="7" rx="2" />
+      <rect x="44" y="6" width="8" height="7" rx="2" />
+      <rect x="44" y="51" width="8" height="7" rx="2" />
+      {/* 間に広がる紙と、読み進める文章の行 */}
+      <rect x="22" y="20" width="20" height="24" />
+      <path d="M28 29 h8" />
+      <path d="M28 36 h5" />
     </svg>
   );
 }
 
 /**
- * 最適化練習。**三つ巴。** 音が連なって回りながら次へ次へと渡る＝連接の紋。
+ * 最適化練習。**的（まと）。** 指定した音を狙い、繰り返し打ち込む修行。
  *
- * 初案は鍵盤2つと運指の弧だったが、実機で見ると「何を表しているか分からない」
- * ため却下。武家の紋の体裁そのものが和風の第一印象として効く。なお一筆ずつの
- * 幅は同じ（stroke）で、頭だけを塗りつぶす。頭の向きに回転の流れが出る。
+ * 「1つの連接に狙いを絞る」仕様とそのまま対応する。手裏剣の的でありながら
+ * 手裏剣そのものは描かない（手裏剣＝スピナーの意味を薄めない）。同心円なので
+ * 小さいサイズでも崩れない。
  */
 export function PracticeMark({ className }: { className?: string }) {
   return (
@@ -60,18 +67,10 @@ export function PracticeMark({ className }: { className?: string }) {
       strokeLinejoin="round"
       aria-hidden="true"
     >
-      <g>
-        <circle cx="32" cy="13" r="3.5" fill="currentColor" stroke="none" />
-        <path d="M32 13 A 19 19 0 0 1 50.7 35.3" />
-      </g>
-      <g transform="rotate(120 32 32)">
-        <circle cx="32" cy="13" r="3.5" fill="currentColor" stroke="none" />
-        <path d="M32 13 A 19 19 0 0 1 50.7 35.3" />
-      </g>
-      <g transform="rotate(240 32 32)">
-        <circle cx="32" cy="13" r="3.5" fill="currentColor" stroke="none" />
-        <path d="M32 13 A 19 19 0 0 1 50.7 35.3" />
-      </g>
+      <circle cx="32" cy="32" r="26" />
+      <circle cx="32" cy="32" r="16" />
+      {/* 的心。塗りつぶして狙いの位置を示す */}
+      <circle cx="32" cy="32" r="6" fill="currentColor" stroke="none" />
     </svg>
   );
 }

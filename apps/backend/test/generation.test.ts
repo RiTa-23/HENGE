@@ -1,7 +1,8 @@
 import { buildRomanCandidates } from "@henge/shared";
 import { env } from "cloudflare:test";
-import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
+// @ts-expect-error vite の ?raw インポート。テスト実行時に中身が文字列で展開される
+import wranglerRaw from "../wrangler.jsonc?raw";
 import { generateBatch, type GenerateBatchInput } from "../src/generation/batch";
 import {
   DEFAULT_MAX_TOKENS,
@@ -54,8 +55,10 @@ describe("resolveModel", () => {
     // wrangler.jsonc の vars の両方に現れる。片方だけ変えると、コードの変更が
     // 静かに無視される（実測: DEFAULT_MODEL を llama-4-scout に替えても、
     // vars に残った qwen3 が動き続けた）。不一致はここで落とす
-    const raw = readFileSync(new URL("../wrangler.jsonc", import.meta.url), "utf8");
-    const config = JSON.parse(raw.replace(/\/\/.*$/gm, ""));
+    const config = JSON.parse(
+      // コメントと末尾カンマを剥がしてから読む（jsonc をそのまま parse できない）
+      wranglerRaw.replace(/\/\/.*$/gm, "").replace(/,(\s*[}\]])/g, "$1"),
+    );
     expect(config.vars.GENERATION_MODEL).toBe(DEFAULT_MODEL);
   });
 });

@@ -16,7 +16,7 @@
 - GitHub Actions + `cloudflare/wrangler-action`
   - PR時: oxlint / oxfmt / tsc / テスト
   - mainマージ時: 両Workerを`wrangler deploy`
-  - **D1マイグレーションは自動適用しない**（サイレント失敗の報告があるため、レビューを挟む手動トリガーの別ワークフローにする）
+  - **D1マイグレーションはデプロイの前に自動適用する**（`deploy.yml` の `migrate` ジョブ）。サイレント失敗の報告があるため、適用後に `list` で未適用が残っていないか確かめ、残っていればデプロイを止める。手動トリガーの別ワークフローは調査・復旧用に残す
 - `CLAUDE.md` の整備
 
 ## Phase 2: データ層

@@ -1,8 +1,10 @@
 name: D1 migrate
 
-# D1のマイグレーションは自動適用しない。サイレント失敗の報告があるため、
-# 「未適用の一覧を見る（list）」→「適用する（apply）」の2段構えの手動フローにしている。
-# マイグレーションファイル自体は Phase 2 以降、Drizzleが apps/backend に生成する。
+# 通常の適用は deploy.yml の migrate ジョブが自動で行う（mainへのマージで走る）。
+# **こちらは調査と復旧のための手動の入口。** 何が未適用かを見たいとき（list）、
+# 自動適用が落ちた後に手で流し直したいとき（apply）に使う。
+# deploy.yml の migrate ジョブと同じ concurrency グループで直列化してあり、
+# 同じDBに同時に触ることはない。
 
 on:
   workflow_dispatch:

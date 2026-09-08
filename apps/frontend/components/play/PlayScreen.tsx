@@ -1,6 +1,7 @@
 "use client";
 
 import {
+  GENERATION_WAIT_LIMIT_MS,
   isApiError,
   isImeKey,
   normalizeTypedKey,
@@ -50,9 +51,11 @@ type Phase =
   | { name: "playing"; session: SessionResponse }
   | { name: "result"; session: SessionResponse };
 
-/** 生成中のときに引き直す間隔と、諦めるまでの上限 */
+/**
+ * 生成中のときに引き直す間隔。諦めるまでの上限は `packages/shared` にある
+ * （ロックのTTLと大小を比べる値なので、両Workerから見える場所に置く）。
+ */
 const RETRY_INTERVAL_MS = 3_000;
-const MAX_WAIT_MS = 90_000;
 
 /** 次に打てるキー。候補それぞれの「いま打つべき1文字」を集める */
 function nextKeysOf(progress: TypingProgress): NextKey[] {
@@ -160,7 +163,7 @@ export function PlayScreen({
       if (code === "GENERATION_IN_PROGRESS") {
         const since = waitingSince.current ?? Date.now();
         waitingSince.current = since;
-        if (Date.now() - since < MAX_WAIT_MS) {
+        if (Date.now() - since < GENERATION_WAIT_LIMIT_MS) {
           setPhase({ name: "preparing" });
           retryTimer.current = setTimeout(
             () => setAttempt((count) => count + 1),

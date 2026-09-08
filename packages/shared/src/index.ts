@@ -41,6 +41,12 @@ export {
   isApiError,
   statusFor,
 } from "./errors";
-export { DAILY_NEURON_LIMIT, PLAY_SIZE, STOCK_TARGET } from "./session";
+export {
+  DAILY_NEURON_LIMIT,
+  GENERATION_WAIT_LIMIT_MS,
+  PLAY_SIZE,
+  STOCK_TARGET,
+  THEME_LOCK_TTL_SECONDS,
+} from "./session";
 export { canGenerate, remainingNeurons } from "./quota";
 export { isAdminEmail } from "./admin";

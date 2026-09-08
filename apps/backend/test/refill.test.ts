@@ -144,6 +144,33 @@ describe("kickRefill の消費記録（実際に使ったニューロンを加�
   });
 
   /**
+   * **記録は「AIが返った直後」に済ませる。** 生成の終わりにまとめて書く形だと、
+   * 読み取得の途中でクライアントが切断してinvocationごと打ち切られたときに、
+   * 消費だけが台帳から消える。ここでは読み取得が始まった時点で既に記録が
+   * 済んでいることを見て、その順序を固定する。
+   */
+  it("読み取得を始める前に、その回の消費を記録し終えている", async () => {
+    await seed();
+    stubAi({ response: AI_TEXT, usage: TOKENS });
+    let neuronsAtReadingTime: number | null = null;
+    vi.spyOn(globalThis, "fetch").mockImplementation(async () => {
+      // 最初の読み取得が走った時点の台帳を覗く
+      neuronsAtReadingTime ??= (await getUsage(db, "u1")).neurons;
+      return new Response(
+        JSON.stringify({ result: { word: [{ surface: AI_TEXT, furigana: AI_READING }] } }),
+        { status: 200, headers: { "content-type": "application/json" } },
+      );
+    });
+    const { waitUntil, flush } = manualWaitUntil();
+
+    const theme = (await getThemeDetail(db, "t1"))!;
+    await kickRefill(env, waitUntil, { db, theme, nextOffset: 15, userId: "u1" });
+    await flush();
+
+    expect(neuronsAtReadingTime).toBeCloseTo(PER_ROUND);
+  });
+
+  /**
    * 読み仮名の取得で落ちる経路。**AIの消費は済んでいる**ので、
    * 例外で抜けても記録されなければならない（batch.ts の onNeurons）。
    */

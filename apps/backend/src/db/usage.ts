@@ -45,3 +45,18 @@ export async function addUsage(db: Db, userId: string, neurons: number): Promise
       },
     });
 }
+
+/**
+ * 消費の記録。**失敗しても呼び出し側を落とさない。**
+ *
+ * 生成の途中から呼ぶため、ここで投げると生成そのものが巻き添えになる。
+ * 記録漏れの方が害が小さいので、ログだけ残して先へ進む（消費は AI Gateway
+ * 側のログにも残る）。
+ */
+export async function recordUsage(db: Db, userId: string, neurons: number): Promise<void> {
+  try {
+    await addUsage(db, userId, neurons);
+  } catch (error) {
+    console.error("消費の記録に失敗した", { userId, neurons, error });
+  }
+}

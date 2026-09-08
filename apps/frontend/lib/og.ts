@@ -42,6 +42,24 @@ export async function siteUrl(): Promise<string> {
   }
 }
 
+/** サイト名。タイトルの先頭と og:site_name の両方で使う */
+const SITE_NAME = "HENGE";
+
+/**
+ * ページのタイトル。**サイト名を先頭に置く。**
+ *
+ * タブは幅が足りなくなると**末尾から**畳まれるため、`〜 | HENGE` の並びだと
+ * タブを何枚も開いた状態で HENGE が真っ先に消える。どのタブがこのサイトかを
+ * 見失わないことを、検索結果での見え方より優先する。
+ *
+ * **各ページで手書きしない。** 5か所に散らすと、次にページを足したときに
+ * 並びが揃わない。タイトルと og:title を同じ文字列にする（docs/09-share.md）
+ * ためにも、組み立てはここ1か所に閉じる。
+ */
+export function pageTitle(name: string): string {
+  return `${SITE_NAME} | ${name}`;
+}
+
 /**
  * OGPフィールド。各ページの metadata に広げて使う。
  *
@@ -57,7 +75,7 @@ export function ogFields(
     openGraph: {
       title,
       description,
-      siteName: "HENGE",
+      siteName: SITE_NAME,
       type: "website",
       images: [OG_IMAGE_PATH],
     },

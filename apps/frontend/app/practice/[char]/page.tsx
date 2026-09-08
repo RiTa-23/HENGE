@@ -3,7 +3,7 @@ import { notFound } from "next/navigation";
 import { AdjustingView } from "@/components/Adjusting";
 import { SiteHeader } from "@/components/SiteHeader";
 import { betaLimitedPage } from "@/lib/api/admin-page";
-import { ogFields } from "@/lib/og";
+import { ogFields, pageTitle } from "@/lib/og";
 import { decodePageParam, findTheme } from "@/lib/api/themes";
 import { adjustingMetadata } from "@/lib/beta/beta";
 import { playHref } from "@/lib/ui/kind";
@@ -20,7 +20,7 @@ export async function generateMetadata({
 
   const char = decodePageParam((await params).char);
   if (char === null) return {};
-  const title = `「${char}」のタイピング最適化練習 | HENGE`;
+  const title = pageTitle(`「${char}」のタイピング最適化練習`);
   const description = `読み仮名に「${char}」を含む文章だけを打つ練習。毎回違う文章が出るので、${char}の運指を文脈を変えながら詰められます。`;
   // シェアの着地ページのため、カードが確実に出るようにする（docs/09-share.md）
   return {

@@ -44,7 +44,7 @@ HENGEで「忍びの心得」を打った。
 |---|---|
 | `twitter:card` | `summary_large_image` |
 | `og:image` | `/og.png`（1200×630。全ページ共通の静的アセット） |
-| `og:title` | 既存の `generateMetadata` のタイトルを流用する |
+| `og:title` | 既存の `generateMetadata` のタイトルを流用する（組み立ては `lib/og.ts` の `pageTitle()`。**サイト名が先頭**） |
 | `og:description` | 既存の description を流用する |
 | `og:type` | `website` |
 
@@ -56,8 +56,8 @@ HENGEで「忍びの心得」を打った。
 |---|---|---|
 | `/` | トップのキャッチコピー | インデックス対象 |
 | `/themes` / `/practice` | 既存のタイトル | |
-| `/themes/[name]` | `「忍びの心得」のタイピング練習 \| HENGE` | **シェアの着地ページ。ここが確実にカードになること** |
-| `/practice/[char]` | `「ざ」のタイピング最適化練習 \| HENGE` | 同上 |
+| `/themes/[name]` | `HENGE \| 「忍びの心得」のタイピング練習` | **シェアの着地ページ。ここが確実にカードになること** |
+| `/practice/[char]` | `HENGE \| 「ざ」のタイピング最適化練習` | 同上 |
 | `/play/[theme]` | 基本OGのみ | noindexのまま。シェア対象ではない |
 
 実装はApp Routerのmetadata APIにOGPフィールドを足すだけ。SSR/SSGのHTMLにメタタグが載るため、OpenNextでも追加の仕組みは不要。

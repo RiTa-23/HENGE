@@ -5,14 +5,14 @@ import { ModeTabs } from "@/components/ModeTabs";
 import { SiteHeader } from "@/components/SiteHeader";
 import { ThemeCard } from "@/components/ThemeCard";
 import { betaLimitedPage } from "@/lib/api/admin-page";
-import { ogFields } from "@/lib/og";
+import { ogFields, pageTitle } from "@/lib/og";
 import { PRESETS, presetCreateHref } from "@/lib/practice/presets";
 import { listThemes } from "@/lib/api/themes";
 import { adjustingMetadata } from "@/lib/beta/beta";
 import { normalizeName } from "@henge/shared";
 import { playHref } from "@/lib/ui/kind";
 
-const TITLE = "タイピング最適化練習 | HENGE";
+const TITLE = pageTitle("タイピング最適化練習");
 const DESCRIPTION =
   "指定した連接を必ず含む文章だけで練習できます。毎回違う文章が出るので、最適化した運指が特定の文章に紐づかず、実戦で出せるようになります。";
 

@@ -125,6 +125,7 @@ const YOUON_DIRECT: Record<string, string[]> = {
   しょ: ["sho", "syo"],
   ちゃ: ["cha", "tya", "cya"],
   ちゅ: ["chu", "tyu", "cyu"],
+  ちぇ: ["che", "tye", "cye"],
   ちょ: ["cho", "tyo", "cyo"],
   にゃ: ["nya"],
   にゅ: ["nyu"],

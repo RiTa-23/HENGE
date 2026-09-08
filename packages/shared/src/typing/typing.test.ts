@@ -129,6 +129,14 @@ describe("外来語のかな", () => {
     expect(accepts("ぢぇ", 0, "dye")).toBe(true);
   });
 
+  // 「チェック」「チェーン」など頻出。じぇ と同じく、テーブル整理で消えないよう固定する
+  test("ちぇ は che / tye / cye、分解入力もできる", () => {
+    expect(accepts("ちぇ", 0, "che")).toBe(true);
+    expect(accepts("ちぇ", 0, "tye")).toBe(true);
+    expect(accepts("ちぇ", 0, "cye")).toBe(true);
+    expect(accepts("ちぇ", 0, "tixe")).toBe(true);
+  });
+
   test("うぃ・うぇ・ゔ", () => {
     expect(accepts("うぃ", 0, "wi")).toBe(true);
     expect(accepts("うぇ", 0, "we")).toBe(true);

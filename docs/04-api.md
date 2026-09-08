@@ -47,7 +47,7 @@
   ],
   "nextOffset": 45,
   "remainingInPool": 12,     // 残り在庫（総生成数 − nextOffset）
-  "quotaConsumed": true,     // 補充が走った場合true
+  "refillKicked": true,      // 補充をキックした場合true（消費量ではない。補充は非同期）
   "neuronsRemaining": 428    // 本日の残ニューロン。ログイン時のみ
 }
 ```

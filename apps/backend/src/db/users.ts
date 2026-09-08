@@ -9,8 +9,10 @@ export interface AdminUserRow {
   email: string;
   image: string | null;
   createdAt: Date;
-  /** 当日（JST基準）の生成回数。行が無ければ0 */
+  /** 当日（JST基準）にAIを呼んだ回数。行が無ければ0 */
   todayGenerationCount: number;
+  /** 当日（JST基準）の消費ニューロン。**上限に張り付いているかはこちらで見る** */
+  todayNeurons: number;
 }
 
 export const USER_LIST_LIMIT_DEFAULT = 20;
@@ -21,7 +23,9 @@ export const USER_LIST_LIMIT_MAX = 50;
  * 「D1へのアクセスはHono Workerに閉じる」に従うため（Next.js側のD1例外は
  * Better Auth の読み書きに限る）。
  *
- * 当日の生成回数を併記するのは、上限に張り付いているユーザーを見つけるため。
+ * 当日の消費を併記するのは、上限に張り付いているユーザーを見つけるため。
+ * **上限は消費ニューロンで見る**（`DAILY_NEURON_LIMIT`）。回数も併記するが、
+ * それは1回あたりの重さ（消費 ÷ 回数）を読むための分母。
  * 日付は必ず toJstDateString() で作る（素の toISOString() だとリセットが朝9時になる）。
  */
 export async function listUsers(
@@ -37,6 +41,7 @@ export async function listUsers(
       image: user.image,
       createdAt: user.createdAt,
       todayGenerationCount: sql<number>`coalesce(${userGenerationUsage.count}, 0)`,
+      todayNeurons: sql<number>`coalesce(${userGenerationUsage.neurons}, 0)`,
     })
     .from(user)
     .leftJoin(

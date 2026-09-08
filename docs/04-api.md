@@ -22,7 +22,7 @@
 | POST | `/api/sessions/start` | 不要（匿名可） | プレイ開始。15問を返す |
 | POST | `/api/themes` | 必須 | 新規作成（初回15問を同期生成） |
 | POST | `/api/prompts/regenerate` | 必須 | 枯渇時の同期再生成 |
-| GET | `/api/me` | 必須 | ユーザー情報・本日の生成残数 |
+| GET | `/api/me` | 必須 | ユーザー情報・本日の残ニューロン |
 | GET | `/api/admin/themes` | 管理者 | 管理用一覧 |
 | DELETE | `/api/admin/themes/[id]` | 管理者 | 削除（prompts・KVも連鎖） |
 | GET | `/api/admin/themes/[id]/prompts` | 管理者 | テーマ1つ分のお題一覧（管理用） |
@@ -122,7 +122,9 @@
 // 閲覧のみ。更新・削除の口は持たない
 // createdAt は認証テーブル（Better Auth）の列でミリ秒精度のため、themes と違い ISO 文字列で返る
 { "users": [{ "id": "...", "name": "Rita", "email": "...", "image": null,
-              "createdAt": "2026-09-05T12:00:00.000Z", "todayGenerationCount": 3 }],
+              "createdAt": "2026-09-05T12:00:00.000Z",
+              "todayNeurons": 19.5,          // 当日の消費。**上限に張り付いているかはこれで見る**
+              "todayGenerationCount": 3 }],  // 当日AIを呼んだ回数（1回あたりの重さを読む分母）
   "nextCursor": null }
 ```
 
@@ -196,7 +198,7 @@ MVPは**500ニューロン/日**（月次上限なし）。日付はJST基準。
 ## エラーレスポンス
 
 ```jsonc
-{ "error": { "code": "QUOTA_EXCEEDED", "message": "本日の生成上限に達しました" } }
+{ "error": { "code": "QUOTA_EXCEEDED", "message": "本日の生成量を使い切りました" } }
 ```
 
 | code | HTTP | 条件 | クライアントの対応 |

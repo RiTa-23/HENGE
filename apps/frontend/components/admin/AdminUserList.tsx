@@ -1,6 +1,6 @@
 "use client";
 
-import { isApiError } from "@henge/shared";
+import { DAILY_NEURON_LIMIT, isApiError } from "@henge/shared";
 import { useEffect, useState } from "react";
 
 interface AdminUser {
@@ -9,6 +9,7 @@ interface AdminUser {
   email: string;
   createdAt: string;
   todayGenerationCount: number;
+  todayNeurons: number;
 }
 
 /** ユーザー一覧。**閲覧のみ**。更新・削除の導線は持たない */
@@ -38,7 +39,8 @@ export function AdminUserList() {
           <th className="py-3 font-normal">名前</th>
           <th className="py-3 font-normal">メール</th>
           <th className="py-3 font-normal">登録日</th>
-          <th className="py-3 text-right font-normal">本日の生成</th>
+          <th className="py-3 text-right font-normal">本日の消費</th>
+          <th className="py-3 text-right font-normal">回数</th>
         </tr>
       </thead>
       <tbody>
@@ -47,14 +49,20 @@ export function AdminUserList() {
             <td className="py-3 text-kinari">{user.name}</td>
             <td className="py-3 text-kinari/60">{user.email}</td>
             <td className="py-3 font-mono text-kinari/60">{user.createdAt.slice(0, 10)}</td>
+            {/* **上限はこちらで見る。** 小数のままでは読めないので1桁に丸める */}
             <td className="py-3 text-right font-mono text-kinari/70">
+              {user.todayNeurons.toFixed(1)}
+              <span className="text-kinari/40"> / {DAILY_NEURON_LIMIT}</span>
+            </td>
+            {/* 回数そのものは上限ではない。1回あたりの重さを読むための分母 */}
+            <td className="py-3 text-right font-mono text-kinari/50">
               {user.todayGenerationCount}
             </td>
           </tr>
         ))}
         {users.length === 0 && (
           <tr>
-            <td colSpan={4} className="py-10 text-center text-kinari/50">
+            <td colSpan={5} className="py-10 text-center text-kinari/50">
               ユーザーがいません
             </td>
           </tr>

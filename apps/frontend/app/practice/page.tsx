@@ -5,11 +5,16 @@ import { ModeTabs } from "@/components/ModeTabs";
 import { SiteHeader } from "@/components/SiteHeader";
 import { ThemeCard } from "@/components/ThemeCard";
 import { betaLimitedPage } from "@/lib/api/admin-page";
+import { ogFields } from "@/lib/og";
 import { PRESETS, presetCreateHref } from "@/lib/practice/presets";
 import { listThemes } from "@/lib/api/themes";
 import { adjustingMetadata } from "@/lib/beta/beta";
 import { normalizeName } from "@henge/shared";
 import { playHref } from "@/lib/ui/kind";
+
+const TITLE = "タイピング最適化練習 | HENGE";
+const DESCRIPTION =
+  "指定した連接を必ず含む文章だけで練習できます。毎回違う文章が出るので、最適化した運指が特定の文章に紐づかず、実戦で出せるようになります。";
 
 export const dynamic = "force-dynamic";
 
@@ -18,12 +23,10 @@ export const dynamic = "force-dynamic";
  * 何も変わらず使える。検索エンジンには調整中の画面を見せないため noindex を返す。
  */
 export async function generateMetadata(): Promise<Metadata> {
+  // **調整中のときは OG を付けない。** noindex にしている画面の共有カードを
+  // 用意しても、出したくない状態の画面を広めるだけになる
   if (await betaLimitedPage()) return adjustingMetadata();
-  return {
-    title: "タイピング最適化練習 | HENGE",
-    description:
-      "指定した連接を必ず含む文章だけで練習できます。毎回違う文章が出るので、最適化した運指が特定の文章に紐づかず、実戦で出せるようになります。",
-  };
+  return { title: TITLE, description: DESCRIPTION, ...ogFields(TITLE, DESCRIPTION) };
 }
 
 /**

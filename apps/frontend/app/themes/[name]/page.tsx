@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import { SiteHeader } from "@/components/SiteHeader";
+import { ogFields } from "@/lib/og";
 import { decodePageParam, findTheme } from "@/lib/api/themes";
 
 export const dynamic = "force-dynamic";
@@ -13,9 +14,14 @@ export async function generateMetadata({
 }): Promise<Metadata> {
   const name = decodePageParam((await params).name);
   if (name === null) return {};
+  const title = `「${name}」のタイピング練習 | HENGE`;
+  const description = `「${name}」をテーマにした日本語タイピングのお題。毎回違う文章が出るので、慣れが起きません。`;
   return {
-    title: `「${name}」のタイピング練習 | HENGE`,
-    description: `「${name}」をテーマにした日本語タイピングのお題。毎回違う文章が出るので、慣れが起きません。`,
+    title,
+    description,
+    // **シェアの着地ページ。** 結果のX投稿からここに来るため、カードが確実に
+    // 出るようにする（docs/09-share.md）
+    ...ogFields(title, description),
   };
 }
 

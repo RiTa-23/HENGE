@@ -1,0 +1,52 @@
+{
+  "model": "@cf/meta/llama-4-scout-17b-16e-instruct",
+  "elapsed": "4.1",
+  "data": {
+    "result": {
+      "choices": [
+        {
+          "finish_reason": "stop",
+          "index": 0,
+          "logprobs": null,
+          "message": {
+            "annotations": null,
+            "audio": null,
+            "content": "マイクロソフトが開発したプログラミング言語。\nオブジェクト指向と型付けを採用している。\n静的型付けでエラー発見が容易になる。\n大規模なアプリケーション開発に適している。\n型の安全性を重視した設計が特徴だ。\n開発効率を高めるための機能が豊富だ。\nコードの可読性と保守性を向上させる。\n多くの企業で利用されている技術である。\nプログラミング初心者にも学びやすい。\n型推論機能でコードを簡潔に書ける。\nインターフェース定義でコードの品質を保つ。\n開発チームの協力を促進するツールだ。\nコードの再利用性を高めることができる。\nバグの早期発見を支援する機能がある。\n大規模プロジェクトでの利用が推奨される。\nコードの保守性を向上させる技術だ。\nプログラミング言語の学習に最適だ。\n型システムでコードの安全性を確保する。\n開発者の生産性を向上させることができる。",
+            "function_call": null,
+            "reasoning": null,
+            "refusal": null,
+            "role": "assistant"
+          },
+          "routed_experts": null,
+          "stop_reason": null,
+          "token_ids": null
+        }
+      ],
+      "created": 1788801211,
+      "ec_transfer_params": null,
+      "id": "chatcmpl-7245ae03-4459-4949-8852-4b870f2d0ab8",
+      "kv_transfer_params": null,
+      "metrics": null,
+      "model": "@cf/meta/llama-4-scout-17b-16e-instruct",
+      "object": "chat.completion",
+      "prompt_logprobs": null,
+      "prompt_text": null,
+      "prompt_token_ids": null,
+      "response": "マイクロソフトが開発したプログラミング言語。\nオブジェクト指向と型付けを採用している。\n静的型付けでエラー発見が容易になる。\n大規模なアプリケーション開発に適している。\n型の安全性を重視した設計が特徴だ。\n開発効率を高めるための機能が豊富だ。\nコードの可読性と保守性を向上させる。\n多くの企業で利用されている技術である。\nプログラミング初心者にも学びやすい。\n型推論機能でコードを簡潔に書ける。\nインターフェース定義でコードの品質を保つ。\n開発チームの協力を促進するツールだ。\nコードの再利用性を高めることができる。\nバグの早期発見を支援する機能がある。\n大規模プロジェクトでの利用が推奨される。\nコードの保守性を向上させる技術だ。\nプログラミング言語の学習に最適だ。\n型システムでコードの安全性を確保する。\n開発者の生産性を向上させることができる。",
+      "service_tier": null,
+      "tool_calls": [],
+      "usage": {
+        "prompt_tokens": 436,
+        "completion_tokens": 199,
+        "total_tokens": 635,
+        "prompt_tokens_details": {
+          "cached_tokens": 0
+        },
+        "neurons": 26.079090118408203
+      }
+    },
+    "success": true,
+    "errors": [],
+    "messages": []
+  }
+}

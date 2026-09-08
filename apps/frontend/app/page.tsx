@@ -1,8 +1,20 @@
+import type { Metadata } from "next";
 import { HeroLogo } from "@/components/HeroLogo";
 import { PracticeMark, ThemeMark } from "@/components/ModeMark";
 import { SiteHeader } from "@/components/SiteHeader";
 import { ThemeCard } from "@/components/ThemeCard";
+import { ogFields } from "@/lib/og";
 import { listThemes } from "@/lib/api/themes";
+
+const TOP_TITLE = "お題が毎回変わる、日本語タイピングの修行場 | HENGE";
+const TOP_DESCRIPTION = "お題が毎回変わる日本語タイピング練習ツール";
+
+/** インデックス対象。シェアされたときのカードにもこのタイトルを使う */
+export const metadata: Metadata = {
+  title: TOP_TITLE,
+  description: TOP_DESCRIPTION,
+  ...ogFields(TOP_TITLE, TOP_DESCRIPTION),
+};
 
 export const dynamic = "force-dynamic";
 

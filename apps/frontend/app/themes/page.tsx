@@ -2,11 +2,16 @@ import type { Metadata } from "next";
 import { ModeTabs } from "@/components/ModeTabs";
 import { SiteHeader } from "@/components/SiteHeader";
 import { ThemeCard } from "@/components/ThemeCard";
+import { ogFields } from "@/lib/og";
 import { listThemes } from "@/lib/api/themes";
 
+const TITLE = "お題一覧 | HENGE";
+const DESCRIPTION = "日本語タイピング練習のお題テーマ一覧。人気順・新着順で選べます。";
+
 export const metadata: Metadata = {
-  title: "お題一覧 | HENGE",
-  description: "日本語タイピング練習のお題テーマ一覧。人気順・新着順で選べます。",
+  title: TITLE,
+  description: DESCRIPTION,
+  ...ogFields(TITLE, DESCRIPTION),
 };
 
 export const dynamic = "force-dynamic";

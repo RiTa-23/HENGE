@@ -1,6 +1,7 @@
 import type { Metadata, Viewport } from "next";
 import { JetBrains_Mono } from "next/font/google";
 import type { ReactNode } from "react";
+import { ogFields, siteUrl } from "@/lib/og";
 import "./globals.css";
 
 /**
@@ -13,10 +14,21 @@ const jetBrainsMono = JetBrains_Mono({
   display: "swap",
 });
 
-export const metadata: Metadata = {
-  title: "HENGE",
-  description: "お題が毎回変わる日本語タイピング練習ツール",
-};
+/**
+ * metadataBase は相対 og:image を絶対URLに解決するために必須（docs/09-share.md）。
+ * レイアウトで1回定義すれば全ページに継承される。
+ * openGraph / twitter は浅くマージされるため、独自に定義するページは lib/og.ts の
+ * ogFields でそろえて書く。
+ */
+export async function generateMetadata(): Promise<Metadata> {
+  const description = "お題が毎回変わる日本語タイピング練習ツール";
+  return {
+    title: "HENGE",
+    description,
+    metadataBase: new URL(await siteUrl()),
+    ...ogFields("HENGE", description),
+  };
+}
 
 export const viewport: Viewport = {
   width: "device-width",

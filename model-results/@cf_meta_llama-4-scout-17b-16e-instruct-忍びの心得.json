@@ -1,0 +1,52 @@
+{
+  "model": "@cf/meta/llama-4-scout-17b-16e-instruct",
+  "elapsed": "2.8",
+  "data": {
+    "result": {
+      "choices": [
+        {
+          "finish_reason": "stop",
+          "index": 0,
+          "logprobs": null,
+          "message": {
+            "annotations": null,
+            "audio": null,
+            "content": "影は静かに動き出す。\n夜の闇に溶け込む術。\n忍は敵を欺く技術。\n隠れ身の術を極める。\n敵の動きを静かに観察。\n情報を集めることが大切。\n忍びの心得は秘密厳守。\n裏切りの危険を常に警戒。\n忍は単独で行動する。\nチームで任務を遂行する。\n敵の弱点を探し出す。\n情報を隠し伝える技術。\n忍びの心得は常に謙虚。\n油断は命取りになる。\n常に状況を分析する。\n忍は冷静さを保つ必要。\n危険を察知する感覚鋭い。\n忍びの心得は自己鍛錬。\n精神と肉体の強さが試される。\n忍びの心得は歴史に根ざす。",
+            "function_call": null,
+            "reasoning": null,
+            "refusal": null,
+            "role": "assistant"
+          },
+          "routed_experts": null,
+          "stop_reason": null,
+          "token_ids": null
+        }
+      ],
+      "created": 1788801204,
+      "ec_transfer_params": null,
+      "id": "chatcmpl-54b21147-0c6c-46a2-8a73-32f6147158d1",
+      "kv_transfer_params": null,
+      "metrics": null,
+      "model": "@cf/meta/llama-4-scout-17b-16e-instruct",
+      "object": "chat.completion",
+      "prompt_logprobs": null,
+      "prompt_text": null,
+      "prompt_token_ids": null,
+      "response": "影は静かに動き出す。\n夜の闇に溶け込む術。\n忍は敵を欺く技術。\n隠れ身の術を極める。\n敵の動きを静かに観察。\n情報を集めることが大切。\n忍びの心得は秘密厳守。\n裏切りの危険を常に警戒。\n忍は単独で行動する。\nチームで任務を遂行する。\n敵の弱点を探し出す。\n情報を隠し伝える技術。\n忍びの心得は常に謙虚。\n油断は命取りになる。\n常に状況を分析する。\n忍は冷静さを保つ必要。\n危険を察知する感覚鋭い。\n忍びの心得は自己鍛錬。\n精神と肉体の強さが試される。\n忍びの心得は歴史に根ざす。",
+      "service_tier": null,
+      "tool_calls": [],
+      "usage": {
+        "prompt_tokens": 396,
+        "completion_tokens": 174,
+        "total_tokens": 570,
+        "prompt_tokens_details": {
+          "cached_tokens": 0
+        },
+        "neurons": 23.165454864501953
+      }
+    },
+    "success": true,
+    "errors": [],
+    "messages": []
+  }
+}

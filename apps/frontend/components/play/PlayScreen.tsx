@@ -82,11 +82,14 @@ export function PlayScreen({
   themeId,
   themeName,
   kind,
+  shareUrl,
   beta = false,
 }: {
   themeId: string;
   themeName: string;
   kind: ThemeKind;
+  /** 結果のX投稿で共有するURL（着地ページの絶対URL）。サーバー側で組み立てて渡す */
+  shareUrl: string;
   /** ベータ運用の間だけロゴの横に「ベータ版」を出す。判定はサーバー側（lib/beta/beta.ts） */
   beta?: boolean;
 }) {
@@ -419,6 +422,8 @@ export function PlayScreen({
         themeName={themeName}
         onRetry={start}
         listHref={backToList}
+        kind={kind}
+        shareUrl={shareUrl}
       />
     );
   }

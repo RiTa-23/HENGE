@@ -1,4 +1,4 @@
-import { PLAY_SIZE } from "@henge/shared";
+import { PLAY_SIZE, type ThemeKind } from "@henge/shared";
 import { topMissedKeys } from "@/lib/play/misses";
 import {
   accuracyRatio,
@@ -7,6 +7,7 @@ import {
   type PlayStats,
   totalKeystrokes,
 } from "@/lib/play/score";
+import { buildShareText, buildTweetIntentUrl } from "@/lib/share/tweet";
 
 export type { PlayStats };
 
@@ -26,6 +27,8 @@ export function Result({
   onRetry,
   themeName,
   listHref,
+  kind,
+  shareUrl,
 }: {
   stats: PlayStats;
   /** 打ち損ねた文字と回数。15問の通算 */
@@ -34,6 +37,10 @@ export function Result({
   themeName: string;
   /** 離脱先の一覧。テーマなら /themes、最適化する音なら /practice */
   listHref: string;
+  /** 投稿テキストの文面を分けるため */
+  kind: ThemeKind;
+  /** X投稿で共有するURL（着地ページの絶対URL）。サーバー側で組み立て済み */
+  shareUrl: string;
 }) {
   const missed = topMissedKeys(missedKeys, MISSED_KEY_LIMIT);
   const items = [
@@ -97,6 +104,17 @@ export function Result({
           >
             もう一度
           </button>
+          <a
+            href={buildTweetIntentUrl({
+              url: shareUrl,
+              text: buildShareText({ kind, themeName, stats }),
+            })}
+            target="_blank"
+            rel="noreferrer"
+            className="rounded-md border border-kin/60 px-8 py-3 font-gothic tracking-widest text-kin transition-colors hover:bg-kin/10"
+          >
+            Xでつぶやく
+          </a>
           <a
             href={listHref}
             className="rounded-md border border-kinari/20 px-8 py-3 font-gothic tracking-widest text-kinari/80 transition-colors hover:border-kin hover:text-kinari"

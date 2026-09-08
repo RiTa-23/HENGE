@@ -1,0 +1,52 @@
+{
+  "model": "@cf/meta/llama-4-scout-17b-16e-instruct",
+  "elapsed": "4.2",
+  "data": {
+    "result": {
+      "choices": [
+        {
+          "finish_reason": "stop",
+          "index": 0,
+          "logprobs": null,
+          "message": {
+            "annotations": null,
+            "audio": null,
+            "content": "福岡市の繁華街は夜も賑やかだ。\n九州の玄関口として栄えている。\n古くから商工業が盛んな土地だ。\n博多湾に面した港町として発展した。\n福岡市内には多くの観光名所がある。\n博多の食文化は全国的に有名だ。\nとんこつラーメンは福岡の名物だ。\nお土産には明太子が人気である。\n博多の歴史は古く、江戸時代から。\n商人の町として栄えた歴史がある。\n博多織は日本の伝統的な織物だ。\n博多の祭りは大変賑やかだ。\n福岡市は九州の中心都市である。\n博多の町には古い寺社が多い。\n福岡市の交通網はとても便利だ。\n博多の食は多様で美味しい。\n福岡市は教育機関が充実している。\n博多の文化は多彩で豊かだ。\n福岡市は自然環境に恵まれている。",
+            "function_call": null,
+            "reasoning": null,
+            "refusal": null,
+            "role": "assistant"
+          },
+          "routed_experts": null,
+          "stop_reason": null,
+          "token_ids": null
+        }
+      ],
+      "created": 1788801207,
+      "ec_transfer_params": null,
+      "id": "chatcmpl-35de042e-61af-4ff1-b60a-a8d7fa282749",
+      "kv_transfer_params": null,
+      "metrics": null,
+      "model": "@cf/meta/llama-4-scout-17b-16e-instruct",
+      "object": "chat.completion",
+      "prompt_logprobs": null,
+      "prompt_text": null,
+      "prompt_token_ids": null,
+      "response": "福岡市の繁華街は夜も賑やかだ。\n九州の玄関口として栄えている。\n古くから商工業が盛んな土地だ。\n博多湾に面した港町として発展した。\n福岡市内には多くの観光名所がある。\n博多の食文化は全国的に有名だ。\nとんこつラーメンは福岡の名物だ。\nお土産には明太子が人気である。\n博多の歴史は古く、江戸時代から。\n商人の町として栄えた歴史がある。\n博多織は日本の伝統的な織物だ。\n博多の祭りは大変賑やかだ。\n福岡市は九州の中心都市である。\n博多の町には古い寺社が多い。\n福岡市の交通網はとても便利だ。\n博多の食は多様で美味しい。\n福岡市は教育機関が充実している。\n博多の文化は多彩で豊かだ。\n福岡市は自然環境に恵まれている。",
+      "service_tier": null,
+      "tool_calls": [],
+      "usage": {
+        "prompt_tokens": 392,
+        "completion_tokens": 214,
+        "total_tokens": 606,
+        "prompt_tokens_details": {
+          "cached_tokens": 0
+        },
+        "neurons": 26.15818214416504
+      }
+    },
+    "success": true,
+    "errors": [],
+    "messages": []
+  }
+}

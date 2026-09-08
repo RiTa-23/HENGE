@@ -1,7 +1,7 @@
 import { STOCK_TARGET } from "@henge/shared";
 import type { Db } from "../db/client";
 import { appendPrompts, recentPromptTexts } from "../db/prompts";
-import { addUsage } from "../db/usage";
+import { recordUsage } from "../db/usage";
 import { setGenerationStatus, type ThemeDetail } from "../db/themes";
 import { acquireThemeLock, releaseThemeLock } from "../kv/lock";
 import { createGetReading } from "../reading/index";
@@ -36,7 +36,6 @@ async function refill(
   input: { db: Db; theme: ThemeDetail; nextOffset: number; userId: string },
 ): Promise<void> {
   const { db, theme, nextOffset, userId } = input;
-  let neurons = 0;
 
   try {
     const model = resolveModel(env.GENERATION_MODEL);
@@ -50,9 +49,10 @@ async function refill(
       existing: await recentPromptTexts(db, theme.id, EXISTING_CONTEXT_SIZE),
       model,
       getReading: createGetReading(env),
-      onNeurons: (used) => {
-        neurons += used;
-      },
+      // **消費が確定した直後に記録する。** 補充は waitUntil の中で走り、
+      // レスポンス送信から30秒で打ち切られる。終わってから記録する形だと、
+      // 打ち切られた回の消費が丸ごと台帳に載らない
+      onNeurons: (used) => recordUsage(db, userId, used),
     });
 
     if (result.valid.length > 0) await appendPrompts(db, theme.id, result.valid, model);
@@ -67,10 +67,7 @@ async function refill(
     // 「このテーマは生成しにくい」とは別物で、印を立てると以後の補充が止まってしまう。
     console.error("背景補充に失敗した", { themeId: theme.id, error });
   } finally {
+    // 記録は onNeurons で済んでいる。ここはロックを返すだけ
     await releaseThemeLock(env.KV, theme.id);
-    // **お題が1件も増えなくても、例外で落ちても、実際に消費した分を記録する。**
-    // ニューロンは呼んだ時点で消費されており、成果が無いことは返ってこない
-    // 理由にならない。AIを呼ぶ前に落ちた場合は0のままなので加算しない。
-    if (neurons > 0) await addUsage(db, userId, neurons);
   }
 }

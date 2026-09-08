@@ -91,13 +91,14 @@ export interface GenerateBatchInput {
   /** 検証結果のログ書き戻しを遅らせる。Honoハンドラからは c.executionCtx.waitUntil を渡す */
   waitUntil?: (promise: Promise<unknown>) => void;
   /**
-   * 1ラウンド分の消費ニューロン。**AI呼び出しの直後に呼ぶ。**
+   * 1ラウンド分の消費ニューロン。**AI呼び出しの直後に呼び、完了を待つ。**
    *
-   * 戻り値（`BatchResult.neurons`）だけでは足りない。読み仮名の取得が落ちて
-   * ここから例外が飛ぶ場合でも、**その時点でAIのニューロンは消費済み**で、
-   * 呼び出し側はそれを記録しなければならない。
+   * 戻り値（`BatchResult.neurons`）を待って記録すると、読み仮名の取得で例外が
+   * 飛ぶ経路と、**クライアントが切断してinvocationごと打ち切られる経路**で
+   * 記録が漏れる。切断されると残りの処理はキャンセルされうるため、記録は
+   * 「消費が確定した直後」に済ませておく必要がある。
    */
-  onNeurons?: (neurons: number) => void;
+  onNeurons?: (neurons: number) => Promise<void> | void;
 }
 
 /**
@@ -144,9 +145,10 @@ export async function generateBatch(env: Env, input: GenerateBatchInput): Promis
       metadata: { themeId: input.themeId, kind: input.kind, round, path: input.path },
     });
 
-    // **検証より先に記録する。** 読み仮名の取得で例外が飛んでも、AIの消費は確定している
+    // **検証より先に記録を済ませる。** この行より後で何が起きても（読み取得の例外、
+    // クライアント切断によるキャンセル）、AIの消費はもう確定している
     neurons += roundNeurons;
-    input.onNeurons?.(roundNeurons);
+    await input.onNeurons?.(roundNeurons);
 
     const validBefore = valid.length;
     const rejectedBefore = { ...rejected };

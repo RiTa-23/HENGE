@@ -129,6 +129,14 @@ describe("外来語のかな", () => {
     expect(accepts("ぢぇ", 0, "dye")).toBe(true);
   });
 
+  // 「チェック」「チェーン」など頻出。じぇ と同じく、テーブル整理で消えないよう固定する
+  test("ちぇ は che / tye / cye、分解入力もできる", () => {
+    expect(accepts("ちぇ", 0, "che")).toBe(true);
+    expect(accepts("ちぇ", 0, "tye")).toBe(true);
+    expect(accepts("ちぇ", 0, "cye")).toBe(true);
+    expect(accepts("ちぇ", 0, "tixe")).toBe(true);
+  });
+
   test("うぃ・うぇ・ゔ", () => {
     expect(accepts("うぃ", 0, "wi")).toBe(true);
     expect(accepts("うぇ", 0, "we")).toBe(true);
@@ -170,7 +178,9 @@ describe("打鍵数", () => {
     expect(countKeystrokesFromKana("しゅりけんがやみをさいた。")).toBe(22);
   });
 
-  test("範囲の境界値（10打・40打）", () => {
+  // 上限そのものの判定は validate.test.ts が KEYSTROKE_MAX を使って見る。
+  // ここは「数えられること」だけを見るので、名前に具体値を書かない
+  test("下限ちょうど（10打）まで数えられる", () => {
     expect(countKeystrokesFromKana("あいうえおかきくけこ")).toBe(15);
     expect(countKeystrokesFromKana("あいうえおあいうえお")).toBe(10);
   });

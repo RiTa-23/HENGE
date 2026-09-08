@@ -60,7 +60,7 @@ export const prompts = sqliteTable(
     readingKana: text("reading_kana").notNull(),
     /** かな→ローマ字候補配列のJSON */
     readingRomanJson: text("reading_roman_json").notNull(),
-    /** 打鍵数（10〜40）。候補が複数ある場合は最短で数える */
+    /** 打鍵数（10〜35）。候補が複数ある場合は最短で数える */
     keystrokeCount: integer("keystroke_count").notNull(),
     source: text("source", { enum: ["workers_ai"] }).notNull(),
     /** 生成に使ったモデル名。どのモデルが作ったお題か後から辿るため */

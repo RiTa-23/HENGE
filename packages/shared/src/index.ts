@@ -41,6 +41,6 @@ export {
   isApiError,
   statusFor,
 } from "./errors";
-export { DAILY_GENERATION_LIMIT, PLAY_SIZE, STOCK_TARGET } from "./session";
-export { canGenerate, remainingQuota } from "./quota";
+export { DAILY_NEURON_LIMIT, PLAY_SIZE, STOCK_TARGET } from "./session";
+export { canGenerate, remainingNeurons } from "./quota";
 export { isAdminEmail } from "./admin";

@@ -1,12 +1,44 @@
 /* oxlint-disable no-await-in-loop -- テストデータの投入は件数が少なく、順に入れた方が読みやすい */
-import { toJstDateString } from "@henge/shared";
+import { buildRomanCandidates, countKeystrokes, toJstDateString } from "@henge/shared";
 import { env, SELF } from "cloudflare:test";
-import { beforeEach, describe, expect, it } from "vitest";
+import { eq } from "drizzle-orm";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 import { createDb } from "../src/db/client";
 import { prompts, themes, user, userGenerationUsage, userThemeProgress } from "../src/db/schema";
 import { themeIdKey, themeLockKey } from "../src/kv/keys";
 
 const db = createDb(env.DB);
+
+const realFetch = globalThis.fetch.bind(globalThis);
+
+/** ルビ振りAPIだけを差し替える。Worker自身への fetch は素通しする */
+function stubReading(furigana: string) {
+  return vi.spyOn(globalThis, "fetch").mockImplementation(async (input) => {
+    const url = String(input);
+    if (!url.includes("yahooapis")) return realFetch(input as RequestInfo);
+    return Response.json({
+      result: { word: [{ surface: "手裏剣", furigana }] },
+    });
+  });
+}
+
+/** お題1行を挿す */
+async function seedPrompt(
+  over: Partial<typeof prompts.$inferInsert> & {
+    id: string;
+    themeId: string;
+    sequenceNumber: number;
+  },
+) {
+  await db.insert(prompts).values({
+    text: "手裏剣が闇を裂いた。",
+    readingKana: "しゅりけんがやみをさいた。",
+    readingRomanJson: "[]",
+    keystrokeCount: 25,
+    source: "workers_ai",
+    ...over,
+  });
+}
 
 async function seedUser(id: string, createdAt: Date) {
   await db.insert(user).values({
@@ -219,5 +251,227 @@ describe("管理用一覧の日時の形", () => {
     expect((userList.body.users as { createdAt: unknown }[])[0]?.createdAt).toBe(
       "2026-09-05T12:00:00.000Z",
     );
+  });
+});
+
+describe("GET /admin/prompts", () => {
+  it("連番順に、読み・打鍵数・モデル・連番を含めて返す", async () => {
+    await seedTheme({ id: "t1" });
+    await seedPrompt({ id: "p1", themeId: "t1", sequenceNumber: 2, model: "model-x" });
+    await seedPrompt({ id: "p2", themeId: "t1", sequenceNumber: 1 });
+
+    const { status, body } = await request("/admin/prompts?themeId=t1");
+
+    expect(status).toBe(200);
+    const list = body.prompts as {
+      id: string;
+      text: string;
+      readingKana: string;
+      keystrokeCount: number;
+      sequenceNumber: number;
+      model: string | null;
+      createdAt: number;
+    }[];
+    expect(list.map((p) => p.id)).toEqual(["p2", "p1"]);
+    expect(list[1]).toMatchObject({
+      text: "手裏剣が闇を裂いた。",
+      readingKana: "しゅりけんがやみをさいた。",
+      keystrokeCount: 25,
+      sequenceNumber: 2,
+      model: "model-x",
+    });
+    expect(list[1]?.createdAt).toBeTypeOf("number");
+  });
+
+  it("違うテーマのお題は混ざらない", async () => {
+    await seedTheme({ id: "t1" });
+    await seedTheme({ id: "t2" });
+    await seedPrompt({ id: "p1", themeId: "t1", sequenceNumber: 1 });
+    await seedPrompt({ id: "p2", themeId: "t2", sequenceNumber: 1 });
+
+    const { body } = await request("/admin/prompts?themeId=t1");
+
+    expect((body.prompts as { id: string }[]).map((p) => p.id)).toEqual(["p1"]);
+  });
+
+  it("limit を超えると nextCursor が返り、最終ページは null", async () => {
+    await seedTheme({ id: "t1" });
+    for (const n of [1, 2, 3]) await seedPrompt({ id: `p${n}`, themeId: "t1", sequenceNumber: n });
+
+    const page1 = await request("/admin/prompts?themeId=t1&limit=2");
+    expect((page1.body.prompts as { id: string }[]).map((p) => p.id)).toEqual(["p1", "p2"]);
+    expect(page1.body.nextCursor).toBe(2);
+
+    const page2 = await request("/admin/prompts?themeId=t1&limit=2&cursor=2");
+    expect((page2.body.prompts as { id: string }[]).map((p) => p.id)).toEqual(["p3"]);
+    expect(page2.body.nextCursor).toBeNull();
+  });
+});
+
+describe("PATCH /admin/prompts", () => {
+  it("本文の差し替えに合わせて、読み・ローマ字・打鍵数も取り直す", async () => {
+    await seedTheme({ id: "t1" });
+    await seedPrompt({ id: "p1", themeId: "t1", sequenceNumber: 1 });
+    const stub = stubReading("にんじゃがつきをほえる。");
+
+    const { status, body } = await request("/admin/prompts", {
+      method: "PATCH",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ id: "p1", text: "忍者が月を吼える。" }),
+    });
+
+    stub.mockRestore();
+    expect(status).toBe(200);
+    expect(body).toMatchObject({
+      id: "p1",
+      text: "忍者が月を吼える。",
+      readingKana: "にんじゃがつきをほえる。",
+    });
+
+    // 本文だけ変わって「読みが古いまま」になっていないか。行を直接見る
+    const [row] = await db.select().from(prompts).where(eq(prompts.id, "p1"));
+    const roman = buildRomanCandidates("にんじゃがつきをほえる。");
+    expect(row?.text).toBe("忍者が月を吼える。");
+    expect(row?.readingKana).toBe("にんじゃがつきをほえる。");
+    expect(row?.readingRomanJson).toBe(JSON.stringify(roman));
+    expect(row?.keystrokeCount).toBe(countKeystrokes(roman));
+  });
+
+  it("存在しないお題は NOT_FOUND", async () => {
+    const stub = stubReading("しのび。");
+    const { status, body } = await request("/admin/prompts", {
+      method: "PATCH",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ id: "nothing", text: "忍者が月を吼える。" }),
+    });
+    stub.mockRestore();
+
+    expect(status).toBe(404);
+    expect((body.error as { code: string }).code).toBe("NOT_FOUND");
+  });
+
+  it("打てない文字を含む本文は、読みを取る前に弾く", async () => {
+    await seedTheme({ id: "t1" });
+    await seedPrompt({ id: "p1", themeId: "t1", sequenceNumber: 1 });
+    // 「」は日本語だがキーボードで打てない。isTypableText のホワイトリストで弾く
+    const stub = stubReading("しのび。");
+
+    const { status, body } = await request("/admin/prompts", {
+      method: "PATCH",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ id: "p1", text: "忍者「参上」。" }),
+    });
+    const called = stub.mock.calls.length;
+    stub.mockRestore();
+
+    expect(status).toBe(400);
+    expect((body.error as { code: string }).code).toBe("VALIDATION_ERROR");
+    // 読み取得（外部サブリクエスト）を消費していない
+    expect(called).toBe(0);
+    // 弾かれた編集で本文が壊れていない
+    const [row] = await db.select().from(prompts).where(eq(prompts.id, "p1"));
+    expect(row?.text).toBe("手裏剣が闇を裂いた。");
+  });
+
+  it("漢字を含まない本文は弾く", async () => {
+    await seedTheme({ id: "t1" });
+    await seedPrompt({ id: "p1", themeId: "t1", sequenceNumber: 1 });
+
+    const { status, body } = await request("/admin/prompts", {
+      method: "PATCH",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ id: "p1", text: "にんじゃがつきをほえる。" }),
+    });
+
+    expect(status).toBe(400);
+    expect((body.error as { code: string }).code).toBe("VALIDATION_ERROR");
+  });
+
+  it("打鍵数が範囲外の読みは弾く", async () => {
+    await seedTheme({ id: "t1" });
+    await seedPrompt({ id: "p1", themeId: "t1", sequenceNumber: 1 });
+    // 読み「あ。」は2打。下限10に届かない
+    const stub = stubReading("あ。");
+
+    const { status, body } = await request("/admin/prompts", {
+      method: "PATCH",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ id: "p1", text: "亜。" }),
+    });
+    stub.mockRestore();
+
+    expect(status).toBe(400);
+    expect((body.error as { code: string }).code).toBe("VALIDATION_ERROR");
+  });
+
+  it("読みに打てないかなが残ったら弾く", async () => {
+    await seedTheme({ id: "t1" });
+    await seedPrompt({ id: "p1", themeId: "t1", sequenceNumber: 1 });
+    // ルビ振りAPIがカタカナを返した場合。ローマ字候補が組めず打てないお題になる
+    const stub = stubReading("シュリケン");
+
+    const { status, body } = await request("/admin/prompts", {
+      method: "PATCH",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ id: "p1", text: "手裏剣。" }),
+    });
+    stub.mockRestore();
+
+    expect(status).toBe(400);
+    expect((body.error as { code: string }).code).toBe("VALIDATION_ERROR");
+  });
+
+  it("最適化テーマでは、読みに「含む」文字が無い編集は弾く", async () => {
+    await seedTheme({ id: "c1", kind: "constraint", name: "ざ", normalizedName: "ざ" });
+    await seedPrompt({ id: "p1", themeId: "c1", sequenceNumber: 1 });
+    const stub = stubReading("にんじゃがつきをほえる。");
+
+    const { status, body } = await request("/admin/prompts", {
+      method: "PATCH",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ id: "p1", text: "忍者が月を吼える。" }),
+    });
+    stub.mockRestore();
+
+    expect(status).toBe(400);
+    expect((body.error as { code: string }).code).toBe("VALIDATION_ERROR");
+  });
+
+  it("最適化テーマでも、読みに「含む」文字があれば通す（表記に無くてよい）", async () => {
+    await seedTheme({ id: "c1", kind: "constraint", name: "ざ", normalizedName: "ざ" });
+    await seedPrompt({ id: "p1", themeId: "c1", sequenceNumber: 1 });
+    // 座頭 → ざとう。表記に「ざ」は無いが読みにある
+    const stub = stubReading("ざとういちがつきをほえる。");
+
+    const { status } = await request("/admin/prompts", {
+      method: "PATCH",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ id: "p1", text: "座頭市が月を吼える。" }),
+    });
+    stub.mockRestore();
+
+    expect(status).toBe(200);
+  });
+});
+
+describe("DELETE /admin/prompts/:id", () => {
+  it("お題を1件だけ消す", async () => {
+    await seedTheme({ id: "t1" });
+    await seedPrompt({ id: "p1", themeId: "t1", sequenceNumber: 1 });
+    await seedPrompt({ id: "p2", themeId: "t1", sequenceNumber: 2 });
+
+    const { status, body } = await request("/admin/prompts/p1", { method: "DELETE" });
+
+    expect(status).toBe(200);
+    expect(body).toEqual({ deleted: true, promptId: "p1" });
+    const rows = await db.select().from(prompts);
+    expect(rows.map((r) => r.id)).toEqual(["p2"]);
+  });
+
+  it("存在しないお題は NOT_FOUND", async () => {
+    const { status, body } = await request("/admin/prompts/nothing", { method: "DELETE" });
+
+    expect(status).toBe(404);
+    expect((body.error as { code: string }).code).toBe("NOT_FOUND");
   });
 });

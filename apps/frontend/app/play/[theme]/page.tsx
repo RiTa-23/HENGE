@@ -1,8 +1,11 @@
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
+import { AdjustingView } from "@/components/Adjusting";
 import { PlayScreen } from "@/components/play/PlayScreen";
-import { siteUrl } from "@/lib/og";
+import { betaLimitedPage } from "@/lib/api/admin-page";
 import { decodePageParam, findTheme } from "@/lib/api/themes";
+import { betaBadgeVisible } from "@/lib/beta/beta";
+import { siteUrl } from "@/lib/og";
 import { detailHref, parseThemeKind } from "@/lib/ui/kind";
 
 /** プレイ画面は検索結果に出さない（着地ページはテーマ詳細） */
@@ -32,6 +35,12 @@ export default async function PlayPage({
   if (name === null) notFound();
 
   const themeKind = parseThemeKind(kind);
+  // **ベータ版では最適化練習ごと公開しない。** テーマモードのプレイは制限しない
+  // （運営が生成したお題をそのまま遊べる）
+  if (themeKind === "constraint" && (await betaLimitedPage())) {
+    return <AdjustingView what="最適化練習" />;
+  }
+
   const found = await findTheme(themeKind, name);
   if (found === null) notFound();
 
@@ -39,8 +48,16 @@ export default async function PlayPage({
   // （docs/09-share.md）。絶対URLが必要なので、ここ（サーバー側）で組み立てる。
   // 組み立ては detailHref に集約。手で /play や /themes を書かない
   const shareUrl = new URL(detailHref(themeKind, found.name), await siteUrl()).toString();
+  // ロゴの横の「ベータ版」。運営にも見せる（サイトの状態の表明。lib/beta/beta.ts）
+  const beta = await betaBadgeVisible();
 
   return (
-    <PlayScreen themeId={found.id} themeName={found.name} kind={themeKind} shareUrl={shareUrl} />
+    <PlayScreen
+      themeId={found.id}
+      themeName={found.name}
+      kind={themeKind}
+      shareUrl={shareUrl}
+      beta={beta}
+    />
   );
 }

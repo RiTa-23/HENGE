@@ -1,0 +1,52 @@
+{
+  "model": "@cf/meta/llama-4-scout-17b-16e-instruct",
+  "elapsed": "3.9",
+  "data": {
+    "result": {
+      "choices": [
+        {
+          "finish_reason": "stop",
+          "index": 0,
+          "logprobs": null,
+          "message": {
+            "annotations": null,
+            "audio": null,
+            "content": "名物は海で獲れる魚が豊富だ\n歴史は古くから魚を食してきた\n人々は新鮮な魚を好んで食べる\n種類は非常に多く存在する\n例として鯛や鮭が挙げられる\n料理人は魚の鮮度を大切にする\n漁師は魚の群れを追うのが上手だ\n海では魚がたくさん泳いでいる\n川では魚がたくさん泳いでいる\n湖では魚がたくさん泳いでいる\n魚は栄養価が高いとされている\n魚は様々な料理に使われる\n魚は人々の健康に良い影響を与える\n魚は環境によって種類が異なる\n魚は美しい見た目をしている\n魚は泳ぐスピードが速いものが多い\n魚は群れで行動することが多い\n魚は人間にとって大切な食料源だ\n魚は古代から人々に親しまれてきた\n魚は現在も人々に親しまれている",
+            "function_call": null,
+            "reasoning": null,
+            "refusal": null,
+            "role": "assistant"
+          },
+          "routed_experts": null,
+          "stop_reason": null,
+          "token_ids": null
+        }
+      ],
+      "created": 1788801386,
+      "ec_transfer_params": null,
+      "id": "chatcmpl-4a53cd4f-7441-4647-8e66-7967cdd561c5",
+      "kv_transfer_params": null,
+      "metrics": null,
+      "model": "@cf/meta/llama-4-scout-17b-16e-instruct",
+      "object": "chat.completion",
+      "prompt_logprobs": null,
+      "prompt_text": null,
+      "prompt_token_ids": null,
+      "response": "名物は海で獲れる魚が豊富だ\n歴史は古くから魚を食してきた\n人々は新鮮な魚を好んで食べる\n種類は非常に多く存在する\n例として鯛や鮭が挙げられる\n料理人は魚の鮮度を大切にする\n漁師は魚の群れを追うのが上手だ\n海では魚がたくさん泳いでいる\n川では魚がたくさん泳いでいる\n湖では魚がたくさん泳いでいる\n魚は栄養価が高いとされている\n魚は様々な料理に使われる\n魚は人々の健康に良い影響を与える\n魚は環境によって種類が異なる\n魚は美しい見た目をしている\n魚は泳ぐスピードが速いものが多い\n魚は群れで行動することが多い\n魚は人間にとって大切な食料源だ\n魚は古代から人々に親しまれてきた\n魚は現在も人々に親しまれている",
+      "service_tier": null,
+      "tool_calls": [],
+      "usage": {
+        "prompt_tokens": 389,
+        "completion_tokens": 204,
+        "total_tokens": 593,
+        "prompt_tokens_details": {
+          "cached_tokens": 0
+        },
+        "neurons": 25.311819076538086
+      }
+    },
+    "success": true,
+    "errors": [],
+    "messages": []
+  }
+}

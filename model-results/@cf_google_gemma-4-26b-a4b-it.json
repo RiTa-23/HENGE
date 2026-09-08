@@ -1,0 +1,15 @@
+{
+  "model": "@cf/google/gemma-4-26b-a4b-it",
+  "elapsed": "235.6",
+  "data": {
+    "errors": [
+      {
+        "message": "AiError: AiError: Request timeout (4fb29476-bbd1-41e5-9478-25481a938fb6)",
+        "code": 3046
+      }
+    ],
+    "success": false,
+    "result": {},
+    "messages": []
+  }
+}

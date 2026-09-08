@@ -83,12 +83,15 @@ export function PlayScreen({
   themeName,
   kind,
   shareUrl,
+  beta = false,
 }: {
   themeId: string;
   themeName: string;
   kind: ThemeKind;
   /** 結果のX投稿で共有するURL（着地ページの絶対URL）。サーバー側で組み立てて渡す */
   shareUrl: string;
+  /** ベータ運用の間だけロゴの横に「ベータ版」を出す。判定はサーバー側（lib/beta/beta.ts） */
+  beta?: boolean;
 }) {
   const { data: authSession } = authClient.useSession();
   const backToList = listHref(kind);
@@ -440,7 +443,7 @@ export function PlayScreen({
       className="mx-auto flex min-h-dvh w-full max-w-4xl flex-col px-8 py-6"
     >
       <header className="flex items-start justify-between border-b border-kin/40 pb-4">
-        <Logo />
+        <Logo beta={beta} />
         <div className="flex items-center gap-3">
           <span className="rounded-full border border-kinari/15 bg-kinari/5 px-4 py-1 text-xs tracking-widest text-kinari/70">
             {themeName}

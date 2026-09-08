@@ -1,0 +1,52 @@
+{
+  "model": "@cf/meta/llama-4-scout-17b-16e-instruct",
+  "elapsed": "4.7",
+  "data": {
+    "result": {
+      "choices": [
+        {
+          "finish_reason": "stop",
+          "index": 0,
+          "logprobs": null,
+          "message": {
+            "annotations": null,
+            "audio": null,
+            "content": "海には様々な魚が泳いでいる。\n魚は古くから人間の食料として利用されてきた。\n日本の市場では毎日新鮮な魚が並ぶ。\n魚の種類は非常に多く世界中で研究されている。\n淡水と海水で生息する魚が異なる。\n魚は栄養価が高く健康に良いとされる。\n鮭は北太平洋で獲れる魚の一種である。\n魚の生態系は非常に複雑で面白い。\n古代文明では魚を神として崇めた。\n現代でも魚は食文化に深く根付いている。\n魚の群れは美しく自然の神秘を感じる。\n釣りは魚を釣るスポーツとして人気がある。\n魚の絵は古代の洞窟壁画にも見られる。\n海の中には巨大な魚も生息している。\n魚は環境変化に敏感で生態系の指標になる。\n養殖魚も近年では一般的になってきた。\n魚の調理法は世界中で多様である。\n新鮮な魚を食べることは健康に良い。\n魚は私たちの生活に密接に関係している。\n美しい魚の群れは観光資源にもなる。",
+            "function_call": null,
+            "reasoning": null,
+            "refusal": null,
+            "role": "assistant"
+          },
+          "routed_experts": null,
+          "stop_reason": null,
+          "token_ids": null
+        }
+      ],
+      "created": 1788798070,
+      "ec_transfer_params": null,
+      "id": "chatcmpl-63e4e942-7b8d-46c1-b15f-cd190c634bde",
+      "kv_transfer_params": null,
+      "metrics": null,
+      "model": "@cf/meta/llama-4-scout-17b-16e-instruct",
+      "object": "chat.completion",
+      "prompt_logprobs": null,
+      "prompt_text": null,
+      "prompt_token_ids": null,
+      "response": "海には様々な魚が泳いでいる。\n魚は古くから人間の食料として利用されてきた。\n日本の市場では毎日新鮮な魚が並ぶ。\n魚の種類は非常に多く世界中で研究されている。\n淡水と海水で生息する魚が異なる。\n魚は栄養価が高く健康に良いとされる。\n鮭は北太平洋で獲れる魚の一種である。\n魚の生態系は非常に複雑で面白い。\n古代文明では魚を神として崇めた。\n現代でも魚は食文化に深く根付いている。\n魚の群れは美しく自然の神秘を感じる。\n釣りは魚を釣るスポーツとして人気がある。\n魚の絵は古代の洞窟壁画にも見られる。\n海の中には巨大な魚も生息している。\n魚は環境変化に敏感で生態系の指標になる。\n養殖魚も近年では一般的になってきた。\n魚の調理法は世界中で多様である。\n新鮮な魚を食べることは健康に良い。\n魚は私たちの生活に密接に関係している。\n美しい魚の群れは観光資源にもなる。",
+      "service_tier": null,
+      "tool_calls": [],
+      "usage": {
+        "prompt_tokens": 311,
+        "completion_tokens": 244,
+        "total_tokens": 555,
+        "prompt_tokens_details": {
+          "cached_tokens": 0
+        },
+        "neurons": 26.488182067871094
+      }
+    },
+    "success": true,
+    "errors": [],
+    "messages": []
+  }
+}

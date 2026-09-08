@@ -67,7 +67,7 @@ export const sessionRoutes = new Hono<{ Bindings: Env }>().post("/sessions/start
     body.allowRefill === true &&
     remainingInPool < STOCK_TARGET &&
     theme.generationStatus === "ok";
-  const quotaConsumed =
+  const refillKicked =
     needsRefill && body.userId !== undefined
       ? await kickRefill(c.env, (promise) => c.executionCtx.waitUntil(promise), {
           db,
@@ -81,13 +81,15 @@ export const sessionRoutes = new Hono<{ Bindings: Env }>().post("/sessions/start
     prompts: shuffle(prompts),
     nextOffset,
     remainingInPool,
-    // 補充が走った場合のみ true。ロックが取れずスキップしたときは消費しない
-    quotaConsumed,
+    // 補充をキックした場合のみ true。ロックが取れずスキップしたときは false。
+    // **消費量ではなくキックしたかどうか。** 補充は非同期なので、この時点では
+    // 何ニューロン使うか決まっていない（記録はHono側で生成後に行う）
+    refillKicked,
   });
 });
 
 /**
- * 在庫不足時の分岐。ロックがあれば「生成中」で、クォータを消費させない。
+ * 在庫不足時の分岐。ロックがあれば「生成中」で、生成を走らせない。
  * 本当に尽きている場合だけ THEME_EXHAUSTED を返す。
  */
 async function exhausted(c: Context<{ Bindings: Env }>, themeId: string) {

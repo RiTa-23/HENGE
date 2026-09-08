@@ -1,33 +1,45 @@
-import { describe, expect, it } from "bun:test";
-import { DAILY_GENERATION_LIMIT } from "./session";
-import { canGenerate, remainingQuota } from "./quota";
+import { describe, expect, test } from "bun:test";
+import { DAILY_NEURON_LIMIT } from "./session";
+import { canGenerate, remainingNeurons } from "./quota";
 
-describe("remainingQuota", () => {
-  it("上限から当日の回数を引いた残数を返す", () => {
-    expect(remainingQuota(0)).toBe(DAILY_GENERATION_LIMIT);
-    expect(remainingQuota(49)).toBe(1);
+describe("remainingNeurons", () => {
+  test("使っていなければ上限がそのまま残る", () => {
+    expect(remainingNeurons(0)).toBe(DAILY_NEURON_LIMIT);
   });
 
-  it("上限に達していれば0", () => {
-    expect(remainingQuota(DAILY_GENERATION_LIMIT)).toBe(0);
+  test("小数の消費もそのまま引く（ニューロンは整数にならない）", () => {
+    expect(remainingNeurons(35.1)).toBeCloseTo(DAILY_NEURON_LIMIT - 35.1);
   });
 
-  it("上限を超えていてもマイナスにならない（並行リクエストのずれ込み対策）", () => {
-    // 判定と加算の間に別リクエストが加算すると、count が上限を超えうる。
-    // マイナスの残数を UI やレスポンスに漏らさない
-    expect(remainingQuota(DAILY_GENERATION_LIMIT + 1)).toBe(0);
+  test("使い切ったら0", () => {
+    expect(remainingNeurons(DAILY_NEURON_LIMIT)).toBe(0);
+  });
+
+  /**
+   * **超過はありうる。** 残り1ニューロンでも生成を通し、実際に使った分を
+   * そのまま記録するため。マイナスの残数を画面に出さないよう0で張り付ける。
+   */
+  test("上限を超えて消費していても0に張り付く", () => {
+    expect(remainingNeurons(DAILY_NEURON_LIMIT + 20.5)).toBe(0);
   });
 });
 
 describe("canGenerate", () => {
-  it("残数があれば許可する", () => {
+  test("残っていれば許可する", () => {
     expect(canGenerate(0)).toBe(true);
-    expect(canGenerate(DAILY_GENERATION_LIMIT - 1)).toBe(true);
   });
 
-  it("残数0なら許可しない（バックグラウンド補充もキックしない）", () => {
-    expect(canGenerate(DAILY_GENERATION_LIMIT)).toBe(false);
-    // 上限超過（並行ずれ込み）でも許可しない
-    expect(canGenerate(DAILY_GENERATION_LIMIT + 1)).toBe(false);
+  /**
+   * **1回分を予約しない。** 残り0.1ニューロンでも1回は通る（その回で
+   * 20前後まで超過しうる）。見積り分を先に引く方式は、モデルを変えるたびに
+   * 見積り定数を手で直すことになる。
+   */
+  test("わずかでも残っていれば1回は通す", () => {
+    expect(canGenerate(DAILY_NEURON_LIMIT - 0.1)).toBe(true);
+  });
+
+  test("使い切っていたら許可しない", () => {
+    expect(canGenerate(DAILY_NEURON_LIMIT)).toBe(false);
+    expect(canGenerate(DAILY_NEURON_LIMIT + 20.5)).toBe(false);
   });
 });

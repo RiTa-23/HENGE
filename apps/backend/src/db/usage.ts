@@ -3,34 +3,45 @@ import { and, eq, sql } from "drizzle-orm";
 import type { Db } from "../db/client";
 import { userGenerationUsage } from "../db/schema";
 
+export interface DailyUsage {
+  /** その日にAIを呼んだ回数。上限の判定には使わない（1回あたりの重さを見る分母） */
+  count: number;
+  /** その日の消費ニューロン。**上限の判定に使うのはこちら** */
+  neurons: number;
+}
+
 /**
- * 当日（JST基準）の生成回数。行が無ければ0。
+ * 当日（JST基準）の消費。行が無ければ0。
  *
  * 日付は必ず toJstDateString() で作る。素の toISOString() を使うと
  * 上限のリセットが朝9時になる。
  */
-export async function getUsageCount(db: Db, userId: string): Promise<number> {
+export async function getUsage(db: Db, userId: string): Promise<DailyUsage> {
   const rows = await db
-    .select({ count: userGenerationUsage.count })
+    .select({ count: userGenerationUsage.count, neurons: userGenerationUsage.neurons })
     .from(userGenerationUsage)
     .where(
       and(eq(userGenerationUsage.userId, userId), eq(userGenerationUsage.date, toJstDateString())),
     );
-  return rows[0]?.count ?? 0;
+  return { count: rows[0]?.count ?? 0, neurons: rows[0]?.neurons ?? 0 };
 }
 
 /**
- * 生成成功時のカウント加算。UPSERT（PK: user_id + date）。
+ * 消費の記録。UPSERT（PK: user_id + date）。
  *
- * **生成に成功した呼び出し側だけが呼ぶこと。** 先に加算すると、生成失敗時に
- * クォータだけが減る（判定 → 生成 → 加算の順を守る）。
+ * **AIを呼んだ側が、成否によらず呼ぶこと。** ニューロンは呼んだ時点で
+ * Cloudflare側が消費しており、有効なお題が0件でも戻ってこない。
+ * 一度も呼んでいない経路（既存テーマにヒットした等）では呼ばない。
  */
-export async function incrementUsage(db: Db, userId: string): Promise<void> {
+export async function addUsage(db: Db, userId: string, neurons: number): Promise<void> {
   await db
     .insert(userGenerationUsage)
-    .values({ userId, date: toJstDateString(), count: 1 })
+    .values({ userId, date: toJstDateString(), count: 1, neurons })
     .onConflictDoUpdate({
       target: [userGenerationUsage.userId, userGenerationUsage.date],
-      set: { count: sql`${userGenerationUsage.count} + 1` },
+      set: {
+        count: sql`${userGenerationUsage.count} + 1`,
+        neurons: sql`${userGenerationUsage.neurons} + ${neurons}`,
+      },
     });
 }

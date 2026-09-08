@@ -1,0 +1,1 @@
+ALTER TABLE `user_generation_usage` ADD `neurons` real DEFAULT 0 NOT NULL;

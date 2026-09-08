@@ -2,7 +2,7 @@ import { env, SELF } from "cloudflare:test";
 import { beforeEach, describe, expect, it } from "vitest";
 import { createDb } from "../src/db/client";
 import { themes, user, userGenerationUsage } from "../src/db/schema";
-import { incrementUsage } from "../src/db/usage";
+import { addUsage } from "../src/db/usage";
 
 /**
  * Hono Worker は外部に公開されず、Service Bindings 経由で Next.js からしか
@@ -32,12 +32,12 @@ describe("Honoは認可判定を持たない", () => {
       createdAt: new Date(),
       updatedAt: new Date(),
     });
-    await incrementUsage(db, "u1");
+    await addUsage(db, "u1", 8.5);
 
     const res = await SELF.fetch("http://backend/usage/u1");
 
     expect(res.status).toBe(200);
-    expect(await res.json()).toEqual({ count: 1 });
+    expect(await res.json()).toEqual({ count: 1, neurons: 8.5 });
   });
 
   it("認証ヘッダが無くても /admin/* は 401/403 を返さない（管理者判定はNext.js側）", async () => {

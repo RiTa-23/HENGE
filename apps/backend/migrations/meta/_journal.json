@@ -8,6 +8,13 @@
       "when": 1788517944219,
       "tag": "0000_flawless_electro",
       "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "6",
+      "when": 1788853184538,
+      "tag": "0001_melted_norrin_radd",
+      "breakpoints": true
     }
   ]
 }

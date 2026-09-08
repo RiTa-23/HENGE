@@ -204,27 +204,35 @@ describe("GET /admin/users", () => {
     expect((body.users as { id: string }[]).map((u) => u.id)).toEqual(["u2", "u1"]);
   });
 
-  it("当日（JST基準）の生成回数を併記する", async () => {
+  it("当日（JST基準）の消費ニューロンと回数を併記する", async () => {
     await seedUser("u1", new Date());
     await db.insert(userGenerationUsage).values({
       userId: "u1",
       date: toJstDateString(),
       count: 3,
+      neurons: 19.5,
     });
 
     const { body } = await request("/admin/users");
 
-    expect((body.users as { todayGenerationCount: number }[])[0]?.todayGenerationCount).toBe(3);
+    const [row] = body.users as { todayGenerationCount: number; todayNeurons: number }[];
+    // 上限に張り付いているかは消費で見る。回数はその分母
+    expect(row?.todayNeurons).toBeCloseTo(19.5);
+    expect(row?.todayGenerationCount).toBe(3);
   });
 
-  it("前日の行は当日のカウントに混ぜない", async () => {
+  it("前日の行は当日の消費に混ぜない", async () => {
     await seedUser("u1", new Date());
     const yesterday = toJstDateString(new Date(Date.now() - 24 * 60 * 60 * 1000));
-    await db.insert(userGenerationUsage).values({ userId: "u1", date: yesterday, count: 49 });
+    await db
+      .insert(userGenerationUsage)
+      .values({ userId: "u1", date: yesterday, count: 20, neurons: 480 });
 
     const { body } = await request("/admin/users");
 
-    expect((body.users as { todayGenerationCount: number }[])[0]?.todayGenerationCount).toBe(0);
+    const [row] = body.users as { todayGenerationCount: number; todayNeurons: number }[];
+    expect(row?.todayNeurons).toBe(0);
+    expect(row?.todayGenerationCount).toBe(0);
   });
 
   it("limit を超えると nextCursor が返る", async () => {

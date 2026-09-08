@@ -1,5 +1,5 @@
-import { canGenerate, quotaResetAt } from "@henge/shared";
-import { backendClient, relay } from "@/lib/api/backend";
+import { canGenerate, quotaResetAt, remainingNeurons } from "@henge/shared";
+import { backendClient } from "@/lib/api/backend";
 import { errorResponse } from "@/lib/api/error";
 import { limitGeneration } from "@/lib/api/rate-limit";
 import { regenerateSchema } from "@/lib/api/schema";
@@ -21,16 +21,26 @@ export async function POST(request: Request) {
 
   const client = await backendClient();
 
-  // クォータの判定はここ（Next.js側）。残数0なら Hono を呼ばずに弾く。
-  // 加算は Hono 側（生成に成功した場合のみ）
+  // 残ニューロンの判定はここ（Next.js側）。残っていなければ Hono を呼ばずに弾く。
+  // 加算は Hono 側（AIを呼んだ分を、成否によらず記録する）
   const usage = await client.usage[":userId"].$get({ param: { userId } });
-  const { count } = (await usage.json()) as { count: number };
-  if (!canGenerate(count)) {
+  const { neurons } = (await usage.json()) as { count: number; neurons: number };
+  if (!canGenerate(neurons)) {
     return errorResponse(
       "QUOTA_EXCEEDED",
-      `本日の生成上限に達しました。日本時間の翌0時（${quotaResetAt()}）にリセットされます`,
+      `本日の生成量を使い切りました。日本時間の翌0時（${quotaResetAt()}）にリセットされます`,
     );
   }
 
-  return relay(await client.prompts.regenerate.$post({ json: { ...parsed.data, userId } }));
+  const res = await client.prompts.regenerate.$post({ json: { ...parsed.data, userId } });
+  const body = await res.json();
+  if (!res.ok) return Response.json(body, { status: res.status });
+
+  // **その回の消費は Hono の応答（neuronsUsed）から受け取る。** D1をもう一度
+  // 読み直すと、加算と読み直しの間に別の生成が挟まったときにずれる
+  const { neuronsUsed } = body as { neuronsUsed?: number };
+  return Response.json({
+    ...body,
+    neuronsRemaining: remainingNeurons(neurons + (neuronsUsed ?? 0)),
+  });
 }

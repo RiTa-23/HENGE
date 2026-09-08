@@ -95,7 +95,8 @@ PRIMARY KEY (user_id, theme_id)
 |---|---|---|
 | `user_id` | TEXT | FK→`user.id` ON DELETE CASCADE |
 | `date` | TEXT | `YYYY-MM-DD`。**JST基準** |
-| `count` | INTEGER | その日の生成回数 |
+| `count` | INTEGER | その日にAIを呼んだ回数。**上限の判定には使わない**（1回あたりの重さ＝消費÷回数を見るための分母） |
+| `neurons` | REAL | その日の消費ニューロン。**上限の判定はこの値で行う**。応答からは取れないためトークン数×モデル別単価で計算する（`docs/05-generation.md`）。小数になるのでREAL |
 
 ```sql
 PRIMARY KEY (user_id, date)
@@ -103,7 +104,7 @@ PRIMARY KEY (user_id, date)
 
 **日付は必ずJST基準の共通関数で作る。** Workersの実行環境はUTCなので、素直に実装すると上限のリセットが朝9時になる。`new Date().toISOString()` を直接使わず、`packages/shared` の変換関数を経由すること。
 
-MVPでは日次上限のみ（50回/日）。月次上限は設けないため当月SUMは不要。
+MVPでは日次上限のみ（**500ニューロン/日**）。月次上限は設けないため当月SUMは不要。
 
 ## KVのキー
 

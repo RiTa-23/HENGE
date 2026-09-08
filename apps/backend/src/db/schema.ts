@@ -3,6 +3,7 @@ import {
   index,
   integer,
   primaryKey,
+  real,
   sqliteTable,
   text,
   uniqueIndex,
@@ -99,7 +100,10 @@ export const userThemeProgress = sqliteTable(
 );
 
 /**
- * 生成回数の日次カウント。日付は必ずJST基準（packages/shared の todayJst）。
+ * 生成の日次消費。日付は必ずJST基準（packages/shared の todayJst）。
+ *
+ * **上限の判定に使うのは `neurons` の方。** `count` は「何回試したか」で、
+ * 1回あたりの重さ（消費 ÷ 回数）を見るときの分母として残している。
  */
 export const userGenerationUsage = sqliteTable(
   "user_generation_usage",
@@ -110,6 +114,11 @@ export const userGenerationUsage = sqliteTable(
     /** YYYY-MM-DD。JST基準 */
     date: text("date").notNull(),
     count: integer("count").notNull().default(0),
+    /**
+     * その日の消費ニューロン。小数になるため REAL。
+     * 値はトークン数から計算する（apps/backend/src/generation/model.ts の neuronsUsed）
+     */
+    neurons: real("neurons").notNull().default(0),
   },
   (t) => [primaryKey({ columns: [t.userId, t.date] })],
 );

@@ -1,5 +1,11 @@
 import { buildGenerationPrompt, parseGeneratedLines } from "./prompt";
-import { DEFAULT_MAX_TOKENS, modelConfig, type ModelId } from "./model";
+import {
+  DEFAULT_MAX_TOKENS,
+  modelConfig,
+  type ModelId,
+  neuronsUsed,
+  type TokenUsage,
+} from "./model";
 import type { ThemeKind } from "@henge/shared";
 
 /** AI Gatewayのメタデータは1リクエスト5件まで。値は文字列・数値・真偽値のみ */
@@ -22,7 +28,8 @@ export interface GenerationMetadata {
 interface AiResponse {
   response?: string;
   choices?: { message?: { content?: string } }[];
-  usage?: { neurons?: number };
+  /** **入っているのはトークン数だけ。** ニューロン数は返らないので自分で計算する */
+  usage?: TokenUsage;
 }
 
 function extractText(result: AiResponse): string {
@@ -33,8 +40,8 @@ export interface AiCallResult {
   texts: string[];
   /** patchLog() で検証結果を書き戻すためのログID */
   logId: string | undefined;
-  /** 応答が返す消費ニューロン（モデルによっては入っていない） */
-  neurons: number | undefined;
+  /** この呼び出しで消費したニューロン。トークン数から計算する（`neuronsUsed`） */
+  neurons: number;
 }
 
 /**
@@ -101,7 +108,7 @@ export async function requestPrompts(
   return {
     texts: parseGeneratedLines(extractText(response)),
     logId: env.AI.aiGatewayLogId ?? undefined,
-    neurons: response.usage?.neurons,
+    neurons: neuronsUsed(input.model, response.usage),
   };
 }
 

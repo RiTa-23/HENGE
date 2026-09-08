@@ -36,7 +36,8 @@ interface SessionResponse {
   prompts: Prompt[];
   nextOffset: number;
   remainingInPool: number;
-  quotaRemaining?: number;
+  /** 本日の残ニューロン。ログイン時のみ */
+  neuronsRemaining?: number;
 }
 
 type Phase =
@@ -45,7 +46,7 @@ type Phase =
   | { name: "loading" }
   /** 在庫が足りず生成中。エラーではなく待ち */
   | { name: "preparing" }
-  | { name: "error"; code: string; message: string }
+  | { name: "error"; code: string; message: string; neuronsRemaining?: number }
   | { name: "playing"; session: SessionResponse }
   | { name: "result"; session: SessionResponse };
 
@@ -150,6 +151,8 @@ export function PlayScreen({
       const { code, message } = isApiError(body)
         ? body.error
         : { code: "UNKNOWN", message: "お題を取得できませんでした" };
+      // 枯渇の画面で「あと何ニューロン使えるか」を出すため、エラー応答からも拾う
+      const { neuronsRemaining } = body as { neuronsRemaining?: number };
 
       // **「生成中」はエラーではなく待ち。** 手裏剣を回したまま数秒後に引き直す。
       // 「少し待ってからもう一度」と出して操作を押し付けるのは、待てば解決する
@@ -168,7 +171,7 @@ export function PlayScreen({
       }
 
       waitingSince.current = null;
-      setPhase({ name: "error", code, message });
+      setPhase({ name: "error", code, message, neuronsRemaining });
       return;
     }
 
@@ -381,7 +384,17 @@ export function PlayScreen({
 
           {canRegenerate && (
             <p className="mt-5 text-sm leading-relaxed text-kinari/60">
-              {kindLabel(kind)}のお題を作り足せます。本日の生成回数を1つ使います。
+              {kindLabel(kind)}のお題を作り足せます。
+              {phase.neuronsRemaining !== undefined && (
+                <>
+                  本日の残りは
+                  {/* 小数のまま出しても読めないので切り捨てる。多く見せない側に倒す */}
+                  <span className="mx-1 font-mono text-kinari">
+                    {Math.floor(phase.neuronsRemaining)}
+                  </span>
+                  ニューロンです。
+                </>
+              )}
             </p>
           )}
           {exhausted && authSession === null && (

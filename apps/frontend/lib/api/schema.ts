@@ -45,3 +45,18 @@ export const adminListQuerySchema = z.object({
 
 /** 削除対象のテーマID（パスパラメータ） */
 export const themeIdParamSchema = z.object({ id: z.string().min(1) });
+
+/** 編集対象のお題ID（パスパラメータ） */
+export const promptIdParamSchema = z.object({ id: z.string().min(1) });
+
+/**
+ * お題本文の編集。
+ *
+ * **ここでは長さしか見ない。** 打てる文字か・漢字を含むか・打鍵数が範囲内か・
+ * 「含む」文字が読みにあるかは、**読み仮名を取らないと判定できない**（表記だけでは
+ * 分からない）。読み取得は D1/外部APIを持つ Hono 側の責務なので、そちらで生成時と
+ * 同じ検査を通す。ここで中途半端に真似ると、2か所の規則がずれる。
+ */
+export const promptTextSchema = z.object({
+  text: z.string().trim().min(1).max(100),
+});

@@ -1,5 +1,23 @@
+import {
+  containsKanji,
+  countKeystrokes,
+  includesConstraint,
+  isKeystrokeCountInRange,
+  isTypableText,
+  KEYSTROKE_MAX,
+  KEYSTROKE_MIN,
+  UnsupportedKanaError,
+} from "@henge/shared";
 import { Hono } from "hono";
 import { createDb } from "../db/client";
+import {
+  deletePrompt,
+  getPromptWithTheme,
+  listPromptsForAdmin,
+  PROMPT_LIST_LIMIT_DEFAULT,
+  updatePromptText,
+} from "../db/prompts";
+import { createGetReading } from "../reading/index";
 import { deleteTheme, LIST_LIMIT_DEFAULT, listThemesForAdmin } from "../db/themes";
 import { listUsers, USER_LIST_LIMIT_DEFAULT } from "../db/users";
 import { fail } from "../http/error";
@@ -49,6 +67,88 @@ export const adminRoutes = new Hono<{ Bindings: Env }>()
     await releaseThemeLock(c.env.KV, themeId);
 
     return c.json({ deleted: true, themeId });
+  })
+  /*
+   * **お題の一覧と編集はパスパラメータを使わない。**
+   *
+   * Hono RPC は、バリデータを置かない限りパスパラメータと本文／クエリを同時に
+   * 型推論できない（`input` が `{ param }` だけになり、`query` / `json` を渡すと
+   * 型で弾かれる）。この規約では検証は Next.js 側に置くと決めているので
+   * （AGENTS.md）、型のためだけに Hono へバリデータを増やさない。
+   *
+   * **公開API側は REST な形のまま**（`/api/admin/themes/[id]/prompts`、
+   * `/api/admin/prompts/[id]`）。内部APIの形は実装の都合なので、外に出る形と
+   * 揃える必要はない。
+   */
+  .get("/admin/prompts", async (c) => {
+    const db = createDb(c.env.DB);
+    return c.json(
+      await listPromptsForAdmin(
+        db,
+        c.req.query("themeId") ?? "",
+        pagination(c.req.query.bind(c.req), PROMPT_LIST_LIMIT_DEFAULT),
+      ),
+    );
+  })
+  .patch("/admin/prompts", async (c) => {
+    const { id: promptId, text } = await c.req.json<{ id: string; text: string }>();
+    const db = createDb(c.env.DB);
+
+    const target = await getPromptWithTheme(db, promptId);
+    if (target === null) return fail(c, "NOT_FOUND", "お題が見つかりません");
+
+    // **本文だけ差し替えてはいけない。** 打鍵判定は読み仮名に対して行うので、
+    // 読みを取り直さないと「画面の文と打つべきローマ字が食い違う」お題ができる。
+    // 生成時と同じ検査を通す。ここを緩めると、生成では弾かれる文が手動で入る
+    if (!isTypableText(text)) {
+      return fail(c, "VALIDATION_ERROR", "打てない文字が含まれています");
+    }
+    if (!containsKanji(text)) {
+      return fail(c, "VALIDATION_ERROR", "漢字を1つ以上入れてください");
+    }
+
+    let reading: Awaited<ReturnType<ReturnType<typeof createGetReading>>>;
+    try {
+      reading = await createGetReading(c.env)(text);
+    } catch (error) {
+      // 読みにテーブル外のかなが残った場合。打てないお題になるので通さない
+      if (error instanceof UnsupportedKanaError) {
+        return fail(c, "VALIDATION_ERROR", "読み仮名に打てない文字が含まれています");
+      }
+      throw error;
+    }
+
+    const keystrokeCount = countKeystrokes(reading.roman);
+    if (!isKeystrokeCountInRange(keystrokeCount)) {
+      return fail(
+        c,
+        "VALIDATION_ERROR",
+        `打鍵数が${KEYSTROKE_MIN}〜${KEYSTROKE_MAX}の範囲外です（${keystrokeCount}打）`,
+      );
+    }
+    if (target.kind === "constraint" && !includesConstraint(reading.kana, target.themeName)) {
+      return fail(c, "VALIDATION_ERROR", `読み仮名に「${target.themeName}」が含まれていません`);
+    }
+
+    await updatePromptText(db, promptId, {
+      text,
+      readingKana: reading.kana,
+      readingRomanJson: JSON.stringify(reading.roman),
+      keystrokeCount,
+    });
+
+    return c.json({ id: promptId, text, readingKana: reading.kana, keystrokeCount });
+  })
+  .delete("/admin/prompts/:id", async (c) => {
+    const promptId = c.req.param("id");
+    const db = createDb(c.env.DB);
+
+    // 連番は詰め直さない。配信は行数で位置を数えるので穴が空いても壊れない
+    // （db/prompts.ts の fetchPromptPage 参照）
+    if (!(await deletePrompt(db, promptId))) {
+      return fail(c, "NOT_FOUND", "お題が見つかりません");
+    }
+    return c.json({ deleted: true, promptId });
   })
   .get("/admin/users", async (c) => {
     const db = createDb(c.env.DB);

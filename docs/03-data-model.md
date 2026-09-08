@@ -70,7 +70,7 @@ CREATE INDEX themes_kind_created ON themes (kind, created_at DESC);
 CREATE UNIQUE INDEX prompts_theme_seq ON prompts (theme_id, sequence_number);
 ```
 
-このインデックス1本で、ページネーション（`WHERE theme_id = ? AND sequence_number BETWEEN ? AND ?`）と総生成数の取得（`SELECT MAX(sequence_number)`）の両方を賄える。
+このインデックス1本で、配信・管理一覧のページネーション（`ORDER BY sequence_number LIMIT ? OFFSET ?`）と**次の採番**（`SELECT MAX(sequence_number)`）を賄える。**在庫数は `COUNT(*)` で数える。** 管理画面からお題を1件消すと連番に穴が空くため、最大値で数えると在庫を多く見積もりすぎる。配信も連番の「値」で範囲指定せず、行数で位置を数える（`OFFSET`）。そうしないと穴を含む15問ブロックが足りなくなり、1件の削除でテーマが遊べなくなる。
 
 **テーマ行はお題15問と同じバッチで挿入する。** テーマ行を先に作ると、生成失敗時にお題ゼロのテーマが公開一覧に残り、クリックしても何も遊べない状態になる。
 

@@ -12,6 +12,12 @@ import type { Metadata } from "next";
 const OG_IMAGE_PATH = "/og.png";
 
 /**
+ * ビルド時だけ使う基準URL。**実行時には使われない**（下の siteUrl 参照）。
+ * 共有対象のページはすべて force-dynamic なので、この値が共有カードに出ることはない。
+ */
+const BUILD_TIME_FALLBACK = "http://localhost:3000";
+
+/**
  * サイトの基準URL。metadataBase（相対 og:image を絶対URLに解決するために必須）と、
  * シェアURLの絶対化に使う。
  *
@@ -20,8 +26,20 @@ const OG_IMAGE_PATH = "/og.png";
  * サイトの基準URLとして正しい。ローカルは http://localhost:3000。
  */
 export async function siteUrl(): Promise<string> {
-  const { env } = await getCloudflareContext({ async: true });
-  return env.BETTER_AUTH_URL;
+  try {
+    const { env } = await getCloudflareContext({ async: true });
+    return env.BETTER_AUTH_URL ?? BUILD_TIME_FALLBACK;
+  } catch {
+    // **ビルド時はここに来る。** Next.js は `/_not-found` を静的生成するが、
+    // その時点では Cloudflare のバインディングが無く getCloudflareContext が落ちる。
+    // ここで握らないと `bun run build` が丸ごと失敗し、**デプロイだけが落ちる**
+    // （CIは lint/tsc/テストしか回さないのでPRでは気付けない）。
+    //
+    // この値が実際に使われるのは静的生成される `/_not-found` だけ。共有される
+    // ページ（トップ・一覧・詳細）はすべて force-dynamic で、リクエスト時に
+    // バインディングのある状態で評価されるため本物のURLになる。
+    return BUILD_TIME_FALLBACK;
+  }
 }
 
 /**

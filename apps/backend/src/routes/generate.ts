@@ -3,7 +3,7 @@ import { Hono } from "hono";
 import { createDb } from "../db/client";
 import { appendPrompts, insertThemeWithPrompts, recentPromptTexts } from "../db/prompts";
 import { findThemeByName, getThemeDetail, setGenerationStatus } from "../db/themes";
-import { incrementUsage } from "../db/usage";
+import { addUsage } from "../db/usage";
 import { generateBatch } from "../generation/batch";
 import { resolveModel } from "../generation/model";
 import { EXISTING_CONTEXT_SIZE } from "../generation/prompt";
@@ -21,6 +21,20 @@ interface CreateBody {
 interface RegenerateBody {
   themeId: string;
   userId: string;
+}
+
+/**
+ * 消費の記録。**失敗しても応答は落とさない。**
+ *
+ * finally から呼ぶため、ここで投げると生成が成功していても 500 になる。
+ * 記録漏れの方が害が小さいので、ログだけ残して先へ進む。
+ */
+async function recordUsage(db: ReturnType<typeof createDb>, userId: string, neurons: number) {
+  try {
+    await addUsage(db, userId, neurons);
+  } catch (error) {
+    console.error("消費の記録に失敗した", { userId, neurons, error });
+  }
 }
 
 /** 表示名で引いて、見つかれば詳細（お題数つき）を返す */
@@ -46,34 +60,55 @@ export const generateRoutes = new Hono<{ Bindings: Env }>()
 
     const themeId = crypto.randomUUID();
     const model = resolveModel(c.env.GENERATION_MODEL);
-    const result = await generateBatch(c.env, {
-      kind: body.kind,
-      name: body.name,
-      themeId,
-      path: "create",
-      target: PLAY_SIZE,
-      existing: [],
-      model,
-      getReading: createGetReading(c.env),
-      waitUntil: (promise) => c.executionCtx.waitUntil(promise),
-    });
+    // AIを呼んだ時点で消費は確定する。成否に関わらず記録するため外に置く
+    let neurons = 0;
 
-    // **目標未達ならテーマ行を作らない。** 先に作ると、お題ゼロのテーマが
-    // 公開一覧に残り、クリックしても何も遊べない状態になる
-    if (!result.reachedTarget) return fail(c, "GENERATION_FAILED");
+    try {
+      const result = await generateBatch(c.env, {
+        kind: body.kind,
+        name: body.name,
+        themeId,
+        path: "create",
+        target: PLAY_SIZE,
+        existing: [],
+        model,
+        getReading: createGetReading(c.env),
+        waitUntil: (promise) => c.executionCtx.waitUntil(promise),
+        onNeurons: (used) => {
+          neurons += used;
+        },
+      });
 
-    await insertThemeWithPrompts(
-      db,
-      { id: themeId, kind: body.kind, name: body.name, normalizedName, createdBy: body.userId },
-      result.valid,
-      model,
-    );
-    await cacheThemeId(c.env.KV, body.kind, normalizedName, themeId);
-    // 生成に成功した（テーマ行の挿入まで完了した）ためクォータを1消費する。
-    // 加算は挿入の後。逆にすると挿入が失敗したときにクォータだけ減る
-    await incrementUsage(db, body.userId);
+      // **目標未達ならテーマ行を作らない。** 先に作ると、お題ゼロのテーマが
+      // 公開一覧に残り、クリックしても何も遊べない状態になる
+      if (!result.reachedTarget) return fail(c, "GENERATION_FAILED");
 
-    return c.json({ theme: await getThemeDetail(db, themeId), created: true });
+      await insertThemeWithPrompts(
+        db,
+        { id: themeId, kind: body.kind, name: body.name, normalizedName, createdBy: body.userId },
+        result.valid,
+        model,
+      );
+      await cacheThemeId(c.env.KV, body.kind, normalizedName, themeId);
+
+      return c.json({
+        theme: await getThemeDetail(db, themeId),
+        created: true,
+        neuronsUsed: neurons,
+      });
+    } finally {
+      // **失敗しても記録する。** ニューロンは呼んだ時点でCloudflare側が消費しており、
+      // 有効なお題が0件でも戻ってこない。ここで見逃すと、作れないテーマ名を連打
+      // したときだけ実コストが台帳に載らない。
+      //
+      // AIを一度も呼んでいない経路（既存テーマにヒット）は neurons が0のままなので
+      // 加算しない。加算は保存の後（finally は return の後に走る）。
+      //
+      // **記録の失敗で応答を落とさない。** ここで投げると、テーマの作成が
+      // 済んでいるのに 500 を返すことになる。記録漏れの方が害が小さい
+      // （消費そのものは AI Gateway 側にも残る）。
+      if (neurons > 0) await recordUsage(db, body.userId, neurons);
+    }
   })
   .post("/prompts/regenerate", async (c) => {
     const body = await c.req.json<RegenerateBody>();
@@ -87,6 +122,8 @@ export const generateRoutes = new Hono<{ Bindings: Env }>()
       return fail(c, "GENERATION_IN_PROGRESS");
     }
 
+    let neurons = 0;
+
     try {
       const model = resolveModel(c.env.GENERATION_MODEL);
       const result = await generateBatch(c.env, {
@@ -99,6 +136,9 @@ export const generateRoutes = new Hono<{ Bindings: Env }>()
         model,
         getReading: createGetReading(c.env),
         waitUntil: (promise) => c.executionCtx.waitUntil(promise),
+        onNeurons: (used) => {
+          neurons += used;
+        },
       });
 
       if (!result.reachedTarget) return fail(c, "GENERATION_FAILED");
@@ -106,11 +146,16 @@ export const generateRoutes = new Hono<{ Bindings: Env }>()
       await appendPrompts(db, theme.id, result.valid, model);
       // 生成できることが実証されたので「生成困難」の印を外す
       if (theme.generationStatus === "difficult") await setGenerationStatus(db, theme.id, "ok");
-      // 生成に成功したためクォータを1消費する（appendの後。逆順だと失敗時にクォータだけ減る）
-      await incrementUsage(db, body.userId);
 
-      return c.json({ theme: await getThemeDetail(db, theme.id), added: result.valid.length });
+      return c.json({
+        theme: await getThemeDetail(db, theme.id),
+        added: result.valid.length,
+        neuronsUsed: neurons,
+      });
     } finally {
+      // ロックは先に返す。**記録の失敗でロックを握ったままにしない**
       await releaseThemeLock(c.env.KV, body.themeId);
+      // 失敗しても実消費を記録する（ロックが取れず生成しなかった経路は上で return 済み）
+      if (neurons > 0) await recordUsage(db, body.userId, neurons);
     }
   });

@@ -4,8 +4,9 @@ import { eq } from "drizzle-orm";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { createDb } from "../src/db/client";
 import { getThemeDetail } from "../src/db/themes";
-import { getUsageCount } from "../src/db/usage";
+import { getUsage } from "../src/db/usage";
 import { kickRefill } from "../src/generation/refill";
+import { DEFAULT_MODEL, neuronsUsed } from "../src/generation/model";
 import { prompts, themes, user, userGenerationUsage } from "../src/db/schema";
 import { themeLockKey } from "../src/kv/keys";
 
@@ -13,6 +14,10 @@ const db = createDb(env.DB);
 
 const AI_TEXT = "忍びは闇を走る。";
 const AI_READING = "しのびはやみをはしる。";
+
+/** 応答に載るトークン数と、そこから決まる1ラウンドあたりの消費 */
+const TOKENS = { prompt_tokens: 1_000, completion_tokens: 1_000 };
+const PER_ROUND = neuronsUsed(DEFAULT_MODEL, TOKENS);
 
 async function seed() {
   await db.insert(user).values({
@@ -86,10 +91,10 @@ beforeEach(async () => {
   await env.KV.delete(themeLockKey("t1"));
 });
 
-describe("kickRefill のクォータ消費（判定→生成→加算の順）", () => {
-  it("1件でも有効なお題が増えたらクォータを1消費する", async () => {
+describe("kickRefill の消費記録（実際に使ったニューロンを加算する）", () => {
+  it("お題が増えたら、その回で使ったニューロンを加算する", async () => {
     await seed();
-    stubAi({ response: AI_TEXT });
+    stubAi({ response: AI_TEXT, usage: TOKENS });
     stubYahooReading();
     const { waitUntil, flush } = manualWaitUntil();
 
@@ -104,15 +109,22 @@ describe("kickRefill のクォータ消費（判定→生成→加算の順）",
     expect(kicked).toBe(true);
     await flush();
 
-    // お題が1件増え、クォータも1増える
     const promptsAfter = await db.select().from(prompts);
     expect(promptsAfter).toHaveLength(45);
-    expect(await getUsageCount(db, "u1")).toBe(1);
+    // 1ラウンドで目標に達したので1回分
+    const usage = await getUsage(db, "u1");
+    expect(usage.count).toBe(1);
+    expect(usage.neurons).toBeCloseTo(PER_ROUND);
   });
 
-  it("有効なお題が1件も増えなければクォータを消費しない", async () => {
+  /**
+   * **これが回数制からニューロン制に変えた理由そのもの。**
+   * 1件も採れなかった呼び出しは、回数制では無料だったが、ニューロンは
+   * 2ラウンド分まるごと消費している。
+   */
+  it("有効なお題が1件も増えなくても、2ラウンド分の消費を加算する", async () => {
     await seed();
-    stubAi({ response: "" }); // 全件バリデーション落ち → valid 0件
+    stubAi({ response: "", usage: TOKENS }); // 全件バリデーション落ち → valid 0件
     const { waitUntil, flush } = manualWaitUntil();
 
     const theme = (await getThemeDetail(db, "t1"))!;
@@ -125,13 +137,33 @@ describe("kickRefill のクォータ消費（判定→生成→加算の順）",
     expect(kicked).toBe(true);
     await flush();
 
-    expect(await getUsageCount(db, "u1")).toBe(0);
+    expect((await getUsage(db, "u1")).neurons).toBeCloseTo(PER_ROUND * 2);
     // 目標未達なので 'difficult' が立つ
     const [row] = await db.select().from(themes).where(eq(themes.id, "t1"));
     expect(row?.generationStatus).toBe("difficult");
   });
 
-  it("生成が例外で失敗してもクォータを消費しない", async () => {
+  /**
+   * 読み仮名の取得で落ちる経路。**AIの消費は済んでいる**ので、
+   * 例外で抜けても記録されなければならない（batch.ts の onNeurons）。
+   */
+  it("読み取得が落ちて例外になっても、AIで使った分は加算する", async () => {
+    await seed();
+    stubAi({ response: AI_TEXT, usage: TOKENS });
+    vi.spyOn(globalThis, "fetch").mockRejectedValue(new Error("Yahoo API障害"));
+    const { waitUntil, flush } = manualWaitUntil();
+
+    const theme = (await getThemeDetail(db, "t1"))!;
+    await kickRefill(env, waitUntil, { db, theme, nextOffset: 15, userId: "u1" });
+    await flush();
+
+    expect((await getUsage(db, "u1")).neurons).toBeCloseTo(PER_ROUND);
+    // 一時的な障害で 'difficult' を立てない
+    const [row] = await db.select().from(themes).where(eq(themes.id, "t1"));
+    expect(row?.generationStatus).toBe("ok");
+  });
+
+  it("AIの呼び出し自体が失敗したら消費しない（応答が返っていない）", async () => {
     await seed();
     vi.spyOn(env.AI, "run").mockRejectedValue(new Error("AI障害"));
     const { waitUntil, flush } = manualWaitUntil();
@@ -146,8 +178,7 @@ describe("kickRefill のクォータ消費（判定→生成→加算の順）",
     expect(kicked).toBe(true);
     await flush();
 
-    // 生成に失敗した場合はカウントしない
-    expect(await getUsageCount(db, "u1")).toBe(0);
+    expect(await getUsage(db, "u1")).toEqual({ count: 0, neurons: 0 });
     // 一時的な障害で 'difficult' を立てない（以後の補充が止まるため）
     const [row] = await db.select().from(themes).where(eq(themes.id, "t1"));
     expect(row?.generationStatus).toBe("ok");
@@ -155,7 +186,7 @@ describe("kickRefill のクォータ消費（判定→生成→加算の順）",
     expect(await env.KV.get(themeLockKey("t1"))).toBeNull();
   });
 
-  it("ロックが取れなければキックせず、クォータも消費しない", async () => {
+  it("ロックが取れなければキックせず、消費もしない", async () => {
     await seed();
     await env.KV.put(themeLockKey("t1"), "1", { expirationTtl: 60 });
     const { waitUntil, flush } = manualWaitUntil();
@@ -170,6 +201,6 @@ describe("kickRefill のクォータ消費（判定→生成→加算の順）",
     expect(kicked).toBe(false);
     await flush();
 
-    expect(await getUsageCount(db, "u1")).toBe(0);
+    expect(await getUsage(db, "u1")).toEqual({ count: 0, neurons: 0 });
   });
 });

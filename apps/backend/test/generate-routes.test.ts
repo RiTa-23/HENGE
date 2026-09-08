@@ -2,16 +2,22 @@ import { env, SELF } from "cloudflare:test";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { createDb } from "../src/db/client";
 import { prompts, themes, user, userGenerationUsage } from "../src/db/schema";
-import { getUsageCount } from "../src/db/usage";
+import { getUsage } from "../src/db/usage";
 import { themeIdKey, themeLockKey } from "../src/kv/keys";
+import { DEFAULT_MODEL, neuronsUsed } from "../src/generation/model";
 
 const db = createDb(env.DB);
+
+/** 応答に載るトークン数と、そこから決まる1ラウンドあたりの消費 */
+const TOKENS = { prompt_tokens: 1_000, completion_tokens: 1_000 };
+const PER_ROUND = neuronsUsed(DEFAULT_MODEL, TOKENS);
 
 /** AIの応答と読み取得を差し替える。外部APIは呼ばない */
 function stubGeneration(lines: string[][], reading = "しのび") {
   let call = 0;
   vi.spyOn(env.AI, "run").mockImplementation(async () => ({
     response: (lines[call++] ?? []).join("\n"),
+    usage: TOKENS,
   }));
   vi.spyOn(env.AI, "gateway").mockReturnValue({
     patchLog: async () => {},
@@ -129,6 +135,7 @@ describe("POST /themes", () => {
 
   it("目標に届かなければ GENERATION_FAILED を返し、テーマ行を作らない", async () => {
     // 打鍵数が足りない文しか返さないので全部却下される
+    await seedUser("u1");
     stubGeneration([["あ"], ["あ"]]);
 
     const { status, body } = await post("/themes", {
@@ -144,6 +151,7 @@ describe("POST /themes", () => {
   });
 
   it("失敗したテーマIDをKVにキャッシュしない", async () => {
+    await seedUser("u1");
     stubGeneration([["あ"], ["あ"]]);
     await post("/themes", { kind: "theme", name: "忍びの心得", userId: "u1" });
 
@@ -151,8 +159,8 @@ describe("POST /themes", () => {
   });
 });
 
-describe("同期生成のクォータ加算（成功した場合のみ）", () => {
-  it("POST /themes で生成に成功したらクォータを1消費する", async () => {
+describe("同期生成の消費記録（成否によらず実消費を加算する）", () => {
+  it("POST /themes で生成に成功したら、その回の消費を加算する", async () => {
     await seedUser("u1");
     stubValidGeneration();
 
@@ -164,19 +172,33 @@ describe("同期生成のクォータ加算（成功した場合のみ）", () =
 
     expect(status).toBe(200);
     expect(body.created).toBe(true);
-    expect(await getUsageCount(db, "u1")).toBe(1);
+    // 応答にもその回の消費を載せる（Next.js が残数の計算に使う）
+    expect(body.neuronsUsed).toBeCloseTo(PER_ROUND);
+    const usage = await getUsage(db, "u1");
+    expect(usage.count).toBe(1);
+    expect(usage.neurons).toBeCloseTo(PER_ROUND);
   });
 
-  it("POST /themes で生成に失敗したらクォータを消費しない", async () => {
+  /**
+   * **回数制との一番の違い。** 作れないテーマ名は2ラウンド回して0件で終わるが、
+   * ニューロンはその2回分を消費している。ここを無料にすると、最も高い呼び出しだけが
+   * 台帳から漏れる。
+   */
+  it("POST /themes で生成に失敗しても、2ラウンド分の消費を加算する", async () => {
     await seedUser("u1");
     stubGeneration([["あ"], ["あ"]]);
 
-    await post("/themes", { kind: "theme", name: "忍びの心得", userId: "u1" });
+    const { status } = await post("/themes", {
+      kind: "theme",
+      name: "忍びの心得",
+      userId: "u1",
+    });
 
-    expect(await getUsageCount(db, "u1")).toBe(0);
+    expect(status).toBe(422);
+    expect((await getUsage(db, "u1")).neurons).toBeCloseTo(PER_ROUND * 2);
   });
 
-  it("既存テーマの再利用ではクォータを消費しない", async () => {
+  it("既存テーマの再利用では消費しない（AIを呼んでいない）", async () => {
     await seedUser("u1");
     await db.insert(themes).values({
       id: "t1",
@@ -188,10 +210,10 @@ describe("同期生成のクォータ加算（成功した場合のみ）", () =
     const { body } = await post("/themes", { kind: "theme", name: "忍びの心得", userId: "u1" });
 
     expect(body.created).toBe(false);
-    expect(await getUsageCount(db, "u1")).toBe(0);
+    expect(await getUsage(db, "u1")).toEqual({ count: 0, neurons: 0 });
   });
 
-  it("POST /prompts/regenerate で生成に成功したらクォータを1消費する", async () => {
+  it("POST /prompts/regenerate で生成に成功したら、その回の消費を加算する", async () => {
     await seedUser("u1");
     await db.insert(themes).values({
       id: "t1",
@@ -205,10 +227,11 @@ describe("同期生成のクォータ加算（成功した場合のみ）", () =
 
     expect(status).toBe(200);
     expect((body.theme as { promptCount: number }).promptCount).toBeGreaterThanOrEqual(15);
-    expect(await getUsageCount(db, "u1")).toBe(1);
+    expect(body.neuronsUsed).toBeCloseTo(PER_ROUND);
+    expect((await getUsage(db, "u1")).neurons).toBeCloseTo(PER_ROUND);
   });
 
-  it("POST /prompts/regenerate でロックが取れなければクォータを消費しない", async () => {
+  it("POST /prompts/regenerate でロックが取れなければ消費しない", async () => {
     await seedUser("u1");
     await db.insert(themes).values({
       id: "t1",
@@ -220,10 +243,10 @@ describe("同期生成のクォータ加算（成功した場合のみ）", () =
 
     await post("/prompts/regenerate", { themeId: "t1", userId: "u1" });
 
-    expect(await getUsageCount(db, "u1")).toBe(0);
+    expect(await getUsage(db, "u1")).toEqual({ count: 0, neurons: 0 });
   });
 
-  it("POST /prompts/regenerate で生成に失敗したらクォータを消費しない", async () => {
+  it("POST /prompts/regenerate で生成に失敗しても消費を加算する", async () => {
     await seedUser("u1");
     await db.insert(themes).values({
       id: "t1",
@@ -235,7 +258,7 @@ describe("同期生成のクォータ加算（成功した場合のみ）", () =
 
     await post("/prompts/regenerate", { themeId: "t1", userId: "u1" });
 
-    expect(await getUsageCount(db, "u1")).toBe(0);
+    expect((await getUsage(db, "u1")).neurons).toBeCloseTo(PER_ROUND * 2);
   });
 });
 
@@ -256,6 +279,7 @@ describe("POST /prompts/regenerate", () => {
   });
 
   it("失敗してもロックを解放する", async () => {
+    await seedUser("u1");
     await db.insert(themes).values({
       id: "t1",
       kind: "theme",

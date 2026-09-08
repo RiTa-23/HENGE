@@ -71,6 +71,8 @@ export interface BatchResult {
   rejected: RejectionCounts;
   rounds: number;
   reachedTarget: boolean;
+  /** 全ラウンドの消費ニューロンの合計 */
+  neurons: number;
 }
 
 export interface GenerateBatchInput {
@@ -88,6 +90,14 @@ export interface GenerateBatchInput {
   getReading: GetReading;
   /** 検証結果のログ書き戻しを遅らせる。Honoハンドラからは c.executionCtx.waitUntil を渡す */
   waitUntil?: (promise: Promise<unknown>) => void;
+  /**
+   * 1ラウンド分の消費ニューロン。**AI呼び出しの直後に呼ぶ。**
+   *
+   * 戻り値（`BatchResult.neurons`）だけでは足りない。読み仮名の取得が落ちて
+   * ここから例外が飛ぶ場合でも、**その時点でAIのニューロンは消費済み**で、
+   * 呼び出し側はそれを記録しなければならない。
+   */
+  onNeurons?: (neurons: number) => void;
 }
 
 /**
@@ -116,11 +126,16 @@ export async function generateBatch(env: Env, input: GenerateBatchInput): Promis
   // ラウンドはまたいで数える（2ラウンド目で同じ型を作り直させない）
   const openings = new Map<string, number>();
   let rounds = 0;
+  let neurons = 0;
 
   for (let round = 1; round <= MAX_ROUNDS; round++) {
     rounds = round;
 
-    const { texts, logId } = await requestPrompts(env, {
+    const {
+      texts,
+      logId,
+      neurons: roundNeurons,
+    } = await requestPrompts(env, {
       model: input.model,
       kind: input.kind,
       name: input.name,
@@ -128,6 +143,10 @@ export async function generateBatch(env: Env, input: GenerateBatchInput): Promis
       existing: input.existing,
       metadata: { themeId: input.themeId, kind: input.kind, round, path: input.path },
     });
+
+    // **検証より先に記録する。** 読み仮名の取得で例外が飛んでも、AIの消費は確定している
+    neurons += roundNeurons;
+    input.onNeurons?.(roundNeurons);
 
     const validBefore = valid.length;
     const rejectedBefore = { ...rejected };
@@ -151,7 +170,7 @@ export async function generateBatch(env: Env, input: GenerateBatchInput): Promis
     if (valid.length >= input.target) break;
   }
 
-  return { valid, rejected, rounds, reachedTarget: valid.length >= input.target };
+  return { valid, rejected, rounds, neurons, reachedTarget: valid.length >= input.target };
 }
 
 /**

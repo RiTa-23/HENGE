@@ -41,3 +41,10 @@ jobs:
       # Cloudflareの認証情報なしで実行できる（forkからのPRでも動く）。
       - name: test:workers (D1 / KV 依存)
         run: bun run test:workers
+
+      # **ビルドはPRで通す。** lint/tsc/テストが全部通ってもビルドだけ落ちることがある。
+      # 実際、ビルド時に static 生成される /_not-found から Cloudflare のバインディングを
+      # 触ってしまい、マージ後のデプロイで初めて失敗した（#93）。
+      # ランナーには .dev.vars が無く、デプロイと同じ条件で回る。所要は30秒ほど。
+      - name: build (OpenNext)
+        run: bun run --cwd apps/frontend build:worker

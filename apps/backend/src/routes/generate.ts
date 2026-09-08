@@ -1,10 +1,11 @@
 import { normalizeName, PLAY_SIZE, type ThemeKind } from "@henge/shared";
-import { Hono } from "hono";
+import { type Context, Hono } from "hono";
 import { createDb } from "../db/client";
 import { appendPrompts, insertThemeWithPrompts, recentPromptTexts } from "../db/prompts";
 import { findThemeByName, getThemeDetail, setGenerationStatus } from "../db/themes";
 import { recordUsage } from "../db/usage";
 import { generateBatch } from "../generation/batch";
+import { AiQuotaExceededError, AiUnavailableError } from "../generation/ai";
 import { resolveModel } from "../generation/model";
 import { EXISTING_CONTEXT_SIZE } from "../generation/prompt";
 import { fail } from "../http/error";
@@ -21,6 +22,18 @@ interface CreateBody {
 interface RegenerateBody {
   themeId: string;
   userId: string;
+}
+
+/**
+ * Workers AI 側の事情なら、その理由で返す。**テーマ名の問題と混ぜない。**
+ *
+ * `GENERATION_FAILED`（テーマ名を変えて再試行）に落とすと、名前を変えても
+ * 直らない原因に対して打ち直しを促すことになる。翻訳できない例外はそのまま投げる。
+ */
+function failFromAiError(c: Context, error: unknown) {
+  if (error instanceof AiQuotaExceededError) return fail(c, "AI_QUOTA_EXCEEDED");
+  if (error instanceof AiUnavailableError) return fail(c, "AI_UNAVAILABLE");
+  throw error;
 }
 
 /** 表示名で引いて、見つかれば詳細（お題数つき）を返す */
@@ -49,24 +62,29 @@ export const generateRoutes = new Hono<{ Bindings: Env }>()
     // 応答に載せる合計。記録そのものはラウンドごとに済ませる（onNeurons）
     let neurons = 0;
 
-    const result = await generateBatch(c.env, {
-      kind: body.kind,
-      name: body.name,
-      themeId,
-      path: "create",
-      target: PLAY_SIZE,
-      existing: [],
-      model,
-      getReading: createGetReading(c.env),
-      waitUntil: (promise) => c.executionCtx.waitUntil(promise),
-      // **消費が確定した直後に記録する。** ここより後で何が起きても
-      // （生成失敗、保存の失敗、クライアント切断によるキャンセル）記録は残る。
-      // AIを一度も呼んでいない経路（既存テーマにヒット）では呼ばれない
-      onNeurons: async (used) => {
-        neurons += used;
-        await recordUsage(db, body.userId, used);
-      },
-    });
+    let result;
+    try {
+      result = await generateBatch(c.env, {
+        kind: body.kind,
+        name: body.name,
+        themeId,
+        path: "create",
+        target: PLAY_SIZE,
+        existing: [],
+        model,
+        getReading: createGetReading(c.env),
+        waitUntil: (promise) => c.executionCtx.waitUntil(promise),
+        // **消費が確定した直後に記録する。** ここより後で何が起きても
+        // （生成失敗、保存の失敗、クライアント切断によるキャンセル）記録は残る。
+        // AIを一度も呼んでいない経路（既存テーマにヒット）では呼ばれない
+        onNeurons: async (used) => {
+          neurons += used;
+          await recordUsage(db, body.userId, used);
+        },
+      });
+    } catch (error) {
+      return failFromAiError(c, error);
+    }
 
     // **目標未達ならテーマ行を作らない。** 先に作ると、お題ゼロのテーマが
     // 公開一覧に残り、クリックしても何も遊べない状態になる
@@ -131,6 +149,8 @@ export const generateRoutes = new Hono<{ Bindings: Env }>()
         added: result.valid.length,
         neuronsUsed: neurons,
       });
+    } catch (error) {
+      return failFromAiError(c, error);
     } finally {
       // 記録は onNeurons で済んでいる。ここはロックを返すだけ
       await releaseThemeLock(c.env.KV, body.themeId);

@@ -1,5 +1,5 @@
 export { PING, ping } from "./ping";
-export { nextJstMidnight, quotaResetAt, toJstDateString } from "./jst";
+export { nextResetAt, quotaResetAt, usageDateKey } from "./usage-window";
 export {
   isHiraganaOnly,
   normalizeConstraintChar,

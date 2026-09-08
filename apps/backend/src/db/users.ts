@@ -1,4 +1,4 @@
-import { toJstDateString } from "@henge/shared";
+import { usageDateKey } from "@henge/shared";
 import { and, desc, eq, sql } from "drizzle-orm";
 import type { Db } from "./client";
 import { user, userGenerationUsage } from "./schema";
@@ -26,7 +26,7 @@ export const USER_LIST_LIMIT_MAX = 50;
  * 当日の消費を併記するのは、上限に張り付いているユーザーを見つけるため。
  * **上限は消費ニューロンで見る**（`DAILY_NEURON_LIMIT`）。回数も併記するが、
  * それは1回あたりの重さ（消費 ÷ 回数）を読むための分母。
- * 日付は必ず toJstDateString() で作る（素の toISOString() だとリセットが朝9時になる）。
+ * 日付は必ず `usageDateKey()` で作る（**00:00 UTC 基準**。`packages/shared`）。
  */
 export async function listUsers(
   db: Db,
@@ -46,7 +46,7 @@ export async function listUsers(
     .from(user)
     .leftJoin(
       userGenerationUsage,
-      and(eq(userGenerationUsage.userId, user.id), eq(userGenerationUsage.date, toJstDateString())),
+      and(eq(userGenerationUsage.userId, user.id), eq(userGenerationUsage.date, usageDateKey())),
     )
     .orderBy(desc(user.createdAt))
     // 次ページの有無を知るために1件多く取る

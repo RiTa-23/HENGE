@@ -13,6 +13,8 @@ describe("エラーコードとHTTPステータス", () => {
       GENERATION_FAILED: 422,
       RATE_LIMITED: 429,
       QUOTA_EXCEEDED: 429,
+      AI_QUOTA_EXCEEDED: 429,
+      AI_UNAVAILABLE: 503,
     });
   });
 
@@ -22,6 +24,22 @@ describe("エラーコードとHTTPステータス", () => {
     expect(apiError("RATE_LIMITED").error.message).not.toBe(
       apiError("QUOTA_EXCEEDED").error.message,
     );
+  });
+
+  test("QUOTA_EXCEEDED と AI_QUOTA_EXCEEDED は同じ429だが別のコード", () => {
+    // 前者はその利用者の500ニューロン、後者はアカウント全体の無料枠。
+    // 後者は他の利用者にも同時に起きるうえ、本人にできることが何も無い
+    expect(statusFor("QUOTA_EXCEEDED")).toBe(statusFor("AI_QUOTA_EXCEEDED"));
+    expect(apiError("QUOTA_EXCEEDED").error.message).not.toBe(
+      apiError("AI_QUOTA_EXCEEDED").error.message,
+    );
+  });
+
+  test("AI_QUOTA_EXCEEDED の文言は、テーマ名の変更を促さない", () => {
+    // GENERATION_FAILED と同じ誘導をすると、名前を変えても直らない原因に対して
+    // 打ち直しをさせることになる
+    expect(apiError("AI_QUOTA_EXCEEDED").error.message).not.toContain("テーマ名");
+    expect(apiError("GENERATION_FAILED").error.message).toContain("テーマ名");
   });
 });
 

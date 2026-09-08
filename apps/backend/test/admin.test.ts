@@ -1,5 +1,5 @@
 /* oxlint-disable no-await-in-loop -- テストデータの投入は件数が少なく、順に入れた方が読みやすい */
-import { buildRomanCandidates, countKeystrokes, toJstDateString } from "@henge/shared";
+import { buildRomanCandidates, countKeystrokes, usageDateKey } from "@henge/shared";
 import { env, SELF } from "cloudflare:test";
 import { eq } from "drizzle-orm";
 import { beforeEach, describe, expect, it, vi } from "vitest";
@@ -208,7 +208,7 @@ describe("GET /admin/users", () => {
     await seedUser("u1", new Date());
     await db.insert(userGenerationUsage).values({
       userId: "u1",
-      date: toJstDateString(),
+      date: usageDateKey(),
       count: 3,
       neurons: 19.5,
     });
@@ -223,7 +223,7 @@ describe("GET /admin/users", () => {
 
   it("前日の行は当日の消費に混ぜない", async () => {
     await seedUser("u1", new Date());
-    const yesterday = toJstDateString(new Date(Date.now() - 24 * 60 * 60 * 1000));
+    const yesterday = usageDateKey(new Date(Date.now() - 24 * 60 * 60 * 1000));
     await db
       .insert(userGenerationUsage)
       .values({ userId: "u1", date: yesterday, count: 20, neurons: 480 });

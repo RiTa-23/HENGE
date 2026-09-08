@@ -8,6 +8,56 @@ import {
 } from "./model";
 import type { ThemeKind } from "@henge/shared";
 
+/**
+ * Workers AI 側の事情で生成できなかったことを表す。**テーマ名の問題と区別する。**
+ *
+ * どちらも `GENERATION_FAILED`（＝テーマ名を変えて再試行）に落とすと、
+ * 名前を変えても直らない原因に対して打ち直しを促すことになる。
+ */
+export class AiQuotaExceededError extends Error {
+  readonly code = "AI_QUOTA_EXCEEDED" as const;
+}
+
+export class AiUnavailableError extends Error {
+  readonly code = "AI_UNAVAILABLE" as const;
+}
+
+/**
+ * Workers AI のエラーコード（https://developers.cloudflare.com/workers-ai/platform/errors/）。
+ *
+ * **3036 と 3040 はどちらも429だが解消時期が違う。** 前者は翌 00:00 UTC まで
+ * 戻らず、後者は数分で直りうる。案内文が正反対になるので区別する。
+ */
+const AI_ERROR_CODE = {
+  /** 1日の無料枠（10,000ニューロン）を使い切った */
+  DAILY_ALLOCATION_EXCEEDED: 3036,
+  /** Out of Capacity。Cloudflare側の空き不足 */
+  OUT_OF_CAPACITY: 3040,
+} as const;
+
+/**
+ * Workers AI の例外を、こちらのエラーに翻訳する。翻訳できないものは `null`。
+ *
+ * **エラーの形に依存しすぎない。** バインディングが投げる例外の形は明文化されて
+ * いないため、`code` プロパティ（数値・文字列の両方ありうる）と、最後の頼みとして
+ * メッセージ中のコード番号の両方を見る。取りこぼしても従来どおり
+ * `GENERATION_FAILED` に落ちるだけで、壊れはしない。
+ */
+export function classifyAiError(error: unknown): Error | null {
+  const source = error as { code?: unknown; message?: unknown } | null;
+  const code = Number(source?.code);
+  const message = typeof source?.message === "string" ? source.message : "";
+  const has = (target: number) => code === target || message.includes(String(target));
+
+  if (has(AI_ERROR_CODE.DAILY_ALLOCATION_EXCEEDED)) {
+    return new AiQuotaExceededError("Workers AI の日次無料枠を使い切った");
+  }
+  if (has(AI_ERROR_CODE.OUT_OF_CAPACITY)) {
+    return new AiUnavailableError("Workers AI が一時的に空いていない");
+  }
+  return null;
+}
+
 /** AI Gatewayのメタデータは1リクエスト5件まで。値は文字列・数値・真偽値のみ */
 export interface GenerationMetadata {
   themeId: string;
@@ -79,7 +129,8 @@ export async function requestPrompts(
     options: Record<string, unknown>,
   ) => Promise<AiResponse>;
 
-  const response = await run(
+  const response = await runOrTranslate(
+    run,
     input.model,
     {
       messages: [
@@ -147,4 +198,27 @@ export async function recordGenerationResult(
     score: Math.round((result.valid / result.requested) * 100),
     metadata: { counts },
   });
+}
+
+/**
+ * AI呼び出しの例外を、こちらのエラーへ翻訳してから投げ直す。
+ *
+ * **枠切れと一時的な混雑は、生成失敗（＝テーマ名の問題）と混ぜない。**
+ * 翻訳できない例外はそのまま投げる。
+ */
+async function runOrTranslate(
+  run: (
+    model: string,
+    input: { messages: { role: string; content: string }[]; max_tokens: number },
+    options: Record<string, unknown>,
+  ) => Promise<AiResponse>,
+  model: string,
+  body: { messages: { role: string; content: string }[]; max_tokens: number },
+  options: Record<string, unknown>,
+): Promise<AiResponse> {
+  try {
+    return await run(model, body, options);
+  } catch (error) {
+    throw classifyAiError(error) ?? error;
+  }
 }

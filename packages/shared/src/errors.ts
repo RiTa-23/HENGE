@@ -3,6 +3,9 @@
  *
  * `RATE_LIMITED` と `QUOTA_EXCEEDED` はどちらも429だが、前者は数秒、後者は日付が変わるまで
  * 解消しない。案内文が変わるためコードで区別する。
+ *
+ * `QUOTA_EXCEEDED` と `AI_QUOTA_EXCEEDED` も同じ理由で分ける。前者は**その利用者**の
+ * 500ニューロン、後者は**アカウント全体**の無料枠で、後者は他の利用者にも同時に起きる。
  */
 export const ERROR_STATUS = {
   /** Zod検証に失敗 */
@@ -23,6 +26,14 @@ export const ERROR_STATUS = {
   RATE_LIMITED: 429,
   /** 日次の生成上限に到達 */
   QUOTA_EXCEEDED: 429,
+  /**
+   * **アカウント全体の**生成枠（Workers AI の無料枠）を使い切った。
+   * 利用者個人の `QUOTA_EXCEEDED` とは別物で、名前を変えても打ち直しても直らない。
+   * 翌 00:00 UTC まで解消しない。
+   */
+  AI_QUOTA_EXCEEDED: 429,
+  /** Workers AI 側が一時的に混み合っている（Out of Capacity）。数分で直りうる */
+  AI_UNAVAILABLE: 503,
 } as const;
 
 export type ErrorCode = keyof typeof ERROR_STATUS;
@@ -38,6 +49,10 @@ const DEFAULT_MESSAGE: Record<ErrorCode, string> = {
   GENERATION_FAILED: "お題を作れませんでした。テーマ名を変えてお試しください",
   RATE_LIMITED: "続けて実行しすぎです。少し待ってからお試しください",
   QUOTA_EXCEEDED: "本日の生成上限に達しました",
+  // **テーマ名の問題ではないと分かる文言にする。** GENERATION_FAILED と同じ
+  // 「名前を変えて」を出すと、直らない原因に対して打ち直しを促すことになる
+  AI_QUOTA_EXCEEDED: "本日はこれ以上お題を作れません。日本時間の朝9時に枠が戻ります",
+  AI_UNAVAILABLE: "いま混み合っています。少し待ってからお試しください",
 };
 
 export interface ApiErrorBody {

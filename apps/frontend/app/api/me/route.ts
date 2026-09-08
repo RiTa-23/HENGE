@@ -22,7 +22,8 @@ export async function GET(request: Request) {
       image: session.user.image,
     },
     neuronsRemaining: remainingNeurons(neurons),
-    // リセットはJST 0時。クライアントはこの時刻を使って案内文を組み立てる
+    // リセットは 00:00 UTC（＝日本時間の朝9時）。値は +09:00 表記で返すので、
+    // クライアントはそのまま日本時間として見せられる
     quotaResetAt: quotaResetAt(),
   });
 }

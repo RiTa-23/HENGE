@@ -213,6 +213,26 @@ describe("kickRefill の消費記録（実際に使ったニューロンを加�
     expect(await env.KV.get(themeLockKey("t1"))).toBeNull();
   });
 
+  /**
+   * **アカウント枠切れで 'difficult' を立てない。** 「このテーマは生成しにくい」
+   * とは別物で、印を立てると枠が戻った後もこのテーマの補充が止まったままになる。
+   */
+  it("アカウントの枠切れで落ちても、生成困難の印を立てない", async () => {
+    await seed();
+    vi.spyOn(env.AI, "run").mockRejectedValue(
+      Object.assign(new Error("daily free allocation"), { code: 3036 }),
+    );
+    const { waitUntil, flush } = manualWaitUntil();
+
+    const theme = (await getThemeDetail(db, "t1"))!;
+    await kickRefill(env, waitUntil, { db, theme, nextOffset: 15, userId: "u1" });
+    await flush();
+
+    const [row] = await db.select().from(themes).where(eq(themes.id, "t1"));
+    expect(row?.generationStatus).toBe("ok");
+    expect(await env.KV.get(themeLockKey("t1"))).toBeNull();
+  });
+
   it("ロックが取れなければキックせず、消費もしない", async () => {
     await seed();
     await env.KV.put(themeLockKey("t1"), "1", { expirationTtl: 60 });

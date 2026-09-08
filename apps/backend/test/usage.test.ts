@@ -1,4 +1,4 @@
-import { toJstDateString } from "@henge/shared";
+import { usageDateKey } from "@henge/shared";
 import { env, SELF } from "cloudflare:test";
 import { beforeEach, describe, expect, it } from "vitest";
 import { createDb } from "../src/db/client";
@@ -43,7 +43,7 @@ describe("addUsage（UPSERT）", () => {
 
   it("前日の行は更新せず、当日の行を別に作る（JST日付で分離）", async () => {
     await seedUser("u1");
-    const yesterday = toJstDateString(new Date(Date.now() - 24 * 60 * 60 * 1000));
+    const yesterday = usageDateKey(new Date(Date.now() - 24 * 60 * 60 * 1000));
     await db
       .insert(userGenerationUsage)
       .values({ userId: "u1", date: yesterday, count: 20, neurons: 490 });

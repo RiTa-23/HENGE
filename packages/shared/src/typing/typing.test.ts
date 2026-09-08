@@ -178,7 +178,9 @@ describe("打鍵数", () => {
     expect(countKeystrokesFromKana("しゅりけんがやみをさいた。")).toBe(22);
   });
 
-  test("範囲の境界値（10打・40打）", () => {
+  // 上限そのものの判定は validate.test.ts が KEYSTROKE_MAX を使って見る。
+  // ここは「数えられること」だけを見るので、名前に具体値を書かない
+  test("下限ちょうど（10打）まで数えられる", () => {
     expect(countKeystrokesFromKana("あいうえおかきくけこ")).toBe(15);
     expect(countKeystrokesFromKana("あいうえおあいうえお")).toBe(10);
   });

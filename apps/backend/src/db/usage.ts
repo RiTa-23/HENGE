@@ -1,4 +1,4 @@
-import { toJstDateString } from "@henge/shared";
+import { usageDateKey } from "@henge/shared";
 import { and, eq, sql } from "drizzle-orm";
 import type { Db } from "../db/client";
 import { userGenerationUsage } from "../db/schema";
@@ -11,17 +11,17 @@ export interface DailyUsage {
 }
 
 /**
- * 当日（JST基準）の消費。行が無ければ0。
+ * 当日（**00:00 UTC 基準**）の消費。行が無ければ0。
  *
- * 日付は必ず toJstDateString() で作る。素の toISOString() を使うと
- * 上限のリセットが朝9時になる。
+ * 日付は必ず `usageDateKey()` で作る。**JSTに直さない。** Workers AI の
+ * 無料枠が 00:00 UTC にリセットされるので、窓を揃える（`packages/shared`）。
  */
 export async function getUsage(db: Db, userId: string): Promise<DailyUsage> {
   const rows = await db
     .select({ count: userGenerationUsage.count, neurons: userGenerationUsage.neurons })
     .from(userGenerationUsage)
     .where(
-      and(eq(userGenerationUsage.userId, userId), eq(userGenerationUsage.date, toJstDateString())),
+      and(eq(userGenerationUsage.userId, userId), eq(userGenerationUsage.date, usageDateKey())),
     );
   return { count: rows[0]?.count ?? 0, neurons: rows[0]?.neurons ?? 0 };
 }
@@ -36,7 +36,7 @@ export async function getUsage(db: Db, userId: string): Promise<DailyUsage> {
 export async function addUsage(db: Db, userId: string, neurons: number): Promise<void> {
   await db
     .insert(userGenerationUsage)
-    .values({ userId, date: toJstDateString(), count: 1, neurons })
+    .values({ userId, date: usageDateKey(), count: 1, neurons })
     .onConflictDoUpdate({
       target: [userGenerationUsage.userId, userGenerationUsage.date],
       set: {

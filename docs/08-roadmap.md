@@ -45,7 +45,7 @@
 
 - Better Auth + Googleプロバイダ（**Next.js Worker側のみ**）
 - Honoを外部非公開にし、`userId`をService Bindings経由で渡す
-- クォータ判定（50回/日、JST基準）
+- クォータ判定（500ニューロン/日、00:00 UTC 基準）
 - Rate Limiting binding
 
 ## Phase 6: フロントエンド実装

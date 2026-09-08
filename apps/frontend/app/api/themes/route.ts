@@ -58,7 +58,7 @@ export async function POST(request: Request) {
   if (!canGenerate(neurons)) {
     return errorResponse(
       "QUOTA_EXCEEDED",
-      `本日の生成量を使い切りました。日本時間の翌0時（${quotaResetAt()}）にリセットされます`,
+      `本日の生成量を使い切りました。日本時間の朝9時（${quotaResetAt()}）にリセットされます`,
     );
   }
 

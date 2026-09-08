@@ -53,7 +53,7 @@ bun run db:migrate:local         # ローカルD1に適用
 ```
 apps/frontend/   Next.js Worker。画面・Route Handler・認証
 apps/backend/    Hono Worker。D1/KV/Workers AIへのアクセス
-packages/shared/ 型定義、ローマ字入力エンジン、正規化関数、JST日付関数
+packages/shared/ 型定義、ローマ字入力エンジン、正規化関数、日次消費の窓（UTC）
 docs/            実装ドキュメント
 ```
 
@@ -64,7 +64,7 @@ docs/            実装ドキュメント
 
 1. **認証は Next.js Worker 側にのみ置く。** Hono側にBetter Authを実装しない。**Honoに公開ルートを生やさない**（外部非公開であることが、Next.jsで認証を完結させる前提になっている）
 2. **Service Bindings は HTTP方式**（`env.BACKEND.fetch`）。`WorkerEntrypoint`によるRPC方式に変えない。Hono RPCとSmart Placementの両方を失う
-3. **日付は必ず `packages/shared` のJST変換関数を経由する。** `new Date().toISOString()` を直接使うと、上限のリセットが朝9時になる
+3. **日次消費の日付は必ず `packages/shared` の `usageDateKey()` を経由する（00:00 UTC 基準）。** JSTに直さない。Workers AI の無料枠が 00:00 UTC にリセットされるため、窓をずらすと1アカウント日の中に利用者のリセットが挟まり、**1人が上限の2倍まで消費できてしまう**。利用者への表示だけ日本時間にする（`quotaResetAt()` が朝9時として返す）
 4. **生成は最大2ラウンド × 20件。** `2 × N_request ≤ 50`（Workers無料プランの外部サブリクエスト上限）を破らない。3ラウンド目で静かに失敗する
 5. **テーマ行はお題15問と同じバッチで挿入する。** 先に作ると、生成失敗時にお題ゼロのテーマが公開一覧に残る
 6. **テーマ削除時はKVも明示的に消す。** D1のCASCADEはD1の中でしか効かない

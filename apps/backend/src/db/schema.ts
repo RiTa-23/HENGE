@@ -100,7 +100,7 @@ export const userThemeProgress = sqliteTable(
 );
 
 /**
- * 生成の日次消費。日付は必ずJST基準（packages/shared の todayJst）。
+ * 生成の日次消費。日付は必ず `usageDateKey()`（**00:00 UTC 基準**）で作る。
  *
  * **上限の判定に使うのは `neurons` の方。** `count` は「何回試したか」で、
  * 1回あたりの重さ（消費 ÷ 回数）を見るときの分母として残している。
@@ -111,7 +111,7 @@ export const userGenerationUsage = sqliteTable(
     userId: text("user_id")
       .notNull()
       .references(() => user.id, { onDelete: "cascade" }),
-    /** YYYY-MM-DD。JST基準 */
+    /** YYYY-MM-DD。**00:00 UTC 基準**（Workers AI の無料枠と窓を揃える） */
     date: text("date").notNull(),
     count: integer("count").notNull().default(0),
     /**

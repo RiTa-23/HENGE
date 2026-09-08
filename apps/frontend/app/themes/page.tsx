@@ -2,10 +2,10 @@ import type { Metadata } from "next";
 import { ModeTabs } from "@/components/ModeTabs";
 import { SiteHeader } from "@/components/SiteHeader";
 import { ThemeCard } from "@/components/ThemeCard";
-import { ogFields } from "@/lib/og";
+import { ogFields, pageTitle } from "@/lib/og";
 import { listThemes } from "@/lib/api/themes";
 
-const TITLE = "お題一覧 | HENGE";
+const TITLE = pageTitle("お題一覧");
 const DESCRIPTION = "日本語タイピング練習のお題テーマ一覧。人気順・新着順で選べます。";
 
 export const metadata: Metadata = {

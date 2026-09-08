@@ -1,3 +1,5 @@
+import { HeroLogo } from "@/components/HeroLogo";
+import { PracticeMark, ThemeMark } from "@/components/ModeMark";
 import { SiteHeader } from "@/components/SiteHeader";
 import { ThemeCard } from "@/components/ThemeCard";
 import { listThemes } from "@/lib/api/themes";
@@ -8,6 +10,10 @@ export const dynamic = "force-dynamic";
  * トップ。**人気テーマから直接プレイへ入れる導線を置く**（テーマ詳細を
  * 経由させない）。詳細は検索エンジンからの着地ページであって、
  * 回遊の途中に挟むものではない。
+ *
+ * 第一画面は**ロゴ → キャッチコピー → 2つのモードの選択**の順。何のサイトかを
+ * 1画面で伝え、次に「どちらから入るか」だけを選ばせる。タイトル（HENGE）は
+ * 見出しではなくブランドの表明なので `h1` はキャッチコピー側に置く。
  */
 export default async function HomePage() {
   const popular = await listThemes({ kind: "theme", sort: "popular", limit: 6 });
@@ -15,33 +21,55 @@ export default async function HomePage() {
   return (
     <>
       <SiteHeader />
-      <main className="mx-auto w-full max-w-5xl px-6 py-20">
-        <h1 className="font-mincho text-4xl leading-relaxed tracking-wide text-kinari">
-          お題が毎回変わる、
-          <br />
-          日本語タイピングの修行場
-        </h1>
-        <p className="mt-6 max-w-xl leading-loose text-kinari/70">
-          同じ文章を繰り返さないので「慣れ」が起きません。15問ひと組で打ちます。
-          ログインしなくても遊べます。
-        </p>
+      <main className="mx-auto w-full max-w-5xl px-6 pb-20 pt-16">
+        <section className="text-center">
+          <HeroLogo />
+          <h1 className="mx-auto mt-10 max-w-2xl font-mincho text-4xl leading-relaxed tracking-wide text-kinari">
+            お題が毎回生まれる、
+            <br />
+            日本語タイピングの修行場
+          </h1>
+          {/* リード文は説明より一撃で伝えたいので、本文より大きい明朝で独立させる。
+              h1 に何のサイトか（インデックス対象のため）を任せ、ここに差分の芯を置く */}
+          <p className="mx-auto mt-8 font-mincho text-xl tracking-wide text-kinari">
+            まだ存在しない文章を、打つ。
+          </p>
+          <p className="mx-auto mt-4 max-w-xl leading-loose text-kinari/70">
+            {/* 文の区切りで改行する。自動折返しに任せると「回っ／てこない」のように
+                句の途中で切れる。br はデスクトップだけ効かせ、モバイルは自然な流れに戻す */}
+            テーマから、AIがお題をその場でつくります。
+            <br className="hidden sm:inline" />
+            打ったお題は二度と回ってこないので、
+            <br className="hidden sm:inline" />
+            暗記ではなくその場で打つ力が鍛えられます。
+            <br className="hidden sm:inline" />
+            ログインしなくても遊べます。
+          </p>
+        </section>
 
-        {/* 2つのモードは排他。トップで並べて、どちらから入るかだけ選ばせる */}
-        <div className="mt-12 grid gap-4 sm:grid-cols-2">
+        {/* 2つのモードは排他。トップで並べて、どちらから入るかだけ選ばせる。
+            紋（ModeMark）はモチーフの流用ではなく新しい線画（docs/07-ui.md） */}
+        <div className="mt-14 grid gap-4 sm:grid-cols-2">
           <a
             href="/themes"
-            className="rounded-md border border-kinari/15 bg-kinari/5 px-8 py-7 transition-colors hover:border-shu/60"
+            className="group rounded-md border border-kinari/15 bg-kinari/5 px-8 py-7 transition-colors hover:border-shu/60"
           >
-            <span className="font-mincho text-xl tracking-wide text-kinari">テーマで打つ</span>
+            <ThemeMark className="h-12 w-12 text-kinari/40 transition-colors group-hover:text-kinari" />
+            <span className="mt-4 block font-mincho text-xl tracking-wide text-kinari">
+              テーマで打つ
+            </span>
             <span className="mt-3 block text-sm leading-relaxed text-kinari/60">
               好きな題材の文章で練習する。無ければその場で作れます。
             </span>
           </a>
           <a
             href="/practice"
-            className="rounded-md border border-kinari/15 bg-kinari/5 px-8 py-7 transition-colors hover:border-shu/60"
+            className="group rounded-md border border-kinari/15 bg-kinari/5 px-8 py-7 transition-colors hover:border-shu/60"
           >
-            <span className="font-mincho text-xl tracking-wide text-kinari">最適化練習</span>
+            <PracticeMark className="h-12 w-12 text-kinari/40 transition-colors group-hover:text-kinari" />
+            <span className="mt-4 block font-mincho text-xl tracking-wide text-kinari">
+              最適化練習
+            </span>
             <span className="mt-3 block text-sm leading-relaxed text-kinari/60">
               指定した連接を必ず含む文章だけを出す。崩した運指を毎回違う文脈で固める。
             </span>

@@ -6,7 +6,8 @@ import { ThemeCard } from "@/components/ThemeCard";
 import { ogFields, pageTitle } from "@/lib/og";
 import { listThemes } from "@/lib/api/themes";
 
-const TOP_TITLE = pageTitle("お題が毎回変わる、日本語タイピングの修行場");
+/** **`h1` のキャッチコピーと同じ文言にする**（docs/09-share.md）。片方だけ直すとずれる */
+const TOP_TITLE = pageTitle("お題が毎回生まれる、日本語タイピングの修行場");
 const TOP_DESCRIPTION = "お題が毎回変わる日本語タイピング練習ツール";
 
 /** インデックス対象。シェアされたときのカードにもこのタイトルを使う */

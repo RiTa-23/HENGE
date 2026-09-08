@@ -103,6 +103,7 @@ export function Result({
             className="rounded-md border border-shu bg-shu/15 px-8 py-3 font-gothic tracking-widest text-kinari transition-colors hover:bg-shu/25"
           >
             もう一度
+            <span className="ml-2 font-mono text-sm text-kinari/50">R</span>
           </button>
           <a
             href={buildTweetIntentUrl({

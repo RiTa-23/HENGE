@@ -222,6 +222,28 @@ export function PlayScreen({
   }, [phase.name]);
 
   /**
+   * 結果の `R` で「もう一度」。開始が Space、中断が Esc で済むのに、
+   * **再挑戦のためだけにマウスへ手を戻す**のは、続けて打ちたいときに手が止まる。
+   *
+   * 開始前のスペースと同じく**窓側で拾う**。結果画面には投稿・一覧・トップへの
+   * リンクが並ぶので、打鍵を拾う要素にフォーカスを固定すると、そこへキーボードで
+   * 到達できなくなる。
+   */
+  useEffect(() => {
+    if (phase.name !== "result") return;
+    const onKey = (event: KeyboardEvent) => {
+      // **修飾キーとの同時押しは拾わない。** `Cmd+R` / `Ctrl+R` のリロードを奪う
+      if (event.ctrlKey || event.metaKey || event.altKey) return;
+      // key と code の両方を見る。配列やIMEの状態によって key が空になることがある
+      if (event.key.toLowerCase() !== "r" && event.code !== "KeyR") return;
+      event.preventDefault();
+      setAttempt((count) => count + 1);
+    };
+    globalThis.addEventListener("keydown", onKey);
+    return () => globalThis.removeEventListener("keydown", onKey);
+  }, [phase.name]);
+
+  /**
    * 枯渇からの復帰。**ログインユーザーだけが使える**（クォータを1消費する）。
    * 匿名は別テーマかログインへ誘導する（docs/04-api.md）。
    *

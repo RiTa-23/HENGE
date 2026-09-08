@@ -48,7 +48,7 @@ HENGEで「忍びの心得」を打った。
 | `og:description` | 既存の description を流用する |
 | `og:type` | `website` |
 
-`metadataBase` は `BETTER_AUTH_URL` を基準にする。これはBetter AuthのbaseURLだが、本番ではデプロイURL（Google OAuthのコールバックに登録する公開URL）と同一のため、サイトの基準URLとしてそのまま使える。レイアウトで1回定義すれば全ページに継承される。**openGraph / twitter は浅くマージされるため、独自に定義するページは `lib/og.ts` の `ogFields()` でそろえて書く。**
+`metadataBase` は `BETTER_AUTH_URL` を基準にする（**ドメインを変えるときの手順は `docs/02-architecture.md`**。ここを更新しないと、共有リンクとOG画像だけが旧ドメインを指したままになる）。これはBetter AuthのbaseURLだが、本番ではデプロイURL（Google OAuthのコールバックに登録する公開URL）と同一のため、サイトの基準URLとしてそのまま使える。レイアウトで1回定義すれば全ページに継承される。**openGraph / twitter は浅くマージされるため、独自に定義するページは `lib/og.ts` の `ogFields()` でそろえて書く。**
 
 対象ページ:
 

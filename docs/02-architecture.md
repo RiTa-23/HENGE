@@ -102,11 +102,34 @@ packages/
 |---|---|---|
 | `GOOGLE_CLIENT_ID` / `GOOGLE_CLIENT_SECRET` | Google OAuth。Google Cloud Console で作り、リダイレクトURIに `BETTER_AUTH_URL/api/auth/callback/google` を登録する | Wranglerのシークレット（Next.js側） |
 | `BETTER_AUTH_SECRET` | セッション署名。`openssl rand -base64 32` 等で作る | 同上 |
-| `BETTER_AUTH_URL` | Better Auth の baseURL。ローカルは `http://localhost:3000`、本番はデプロイURL | 同上（URLそのものは公開情報だが、環境ごとに値が変わるため vars ではなくシークレットとして管理する） |
+| `BETTER_AUTH_URL` | Better Auth の baseURL。ローカルは `http://localhost:3000`、本番は**公開ドメイン**。**認証だけでなく、シェアURLとOGPの基準URLもここから引く**（`lib/og.ts` の `siteUrl()`） | 同上（URLそのものは公開情報だが、環境ごとに値が変わるため vars ではなくシークレットとして管理する） |
 | `YAHOO_APP_ID` | ルビ振りAPI | 同上（Hono側） |
 | `ADMIN_EMAILS` | 管理者判定（カンマ区切り） | 同上（Next.js側） |
 
 ローカル開発では `.dev.vars` を使う。テンプレートは `apps/frontend/.dev.vars.example` / `apps/backend/.dev.vars.example`。**リポジトリにコミットしない。**
+
+### 公開ドメインを変えるときの手順
+
+**`BETTER_AUTH_URL` は認証の baseURL であると同時に、サイトの基準URLでもある**（`lib/og.ts` の `siteUrl()`）。ここから次の3つが決まる。
+
+- Google OAuth のコールバック先
+- X投稿で共有されるURL（`docs/09-share.md`）
+- OGPの `metadataBase`（`og:image` の絶対URL）
+
+**1つの値で3つが動くので、順序を守らないとログインが壊れる。**
+
+1. **先に** Google Cloud Console へ新しいリダイレクトURI（`https://<新ドメイン>/api/auth/callback/google`）を追加する。旧URIはまだ消さない
+2. `BETTER_AUTH_URL` を新ドメインに更新する（`bunx wrangler secret put BETTER_AUTH_URL`。シークレットは即時反映で、再デプロイは不要）
+3. 反映を確認する。**`og:image` のホスト名が新ドメインになっていれば通っている**
+
+```bash
+curl -s https://<新ドメイン>/ | grep -o 'og:image" content="[^"]*"'
+```
+
+4. 旧ドメインを残すか決める。残すと**同じ内容が2つのホスト名で配信され**、検索エンジンから重複コンテンツとして扱われる。止めるなら `apps/frontend/wrangler.jsonc` に `"workers_dev": false` を足して再デプロイする（Hono Worker は既にそうしている）
+5. 落ち着いたら Google Console から旧リダイレクトURIを消す
+
+**2を先にやるとログインが `redirect_uri_mismatch` で壊れる。** 新しいコールバック先が Google に登録されていない状態で認証が始まるため。
 
 ### ローカルのD1は両Workerで共有する
 

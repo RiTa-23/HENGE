@@ -18,10 +18,9 @@ export function themeLockKey(themeId: string): string {
 }
 
 /**
- * 生成ロックのTTL（秒）。
+ * 生成ロックのTTL。**値は `packages/shared` に置く。**
  *
- * KVの下限が60秒。生成は最大2ラウンド（AI呼び出し2回＋読み取得40回）走るため、
- * 下限ぎりぎりだと処理中にロックが切れて二重に起動しうる。余裕を見て120秒にする。
- * 処理がクラッシュしてもTTLで自動的に復旧するため、古いロックを掃除する仕組みは要らない。
+ * クライアントの待ち上限（`GENERATION_WAIT_LIMIT_MS`）より短いことが前提の値で、
+ * 両Workerから見える場所に置かないと、片方だけ動かしたときに静かに壊れる。
  */
-export const THEME_LOCK_TTL_SECONDS = 120;
+export { THEME_LOCK_TTL_SECONDS } from "@henge/shared";

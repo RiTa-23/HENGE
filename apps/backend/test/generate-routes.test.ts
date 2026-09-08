@@ -159,6 +159,63 @@ describe("POST /themes", () => {
   });
 });
 
+describe("Workers AI 側の事情は、テーマ名の問題と区別して返す", () => {
+  /** アカウント全体の枠切れ。**名前を変えても打ち直しても直らない** */
+  it("枠切れ(3036)なら AI_QUOTA_EXCEEDED を返し、テーマを作らない", async () => {
+    await seedUser("u1");
+    vi.spyOn(env.AI, "run").mockRejectedValue(
+      Object.assign(new Error("daily free allocation"), { code: 3036 }),
+    );
+
+    const { status, body } = await post("/themes", {
+      kind: "theme",
+      name: "忍びの心得",
+      userId: "u1",
+    });
+
+    expect(status).toBe(429);
+    expect((body.error as { code: string }).code).toBe("AI_QUOTA_EXCEEDED");
+    expect(await db.select().from(themes)).toHaveLength(0);
+    // 応答が返っていないので消費もしていない
+    expect(await getUsage(db, "u1")).toEqual({ count: 0, neurons: 0 });
+  });
+
+  it("一時的な混雑(3040)なら AI_UNAVAILABLE を返す", async () => {
+    await seedUser("u1");
+    vi.spyOn(env.AI, "run").mockRejectedValue(
+      Object.assign(new Error("out of capacity"), { code: 3040 }),
+    );
+
+    const { status, body } = await post("/themes", {
+      kind: "theme",
+      name: "忍びの心得",
+      userId: "u1",
+    });
+
+    expect(status).toBe(503);
+    expect((body.error as { code: string }).code).toBe("AI_UNAVAILABLE");
+  });
+
+  it("再生成でも同じコードを返し、ロックは解放する", async () => {
+    await seedUser("u1");
+    await db.insert(themes).values({
+      id: "t1",
+      kind: "theme",
+      name: "忍びの心得",
+      normalizedName: "忍びの心得",
+    });
+    vi.spyOn(env.AI, "run").mockRejectedValue(
+      Object.assign(new Error("daily free allocation"), { code: 3036 }),
+    );
+
+    const { status, body } = await post("/prompts/regenerate", { themeId: "t1", userId: "u1" });
+
+    expect(status).toBe(429);
+    expect((body.error as { code: string }).code).toBe("AI_QUOTA_EXCEEDED");
+    expect(await env.KV.get(themeLockKey("t1"))).toBeNull();
+  });
+});
+
 describe("同期生成の消費記録（成否によらず実消費を加算する）", () => {
   it("POST /themes で生成に成功したら、その回の消費を加算する", async () => {
     await seedUser("u1");

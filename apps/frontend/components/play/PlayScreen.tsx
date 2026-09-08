@@ -379,6 +379,11 @@ export function PlayScreen({
     // 枯渇はログインしていれば作り足して続けられる。匿名は別テーマかログインへ
     const exhausted = phase.code === "THEME_EXHAUSTED";
     const canRegenerate = exhausted && authSession !== null;
+    /**
+     * **押しても直らないものに「もう一度」を出さない。** アカウント全体の枠切れは
+     * 翌 00:00 UTC まで戻らないので、押させると同じ画面に戻るだけになる。
+     */
+    const retryable = !exhausted && phase.code !== "AI_QUOTA_EXCEEDED";
 
     return (
       <div className="flex min-h-dvh items-center justify-center p-6">
@@ -425,7 +430,7 @@ export function PlayScreen({
                 Googleでログイン
               </button>
             )}
-            {!exhausted && (
+            {retryable && (
               <button
                 type="button"
                 onClick={start}

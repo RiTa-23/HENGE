@@ -40,6 +40,8 @@ export async function POST(request: Request) {
     },
   });
   const body = await res.json();
-  if (!res.ok) return Response.json(body, { status: res.status });
-  return Response.json({ ...body, neuronsRemaining: remainingNeurons(neurons) });
+  // **エラーでも残数を載せる。** 枯渇（THEME_EXHAUSTED）の画面から
+  // 「お題を作り足す」に進めるため、そこに残ニューロンを出す必要がある
+  const withRemaining = { ...body, neuronsRemaining: remainingNeurons(neurons) };
+  return Response.json(withRemaining, res.ok ? undefined : { status: res.status });
 }

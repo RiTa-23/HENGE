@@ -10,6 +10,8 @@ interface CreatedTheme {
   theme: { name: string };
   /** false なら既存テーマの再利用（生成は走っていない） */
   created: boolean;
+  /** 本日の残ニューロン */
+  neuronsRemaining?: number;
 }
 
 /**
@@ -63,7 +65,11 @@ export function CreateThemeForm({
   const [name, setName] = useState(initialName);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [created, setCreated] = useState<{ name: string; created: boolean } | null>(null);
+  const [created, setCreated] = useState<{
+    name: string;
+    created: boolean;
+    neuronsRemaining?: number;
+  } | null>(null);
 
   /**
    * ブラウザバックで戻ってきたときに、生成中でもないのに手裏剣が回り続けるのを防ぐ。
@@ -120,8 +126,8 @@ export function CreateThemeForm({
     // **既存と一致した場合もエラーにしない。** ただし**そのまま始めない。**
     // 作った直後に遊びたいとは限らず、続けて別のお題を作りたいこともある。
     // 勝手に始めると、その時点でお題を1組消費してしまう
-    const { theme, created: isNew } = body as CreatedTheme;
-    setCreated({ name: theme.name, created: isNew });
+    const { theme, created: isNew, neuronsRemaining } = body as CreatedTheme;
+    setCreated({ name: theme.name, created: isNew, neuronsRemaining });
     setBusy(false);
   };
 
@@ -147,7 +153,17 @@ export function CreateThemeForm({
         <h2 className="mt-3 font-mincho text-2xl tracking-wide text-kinari">{created.name}</h2>
         {!created.created && (
           <p className="mt-4 text-sm text-kinari/50">
-            作り直していないので、生成回数は消費していません。
+            作り直していないので、ニューロンは消費していません。
+          </p>
+        )}
+        {created.neuronsRemaining !== undefined && (
+          <p className="mt-4 text-sm text-kinari/50">
+            本日の残りは
+            {/* 小数のまま出しても読めないので切り捨てる。多く見せない側に倒す */}
+            <span className="mx-1 font-mono text-kinari/80">
+              {Math.floor(created.neuronsRemaining)}
+            </span>
+            ニューロンです。
           </p>
         )}
 

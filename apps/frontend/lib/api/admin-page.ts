@@ -1,4 +1,5 @@
 import { notFound } from "next/navigation";
+import { betaLimitation } from "@/lib/beta/beta";
 import { forbidNonAdmin } from "@/lib/api/admin";
 
 /**
@@ -12,4 +13,13 @@ export async function requireAdminPage(): Promise<void> {
   const { headers } = await import("next/headers");
   const denied = await forbidNonAdmin(new Request("http://admin", { headers: await headers() }));
   if (denied !== null) notFound();
+}
+
+/**
+ * ページ（SSR）用のベータ判定。Route Handler と同じ betaLimitation を
+ * リクエストヘッダー経由で呼ぶ。**ページ用の判定を別に書かない**（ずれるため）。
+ */
+export async function betaLimitedPage(): Promise<boolean> {
+  const { headers } = await import("next/headers");
+  return betaLimitation(new Request("http://page", { headers: await headers() }));
 }

@@ -4,6 +4,7 @@ import { errorResponse } from "@/lib/api/error";
 import { limitGeneration } from "@/lib/api/rate-limit";
 import { themeListQuerySchema, themeNameSchema } from "@/lib/api/schema";
 import { currentUserId } from "@/lib/api/session";
+import { betaLimitation } from "@/lib/beta/beta";
 
 export const dynamic = "force-dynamic";
 
@@ -30,6 +31,14 @@ export async function GET(request: Request) {
 export async function POST(request: Request) {
   const userId = await currentUserId(request);
   if (userId === null) return errorResponse("UNAUTHORIZED");
+
+  // **ベータ版では新しいお題の生成を弾く。** ベータ版利用者は既存プールのプレイと
+  // 補充生成だけができるため、/api/prompts/regenerate と /api/sessions/start は通す。
+  // 運営アカウントは制限しない（lib/beta/beta.ts）。判定はレート制限やクォータの
+  // 照会より前に置く（認可の決まり。docs/04-api.md）
+  if (await betaLimitation(request)) {
+    return errorResponse("FORBIDDEN", "お題の生成は調整中です。既にあるお題は引き続き遊べます");
+  }
 
   // 連打はここで弾く。クォータの取得（D1アクセス）より先に判定する
   const limited = await limitGeneration(userId);

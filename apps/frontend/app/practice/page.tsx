@@ -1,20 +1,30 @@
 import type { Metadata } from "next";
+import { AdjustingView } from "@/components/Adjusting";
 import { CreateThemeForm } from "@/components/CreateThemeForm";
 import { ModeTabs } from "@/components/ModeTabs";
 import { SiteHeader } from "@/components/SiteHeader";
 import { ThemeCard } from "@/components/ThemeCard";
+import { betaLimitedPage } from "@/lib/api/admin-page";
 import { PRESETS, presetCreateHref } from "@/lib/practice/presets";
 import { listThemes } from "@/lib/api/themes";
+import { adjustingMetadata } from "@/lib/beta/beta";
 import { normalizeName } from "@henge/shared";
 import { playHref } from "@/lib/ui/kind";
 
-export const metadata: Metadata = {
-  title: "タイピング最適化練習 | HENGE",
-  description:
-    "指定した連接を必ず含む文章だけで練習できます。毎回違う文章が出るので、最適化した運指が特定の文章に紐づかず、実戦で出せるようになります。",
-};
-
 export const dynamic = "force-dynamic";
+
+/**
+ * **ベータ版では調整中**（まだアラが目立つため公開しない）。運営アカウントは
+ * 何も変わらず使える。検索エンジンには調整中の画面を見せないため noindex を返す。
+ */
+export async function generateMetadata(): Promise<Metadata> {
+  if (await betaLimitedPage()) return adjustingMetadata();
+  return {
+    title: "タイピング最適化練習 | HENGE",
+    description:
+      "指定した連接を必ず含む文章だけで練習できます。毎回違う文章が出るので、最適化した運指が特定の文章に紐づかず、実戦で出せるようになります。",
+  };
+}
 
 /**
  * 最適化練習の一覧。テーマ一覧と**対称の構造**にする。
@@ -27,6 +37,10 @@ export default async function PracticePage({
 }: {
   searchParams: Promise<{ char?: string }>;
 }) {
+  // **ベータ版では運営アカウント以外に調整中の画面を出す。** 一覧の取得や
+  // 作成フォームを出さない（生成の入口ごと閉じる）
+  if (await betaLimitedPage()) return <AdjustingView what="最適化練習" />;
+
   const { char } = await searchParams;
   const generated = await listThemes({ kind: "constraint", sort: "popular", limit: 50 });
 

@@ -8,7 +8,7 @@ import { listThemes } from "@/lib/api/themes";
 
 /** **`h1` のキャッチコピーと同じ文言にする**（docs/09-share.md）。片方だけ直すとずれる */
 const TOP_TITLE = pageTitle("お題が毎回生まれる、日本語タイピングの修行場");
-const TOP_DESCRIPTION = "お題が毎回変わる日本語タイピング練習ツール";
+const TOP_DESCRIPTION = "お題が毎回生まれる日本語タイピング練習ツール";
 
 /** インデックス対象。シェアされたときのカードにもこのタイトルを使う */
 export const metadata: Metadata = {

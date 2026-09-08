@@ -21,7 +21,7 @@ const jetBrainsMono = JetBrains_Mono({
  * ogFields でそろえて書く。
  */
 export async function generateMetadata(): Promise<Metadata> {
-  const description = "お題が毎回変わる日本語タイピング練習ツール";
+  const description = "お題が毎回生まれる日本語タイピング練習ツール";
   return {
     title: "HENGE",
     description,

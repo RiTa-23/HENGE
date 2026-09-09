@@ -12,6 +12,10 @@ import { join } from "node:path";
  *
  * 16進数値の定義そのものは globals.css の @theme にしか無いので、
  * そのファイルだけ検査から外す。
+ *
+ * **コメント中の issue 参照（`#121` など）もここに引っかかる。** 3桁の16進は
+ * CSSの色として妥当なので、色なのか番号なのかは検査側からは区別できない。
+ * 検査対象のファイルでは `Issue 121` のように `#` を付けずに書くこと。
  */
 
 const ROOTS = [join(import.meta.dir, "../../app"), join(import.meta.dir, "../../components")];

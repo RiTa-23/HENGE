@@ -22,26 +22,31 @@
       .inner {
         text-align: center;
       }
+      /**
+       * アプリアイコン。**app/icon.png をそのまま参照する。**ここに絵を焼き直すと、
+       * アイコンを差し替えたときにOG画像だけ古いまま残る。
+       */
+      .icon {
+        display: block;
+        width: 240px;
+        height: 240px;
+        margin: 0 auto 16px;
+      }
       .logo {
         font-family: "Shippori Mincho", serif;
         font-weight: 700;
-        font-size: 170px;
+        font-size: 150px;
         line-height: 1;
         letter-spacing: 0.18em;
         margin-left: 0.18em; /* 字間で末尾に出た余白の分を戻す */
         color: #ece2cf;
       }
-      .underline {
-        display: block;
-        width: 560px;
-        height: 34px;
-        margin: 12px auto 0;
-      }
+      /* 朱の一筆は入れない。朱はアイコンの弧が担う（docs/07-ui.md） */
       .tagline {
-        margin-top: 56px;
+        margin-top: 44px;
         font-family: "Zen Kaku Gothic New", sans-serif;
         font-weight: 500;
-        font-size: 34px;
+        font-size: 32px;
         letter-spacing: 0.2em;
         color: rgba(236, 226, 207, 0.75);
       }
@@ -49,14 +54,8 @@
   </head>
   <body>
     <div class="inner">
+      <img class="icon" src="../apps/frontend/app/icon.png" alt="" />
       <div class="logo">HENGE</div>
-      <!-- 筆の下線。Logo / HeroLogo と同じ一筆 -->
-      <svg class="underline" viewBox="0 0 120 8" preserveAspectRatio="none" aria-hidden="true">
-        <path
-          d="M2 5 C 24 1.5, 60 1, 92 3 C 104 3.8, 112 4.6, 118 5.6 C 110 5.2, 96 5, 80 5.2 C 52 5.6, 22 6.4, 2 5 Z"
-          fill="#d24a25"
-        />
-      </svg>
       <div class="tagline">お題が毎回生まれる、日本語タイピングの修行場</div>
     </div>
   </body>

@@ -1,4 +1,5 @@
 #!/usr/bin/env bun
+import { unlink } from "node:fs/promises";
 import { KEYSTROKE_MAX, KEYSTROKE_MIN } from "@henge/shared";
 import { planRebuild, type StoredPrompt, updateStatement } from "./rebuild-roman-plan";
 
@@ -29,16 +30,27 @@ const WRITE_CHUNK = 500;
  * 保守用のスクリプトでサービスを止めないための歯止め。
  */
 const CONFIRM_THRESHOLD = 5000;
+/** 画面に並べる行数の上限。**全件出すと端末が埋まって、肝心の要約が流れる** */
+const LIST_LIMIT = 40;
 
 type Options = { remote: boolean; apply: boolean; force: boolean; limit: number };
 
 function parseArgs(argv: readonly string[]): Options {
   const limitArg = argv.find((a) => a.startsWith("--limit="));
+  let limit = Number.POSITIVE_INFINITY;
+  if (limitArg !== undefined) {
+    limit = Number(limitArg.slice(8));
+    // 検証しないと NaN がそのまま SQL の LIMIT に入り、D1の構文エラーになって
+    // 「なぜ落ちたか」が分からない
+    if (!Number.isInteger(limit) || limit <= 0) {
+      throw new Error(`--limit= には1以上の整数を渡す（受け取った値: ${limitArg.slice(8)}）`);
+    }
+  }
   return {
     remote: argv.includes("--remote"),
     apply: argv.includes("--apply"),
     force: argv.includes("--force"),
-    limit: limitArg === undefined ? Number.POSITIVE_INFINITY : Number(limitArg.slice(8)),
+    limit,
   };
 }
 
@@ -48,7 +60,9 @@ async function d1(remote: boolean, args: readonly string[]): Promise<unknown> {
   // 使われ、dev や db:migrate:local が見ているDB（リポジトリ直下）と別物になる
   const target = remote ? ["--remote"] : ["--local", "--persist-to", "../../.wrangler/state"];
   const proc = Bun.spawn(["bunx", "wrangler", "d1", "execute", "henge-db", ...target, ...args], {
-    cwd: new URL("..", import.meta.url).pathname,
+    // **URL の pathname を使わない。** パーセントエンコードされるので、パスに
+    // 空白や日本語が混ざると別の場所で wrangler が動く
+    cwd: `${import.meta.dir}/..`,
     stdout: "pipe",
     stderr: "pipe",
   });
@@ -112,7 +126,7 @@ async function main() {
 
   console.log(`\n見た行: ${plan.scanned}  一致: ${plan.unchanged}  要更新: ${plan.changed.length}`);
 
-  for (const row of plan.changed.slice(0, 40)) {
+  for (const row of plan.changed.slice(0, LIST_LIMIT)) {
     const before = JSON.parse(
       rows.find((r) => r.id === row.id)?.readingRomanJson ?? "[]",
     ) as string[][];
@@ -124,7 +138,9 @@ async function main() {
         (row.outOfRange ? `  ← ${KEYSTROKE_MIN}〜${KEYSTROKE_MAX}打の範囲外` : ""),
     );
   }
-  if (plan.changed.length > 40) console.log(`  …ほか ${plan.changed.length - 40} 件`);
+  if (plan.changed.length > LIST_LIMIT) {
+    console.log(`  …ほか ${plan.changed.length - LIST_LIMIT} 件`);
+  }
 
   const outOfRange = plan.changed.filter((r) => r.outOfRange);
   if (outOfRange.length > 0) {
@@ -132,8 +148,12 @@ async function main() {
       `\n打鍵数が範囲外になる行が ${outOfRange.length} 件ある。` +
         `**値は書き換えるが、消しはしない。**残すか消すかは人が決める:`,
     );
-    for (const row of outOfRange)
+    for (const row of outOfRange.slice(0, LIST_LIMIT)) {
       console.log(`  ${row.id}  ${row.readingKana}  ${row.keystrokeCount}打`);
+    }
+    if (outOfRange.length > LIST_LIMIT) {
+      console.log(`  …ほか ${outOfRange.length - LIST_LIMIT} 件`);
+    }
   }
 
   if (plan.unsupported.length > 0) {
@@ -141,8 +161,11 @@ async function main() {
       `\nテーブルに無いかなを含む行が ${plan.unsupported.length} 件ある。` +
         `**書き換えない。**打てないお題なので、消すかどうかは人が決める:`,
     );
-    for (const row of plan.unsupported) {
+    for (const row of plan.unsupported.slice(0, LIST_LIMIT)) {
       console.log(`  ${row.id}  ${row.readingKana}  ← 「${row.missingKana}」がテーブルに無い`);
+    }
+    if (plan.unsupported.length > LIST_LIMIT) {
+      console.log(`  …ほか ${plan.unsupported.length - LIST_LIMIT} 件`);
     }
   }
 
@@ -172,6 +195,8 @@ async function main() {
     await Bun.write(file, chunk.map(updateStatement).join("\n"));
     // oxlint-disable-next-line no-await-in-loop
     await d1(options.remote, ["--file", file]);
+    // oxlint-disable-next-line no-await-in-loop
+    await unlink(file);
     console.log(
       `書き込み ${Math.min(i + WRITE_CHUNK, plan.changed.length)} / ${plan.changed.length}`,
     );

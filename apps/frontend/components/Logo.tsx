@@ -1,9 +1,17 @@
+import { AppIcon } from "./AppIcon";
+
 /**
- * 左上のロゴ。朱の一筆で下線を引く（HENGE の唯一の朱の例外＝ブランド）。
+ * 左上のロゴ。**アイコン＋ワードマーク**の横並び。トップのヒーロー（`HeroLogo`）
+ * と構成は同じで、大きさと並びだけが違う。
+ *
+ * **ワードマークの下に朱の一筆を引かない。** 朱はアイコンの弧が担う（docs/07-ui.md）。
  *
  * `beta` のときは横に「ベータ版」を出す。**アンカーの外側に置く。**
- * 内側に入れるとアンカーの幅が広がり、筆の下線（`w-full`）が伸びて
- * 見た目が変わるため。バッジは表示であって操作ではないので、リンクの内側に不要。
+ * バッジは表示であって操作ではないので、リンクの内側に不要。
+ *
+ * **外側の `shrink-0` を外さない。** ヘッダーはモバイル幅で中身が収まっておらず
+ * （Issue 121「ヘッダーがモバイル幅で収まっていない」）、縮むのを許すとバッジが
+ * ワードマークに重なる。それを直すまでの防波堤で、はみ出し自体はそちらで解決する。
  *
  * このpropは**クライアントコンポーネント（PlayScreen）からも渡れる**よう
  * 単純なbooleanにしている。判定そのものはサーバー側の `betaBadgeVisible()`
@@ -11,17 +19,10 @@
  */
 export function Logo({ href = "/", beta = false }: { href?: string; beta?: boolean }) {
   return (
-    <span className="inline-flex items-center gap-3">
-      <a href={href} className="inline-block">
+    <span className="inline-flex shrink-0 items-center gap-3">
+      <a href={href} className="inline-flex items-center gap-2">
+        <AppIcon className="h-9 w-9 sm:h-11 sm:w-11" />
         <span className="font-mincho text-3xl font-bold tracking-[0.18em] text-kinari">HENGE</span>
-        <svg viewBox="0 0 120 8" className="mt-1 block h-2 w-full" aria-hidden="true">
-          {/* 筆で払ったような下線。左が太く右へ細る */}
-          <path
-            d="M2 5 C 24 1.5, 60 1, 92 3 C 104 3.8, 112 4.6, 118 5.6 C 110 5.2, 96 5, 80 5.2 C 52 5.6, 22 6.4, 2 5 Z"
-            fill="currentColor"
-            className="text-shu"
-          />
-        </svg>
       </a>
       {beta && (
         <span className="rounded border border-kin/60 px-2 py-0.5 text-xs tracking-[0.25em] text-kin">

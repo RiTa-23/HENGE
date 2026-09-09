@@ -62,7 +62,11 @@ HENGEで「忍びの心得」を打った。
 
 実装はApp Routerのmetadata APIにOGPフィールドを足すだけ。SSR/SSGのHTMLにメタタグが載るため、OpenNextでも追加の仕組みは不要。
 
-**OG画像は `scripts/generate-og.html` の源から生成する。** サイトの4色（docs/07-ui.md）と、ロゴと同じ筆の下線を使う。再生成の手順:
+**OG画像は `scripts/generate-og.html` の源から生成する。** サイトの4色（docs/07-ui.md）を使い、トップのヒーローと同じ**アイコン → ワードマーク → キャッチコピー**の縦積みにする（**朱の一筆は入れない**。朱はアイコンの弧が担う）。
+
+**アイコンは `apps/frontend/app/icon.png` を参照する。**源のHTMLに絵を焼き直さない。焼き直すと、アイコンを差し替えたときにOG画像だけ古いまま残る。
+
+再生成の手順:
 
 ```bash
 "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome" \
@@ -72,7 +76,9 @@ HENGEで「忍びの心得」を打った。
   "file://$(pwd)/scripts/generate-og.html"
 ```
 
-`--virtual-time-budget` はWebフォント（Google Fonts CDN）の読み込み待ち。源のHTMLを書き換えたらこのコマンドで og.png を作り直す。
+`--virtual-time-budget` はWebフォント（Google Fonts CDN）の読み込み待ち。**足りないと明朝がフォールバックのゴシックのまま焼き付く**ので、生成後は必ず絵を目で見て確認する。`--allow-file-access-from-files` は `file://` から `app/icon.png` を読むために要る。
+
+源のHTMLを書き換えたとき、**そして `app/icon.png` を差し替えたとき**は、このコマンドで og.png を作り直す。
 
 ## やらないこと
 

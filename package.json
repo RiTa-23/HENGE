@@ -17,7 +17,8 @@
     "test": "bun run --cwd packages/shared test && bun run --cwd apps/frontend test",
     "test:workers": "bun run --cwd apps/backend test:workers",
     "db:generate": "bun run --cwd apps/backend db:generate",
-    "db:migrate:local": "bun run --cwd apps/backend db:migrate:local"
+    "db:migrate:local": "bun run --cwd apps/backend db:migrate:local",
+    "rebuild:roman": "bun run --cwd apps/backend scripts/rebuild-roman.ts"
   },
   "devDependencies": {
     "@better-auth/cli": "~1.4.21",

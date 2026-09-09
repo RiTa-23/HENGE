@@ -1,4 +1,4 @@
-import { AppIcon } from "./AppIcon";
+import { HeroMark } from "./HeroMark";
 
 /**
  * トップのタイトル。**アイコン＋ワードマークを縦に積んで、一番大きく出す。**
@@ -8,11 +8,13 @@ import { AppIcon } from "./AppIcon";
  *
  * **ワードマークの下に朱の一筆を引かない。** 朱はアイコンの弧が担う。両方置くと
  * 朱の一筆が縦に2本並ぶ（docs/07-ui.md）。
+ *
+ * 試行中: アイコンを動かしている（`HeroMark`）。ヘッダーの `Logo` は静止のまま。
  */
 export function HeroLogo() {
   return (
     <div className="inline-block">
-      <AppIcon className="mx-auto mb-4 h-40 w-40 sm:h-48 sm:w-48" />
+      <HeroMark className="mx-auto mb-4 h-40 w-40 sm:h-48 sm:w-48" />
       <span className="font-mincho text-7xl font-bold tracking-[0.18em] text-kinari sm:text-8xl">
         HENGE
       </span>

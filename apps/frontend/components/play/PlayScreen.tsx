@@ -48,6 +48,8 @@ type Phase =
   /** 在庫が足りず生成中。エラーではなく待ち */
   | { name: "preparing" }
   | { name: "error"; code: string; message: string; neuronsRemaining?: number }
+  /** お題は手元にあるが、まだ見せていない。開始の合図を出している最中 */
+  | { name: "starting"; session: SessionResponse }
   | { name: "playing"; session: SessionResponse }
   | { name: "result"; session: SessionResponse };
 
@@ -64,6 +66,15 @@ const RETRY_INTERVAL_MS = 3_000;
  * 「いま押したキー」なのか「さっき押したキー」なのか読めなくなる。
  */
 const MISS_FLASH_MS = 450;
+
+/**
+ * 開始の合図（「はじめ！」）を出しておく長さ。
+ *
+ * **この間は時間を数えない**（`startedAt` は合図が消えてから置く）。合図を
+ * 挟んだぶんまで計時すると、WPM が実際より低く出て**スコアが静かに壊れる**。
+ * お題も合図が消えるまで出さない。見えていれば、待っているあいだに読めてしまう。
+ */
+const START_CUE_MS = 900;
 
 /** 次に打てるキー。候補それぞれの「いま打つべき1文字」を集める */
 function nextKeysOf(progress: TypingProgress): NextKey[] {
@@ -128,15 +139,18 @@ export function PlayScreen({
   const waitingSince = useRef<number | null>(null);
   const retryTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  /** 1問目から打ち始める。取得直後と、中断からの再開の両方で使う */
-  const beginPlay = (session: SessionResponse) => {
+  /**
+   * 1問目を出して打ち始める。**開始の合図が消えた瞬間に呼ぶ。**
+   * ここで `startedAt` を置くので、合図のぶんは計時に入らない。
+   */
+  const beginPlay = useCallback((session: SessionResponse) => {
     setPromptIndex(0);
     setStats({ hits: 0, misses: 0, elapsedMs: 0 });
     setMissedKeys(new Map());
     startedAt.current = performance.now();
     setProgress(startTyping(session.prompts[0]?.readingRoman ?? []));
     setPhase({ name: "playing", session });
-  };
+  }, []);
 
   /**
    * 途中でやめて開始前へ戻る。**取得済みのお題は捨てる。**
@@ -194,7 +208,8 @@ export function PlayScreen({
     const session = body as SessionResponse;
     // **返された時点で消費が確定する。** 中断しても巻き戻さない
     writeOffset(themeId, session.nextOffset);
-    beginPlay(session);
+    // お題はまだ出さない。合図を挟んでから1問目を見せる
+    setPhase({ name: "starting", session });
   }, [themeId]);
 
   // **開始するまで sessions/start を呼ばない。** 呼んだ時点でオフセットの消費が
@@ -211,6 +226,13 @@ export function PlayScreen({
       if (missTimer.current !== null) clearTimeout(missTimer.current);
     };
   }, []);
+
+  // 開始の合図。出しきってから1問目を見せる（ここまで時間は数えない）
+  useEffect(() => {
+    if (phase.name !== "starting") return;
+    const timer = setTimeout(() => beginPlay(phase.session), START_CUE_MS);
+    return () => clearTimeout(timer);
+  }, [phase, beginPlay]);
 
   // 打鍵を拾う要素にフォーカスを当て続ける。外れると1打も拾えなくなる
   useEffect(() => {
@@ -398,6 +420,15 @@ export function PlayScreen({
         message="お題を作っています"
         note="できあがり次第そのまま始まります。閉じずにお待ちください。"
       />
+    );
+  }
+
+  if (phase.name === "starting") {
+    return (
+      <div className="flex min-h-dvh flex-col items-center justify-center gap-8 p-6">
+        <p className="text-sm tracking-widest text-kinari/50">{themeName}</p>
+        <p className="start-cue font-mincho text-6xl tracking-widest text-shu">はじめ！</p>
+      </div>
     );
   }
 

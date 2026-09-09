@@ -128,6 +128,8 @@ curl -s https://<新ドメイン>/ | grep -o 'og:image" content="[^"]*"'
 
 4. 旧ドメインを残すか決める。残すと**同じ内容が2つのホスト名で配信され**、検索エンジンから重複コンテンツとして扱われる。止めるなら `apps/frontend/wrangler.jsonc` に `"workers_dev": false` を足して再デプロイする（Hono Worker は既にそうしている）
 5. 落ち着いたら Google Console から旧リダイレクトURIを消す
+6. **Cloudflare Web Analytics の Configured hostname を新ドメインに直す。** Cloudflare は登録したホスト名以外からの計測を受け付けないので、ここを忘れるとアクセス解析だけ黙って止まる（トークンは変えなくてよい）
+7. **プライバシーポリシー（`/privacy`）に旧ドメインが出ていないか確認する**
 
 **2を先にやるとログインが `redirect_uri_mismatch` で壊れる。** 新しいコールバック先が Google に登録されていない状態で認証が始まるため。
 

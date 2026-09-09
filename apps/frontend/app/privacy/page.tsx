@@ -118,9 +118,21 @@ export default function PrivacyPage() {
         </Section>
 
         <Section title="アクセス解析">
-          {/* **アクセス解析を入れたら、この段落を書き換えること。**
-              実態と違う記述を残さない（Issue 74 のチェック項目にも入れてある） */}
-          <p>現在、アクセス解析のツールは使用していません。</p>
+          <p>
+            どのページがどれだけ見られているかを知るために、Cloudflare Web Analytics
+            を使っています。ページの表示回数、参照元、おおまかな地域、表示にかかった時間などを記録します。
+          </p>
+          <p>
+            提供元である Cloudflare は、この解析について
+            <b className="font-normal text-kinari">
+              「利用状況の計測にCookieやlocalStorageといったクライアント側の状態を一切使わない」
+            </b>
+            および
+            <b className="font-normal text-kinari">
+              「IPアドレスやUser-Agentなどによって個人を識別（フィンガープリント）しない」
+            </b>
+            と説明しています。
+          </p>
         </Section>
 
         <Section title="保存期間と削除">

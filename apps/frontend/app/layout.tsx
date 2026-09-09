@@ -1,5 +1,6 @@
 import type { Metadata, Viewport } from "next";
 import { JetBrains_Mono } from "next/font/google";
+import Script from "next/script";
 import type { ReactNode } from "react";
 import { ogFields, siteUrl } from "@/lib/og";
 import "./globals.css";
@@ -35,7 +36,22 @@ export const viewport: Viewport = {
   initialScale: 1,
 };
 
-export default function RootLayout({ children }: { children: ReactNode }) {
+/**
+ * Cloudflare Web Analytics のビーコン。
+ *
+ * **トークンは秘密ではない。** 公開HTMLに載る前提の値で、Cloudflare側は
+ * 登録したホスト名（henge.ritane.co）以外からの計測を受け付けない。
+ *
+ * `henge.ritane.co` は Worker が直接返しているため、**ゾーン側の自動挿入は効かない。**
+ * ここで自分で埋め込む必要がある。
+ */
+const WEB_ANALYTICS_TOKEN = "43af9fa87b064462a11a85b7761291a5";
+
+export default async function RootLayout({ children }: { children: ReactNode }) {
+  // **ローカルの閲覧を本番の数字に混ぜない。** 判定は siteUrl（＝BETTER_AUTH_URL）で行う。
+  // ホスト名を直接書くと、ドメインを変えたときにここだけ取り残される
+  const local = new URL(await siteUrl()).hostname === "localhost";
+
   return (
     <html lang="ja" className={jetBrainsMono.variable}>
       <head>
@@ -52,7 +68,22 @@ export default function RootLayout({ children }: { children: ReactNode }) {
           href="https://fonts.googleapis.com/css2?family=Shippori+Mincho:wght@500;700&family=Zen+Kaku+Gothic+New:wght@400;500;700&display=swap"
         />
       </head>
-      <body>{children}</body>
+      <body>
+        {children}
+        {/*
+          **素の `<script>` で書かない。** Reactは描画中に見つけたscriptを実行せず、
+          開発中は毎回コンソールに警告が出る。next/script なら注入まで面倒を見る。
+          `afterInteractive` は表示を妨げない位置（Cloudflareの案内どおり本文のあと）。
+        */}
+        {!local && (
+          <Script
+            type="module"
+            src="https://static.cloudflareinsights.com/beacon.min.js"
+            strategy="afterInteractive"
+            data-cf-beacon={`{"token": "${WEB_ANALYTICS_TOKEN}"}`}
+          />
+        )}
+      </body>
     </html>
   );
 }

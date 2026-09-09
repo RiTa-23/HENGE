@@ -1,10 +1,8 @@
 import type { D1Migration } from "@cloudflare/vitest-pool-workers";
 import { applyD1Migrations, env } from "cloudflare:test";
 
-/**
- * テスト用D1に、実際のマイグレーションを適用する（各テストファイルの実行前）。
- * スキーマを手で書き写さないことで、マイグレーションとテストがずれないようにする。
- */
+// 各テストファイルの実行前に、テスト用D1へ実際のマイグレーションを適用する。
+// スキーマを手で書き写さないことで、マイグレーションとテストがずれないようにする。
 
 /**
  * `vitest.config.ts` の `miniflare.bindings` で渡している、**テストのときだけ存在する値**。
@@ -19,4 +17,15 @@ import { applyD1Migrations, env } from "cloudflare:test";
  */
 type TestEnv = typeof env & { TEST_MIGRATIONS: D1Migration[] };
 
-await applyD1Migrations(env.DB, (env as TestEnv).TEST_MIGRATIONS);
+const migrations = (env as TestEnv).TEST_MIGRATIONS;
+
+// **キャストは「必ずある」と言い切る書き方なので、ここで実際に確かめる。**
+// vitest.config.ts 側で渡すのをやめたりリネームしたりしても型は通ってしまい、
+// undefined のまま進むと全テストが「no such table」の連鎖で落ちて原因が見えない。
+if (migrations === undefined) {
+  throw new Error(
+    "TEST_MIGRATIONS が渡っていない。vitest.config.ts の miniflare.bindings を確認する",
+  );
+}
+
+await applyD1Migrations(env.DB, migrations);

@@ -141,8 +141,8 @@
   bottom: calc(100% + 3px);
   left: 50%;
   translate: -50% 0;
-  width: 17px;
-  height: 17px;
+  width: 20px;
+  height: 20px;
   color: var(--color-makibishi);
 }
 

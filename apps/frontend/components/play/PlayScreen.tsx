@@ -22,8 +22,10 @@ import { Loading } from "./Loading";
 import { ProgressDots } from "./ProgressDots";
 import { Result, type PlayStats } from "./Result";
 import { Scroll } from "./Scroll";
+import { SoundToggle } from "./SoundToggle";
 import { readOffset, writeOffset } from "@/lib/play/offset";
 import { mergeMissedKeys } from "@/lib/play/misses";
+import { playHit, playMiss, primeAudio, readMuted, writeMuted } from "@/lib/play/sound";
 import { kindLabel, listHref } from "@/lib/ui/kind";
 
 interface Prompt {
@@ -131,6 +133,12 @@ export function PlayScreen({
   const [imeDetected, setImeDetected] = useState(false);
   /** 直前に打ち間違えたキー。キーボード上で少しのあいだ赤くする */
   const [missKey, setMissKey] = useState<string | null>(null);
+  /**
+   * 効果音を止めているか。**初期値はサーバーでは決まらない**ので、
+   * 描画してから localStorage を読む（初回描画で読むと、サーバーの
+   * 出力と食い違って hydration が壊れる）。
+   */
+  const [muted, setMuted] = useState(false);
   const missTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const startedAt = useRef<number>(0);
   const surface = useRef<HTMLDivElement>(null);
@@ -219,6 +227,16 @@ export function PlayScreen({
     if (attempt > 0) void load();
   }, [load, attempt]);
 
+  useEffect(() => setMuted(readMuted()), []);
+
+  const toggleSound = () => {
+    const next = !muted;
+    setMuted(next);
+    writeMuted(next);
+    // 鳴らす側へ戻したこの操作が、音を出せる状態にするきっかけになる
+    if (!next) primeAudio();
+  };
+
   // 予約を残したまま画面を離れない
   useEffect(() => {
     return () => {
@@ -255,6 +273,9 @@ export function PlayScreen({
       if (event.key !== " " && event.code !== "Space") return;
       // スペースでの画面スクロールを止める
       event.preventDefault();
+      // **音はユーザー操作の中で起こす。** 操作を伴わずに作った AudioContext は
+      // ブラウザに止められたままになり、1問目が無音になる
+      primeAudio();
       setAttempt((count) => count + 1);
     };
     globalThis.addEventListener("keydown", onKey);
@@ -351,7 +372,12 @@ export function PlayScreen({
     const next = pressKey(progress, typed);
     // **受理されなかった打鍵だけを赤くする。** 押したキーそのものを出すので、
     // 苦手キーの集計（打つべきだった文字を数える）とは別物
-    if (next.missCount > progress.missCount) flashMissKey(toNextKey(typed).key);
+    const missed = next.missCount > progress.missCount;
+    if (missed) flashMissKey(toNextKey(typed).key);
+    if (!muted) {
+      if (missed) playMiss();
+      else playHit();
+    }
 
     if (!next.finished) {
       setProgress(next);
@@ -396,6 +422,10 @@ export function PlayScreen({
           <p className="mt-4 text-xs leading-relaxed text-kinari/40">
             押すまでお題は消費されません。
           </p>
+
+          <div className="mt-8 flex justify-center">
+            <SoundToggle muted={muted} onToggle={toggleSound} />
+          </div>
 
           <div className="mt-12 flex justify-center">
             <a
@@ -548,6 +578,8 @@ export function PlayScreen({
           <span className="rounded-full border border-kinari/15 bg-kinari/5 px-4 py-1 text-xs tracking-widest text-kinari/70">
             {themeName}
           </span>
+          {/* 音の入/切も、やめるボタンと同じ理由でこの中に置く */}
+          <SoundToggle muted={muted} onToggle={toggleSound} />
           {/*
             打鍵を拾う要素の中に置く。外に出すと、押した時点でフォーカスが
             surface から外れ、onBlur の当て直しと競合する。

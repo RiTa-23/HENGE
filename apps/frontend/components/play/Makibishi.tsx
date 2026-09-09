@@ -19,19 +19,19 @@ export function Makibishi() {
     <svg className="makibishi" viewBox="0 0 24 24" aria-hidden="true">
       <g fill="currentColor">
         {/* 上向きの棘。踏むと刺さる側なので、いちばん長く見せる */}
-        <polygon points="12,0.8 14.3,12.2 9.7,12.2" />
+        <polygon points="12,0.8 14.8,12.2 9.2,12.2" />
         {/* 接地する2本の脚 */}
-        <polygon points="2.6,19.8 13.1,14.3 10.6,10.7" />
-        <polygon points="21.4,19.8 13.4,10.7 10.9,14.3" />
+        <polygon points="2.6,19.8 13.7,14.3 10.3,10.1" />
+        <polygon points="21.4,19.8 13.7,10.1 10.3,14.3" />
         {/* 手前へ出る棘。脚のあいだから覗く */}
         <polygon
-          points="12,21.8 13.9,12.2 10.1,12.2"
+          points="12,21.8 14.2,12.2 9.8,12.2"
           stroke="var(--color-sumi)"
           strokeWidth="0.7"
           strokeLinejoin="round"
         />
         {/* 棘の付け根。これが無いと4本がばらばらの三角に見える */}
-        <circle cx="12" cy="12.2" r="2.7" />
+        <circle cx="12" cy="12.2" r="3" />
       </g>
     </svg>
   );

@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { SiteFooter } from "@/components/SiteFooter";
 import { SiteHeader } from "@/components/SiteHeader";
 import { ogFields, pageTitle } from "@/lib/og";
 
@@ -175,6 +176,7 @@ export default function PrivacyPage() {
 
         <p className="mt-12 text-sm text-kinari/50">制定日: 2026年9月9日</p>
       </main>
+      <SiteFooter />
     </>
   );
 }

@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { AdjustingView } from "@/components/Adjusting";
 import { CreateThemeForm } from "@/components/CreateThemeForm";
 import { ModeTabs } from "@/components/ModeTabs";
+import { SiteFooter } from "@/components/SiteFooter";
 import { SiteHeader } from "@/components/SiteHeader";
 import { ThemeCard } from "@/components/ThemeCard";
 import { betaLimitedPage } from "@/lib/api/admin-page";
@@ -126,6 +127,7 @@ export default async function PracticePage({
           </div>
         </section>
       </main>
+      <SiteFooter />
     </>
   );
 }

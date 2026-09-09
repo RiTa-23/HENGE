@@ -68,7 +68,9 @@ export default async function RootLayout({ children }: { children: ReactNode }) 
           href="https://fonts.googleapis.com/css2?family=Shippori+Mincho:wght@500;700&family=Zen+Kaku+Gothic+New:wght@400;500;700&display=swap"
         />
       </head>
-      <body>
+      {/* **縦のフレックスにする。** SiteFooter の `mt-auto` を効かせて、
+          内容の短いページでもフッターが画面の下に着く */}
+      <body className="flex min-h-dvh flex-col">
         {children}
         {/*
           **素の `<script>` で書かない。** Reactは描画中に見つけたscriptを実行せず、

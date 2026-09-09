@@ -64,9 +64,9 @@ export default function PrivacyPage() {
               ログインした状態を保つために使います
             </li>
             <li>
-              <b className="font-normal text-kinari">IPアドレスとブラウザの種類（User-Agent）</b>
+              <b className="font-normal text-kinari">ブラウザの種類（User-Agent）</b>
               {" — "}
-              ログイン時のリクエストから記録します。セッションの管理と、不正な利用への対処に使います
+              ログイン時のリクエストから記録します。セッションの管理に使います
             </li>
             <li>
               <b className="font-normal text-kinari">作成したテーマ</b>
@@ -109,6 +109,17 @@ export default function PrivacyPage() {
               ログインの認証のために利用します
             </li>
           </ul>
+        </Section>
+
+        <Section title="保存していないもの">
+          <p>
+            <b className="font-normal text-kinari">IPアドレスは保存していません。</b>
+            ログインの記録に残るのは、ブラウザの種類だけです。
+          </p>
+          <p>
+            パスワードも保持していません。ログインはGoogleアカウントのみで、
+            本サービスがパスワードを受け取ることはありません。
+          </p>
         </Section>
 
         <Section title="Cookie">

@@ -17,6 +17,10 @@ import * as authSchema from "@henge/shared/db/auth-schema";
 export function createAuth(env: CloudflareEnv) {
   const db = drizzle(env.DB, { schema: authSchema });
   return betterAuth({
+    // **IPアドレスの記録を有効にしない。** プライバシーポリシー（app/privacy）で
+    // 「IPアドレスは保存していません」と明言している。`advanced.ipAddress` を
+    // 設定すると session.ip_address が埋まり始め、その記述が嘘になる。
+    // 記録したくなったら、ポリシーを同じPRで直すこと。
     database: drizzleAdapter(db, { provider: "sqlite" }),
     socialProviders: {
       google: {

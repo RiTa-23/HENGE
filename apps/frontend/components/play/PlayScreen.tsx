@@ -57,6 +57,14 @@ type Phase =
  */
 const RETRY_INTERVAL_MS = 3_000;
 
+/**
+ * 打ち間違えたキーを赤くしておく長さ。
+ *
+ * 短すぎると見る前に消え、長すぎると次の打鍵のハイライトと重なって
+ * 「いま押したキー」なのか「さっき押したキー」なのか読めなくなる。
+ */
+const MISS_FLASH_MS = 450;
+
 /** 次に打てるキー。候補それぞれの「いま打つべき1文字」を集める */
 function nextKeysOf(progress: TypingProgress): NextKey[] {
   const letters = new Set(
@@ -110,6 +118,9 @@ export function PlayScreen({
    * 打つたびに出たり消えたりすると、打鍵に気を取られて読めない
    */
   const [imeDetected, setImeDetected] = useState(false);
+  /** 直前に打ち間違えたキー。キーボード上で少しのあいだ赤くする */
+  const [missKey, setMissKey] = useState<string | null>(null);
+  const missTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const startedAt = useRef<number>(0);
   const surface = useRef<HTMLDivElement>(null);
   // 生成中の待ち。attempt を増やすと load が走り直す
@@ -193,10 +204,11 @@ export function PlayScreen({
     if (attempt > 0) void load();
   }, [load, attempt]);
 
-  // 待ち直しの予約を残したまま画面を離れない
+  // 予約を残したまま画面を離れない
   useEffect(() => {
     return () => {
       if (retryTimer.current !== null) clearTimeout(retryTimer.current);
+      if (missTimer.current !== null) clearTimeout(missTimer.current);
     };
   }, []);
 
@@ -277,6 +289,16 @@ export function PlayScreen({
     setPhase({ name: "error", code, message });
   };
 
+  /**
+   * 打ち間違えたキーを赤くする。**連打されたら数え直す**（前の予約を捨てる）。
+   * 捨てないと、続けてミスしたときに最初の1つの予約で消えてしまう。
+   */
+  const flashMissKey = (key: string) => {
+    if (missTimer.current !== null) clearTimeout(missTimer.current);
+    setMissKey(key);
+    missTimer.current = setTimeout(() => setMissKey(null), MISS_FLASH_MS);
+  };
+
   const onKeyDown = (event: React.KeyboardEvent<HTMLDivElement>) => {
     if (phase.name !== "playing") return;
 
@@ -305,6 +327,10 @@ export function PlayScreen({
     event.preventDefault();
 
     const next = pressKey(progress, typed);
+    // **受理されなかった打鍵だけを赤くする。** 押したキーそのものを出すので、
+    // 苦手キーの集計（打つべきだった文字を数える）とは別物
+    if (next.missCount > progress.missCount) flashMissKey(toNextKey(typed).key);
+
     if (!next.finished) {
       setProgress(next);
       return;
@@ -524,7 +550,7 @@ export function PlayScreen({
       </div>
 
       <div className="border-t border-kin/40 pt-6">
-        <Keyboard nextKeys={nextKeysOf(progress)} />
+        <Keyboard nextKeys={nextKeysOf(progress)} missKey={missKey} />
       </div>
 
       {imeDetected && (

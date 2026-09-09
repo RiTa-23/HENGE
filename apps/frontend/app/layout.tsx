@@ -47,11 +47,19 @@ export const viewport: Viewport = {
  */
 const WEB_ANALYTICS_TOKEN = "43af9fa87b064462a11a85b7761291a5";
 
-export default async function RootLayout({ children }: { children: ReactNode }) {
-  // **ローカルの閲覧を本番の数字に混ぜない。** 判定は siteUrl（＝BETTER_AUTH_URL）で行う。
-  // ホスト名を直接書くと、ドメインを変えたときにここだけ取り残される
-  const local = new URL(await siteUrl()).hostname === "localhost";
+/**
+ * 出し分けを `siteUrl()`（＝リクエスト時の値）で判定しない。
+ *
+ * **`/privacy` のような静的ページはビルド時にHTMLが焼かれる。** その時点では
+ * Cloudflare のバインディングが無く `siteUrl()` は localhost に落ちるので、
+ * 「本番かどうか」の判定が必ず外れ、そのページにだけビーコンが入らなくなる。
+ *
+ * `NODE_ENV` はバンドル時に定数へ畳まれるため、静的ページでも動的ページでも
+ * 同じ結果になる。`bun run preview` ではローカルでもビーコンが出るが、
+ * Cloudflare は登録したホスト名以外からの計測を受け付けないので実害はない。
+ */
 
+export default function RootLayout({ children }: { children: ReactNode }) {
   return (
     <html lang="ja" className={jetBrainsMono.variable}>
       <head>
@@ -77,7 +85,7 @@ export default async function RootLayout({ children }: { children: ReactNode }) 
           開発中は毎回コンソールに警告が出る。next/script なら注入まで面倒を見る。
           `afterInteractive` は表示を妨げない位置（Cloudflareの案内どおり本文のあと）。
         */}
-        {!local && (
+        {process.env.NODE_ENV === "production" && (
           <Script
             type="module"
             src="https://static.cloudflareinsights.com/beacon.min.js"

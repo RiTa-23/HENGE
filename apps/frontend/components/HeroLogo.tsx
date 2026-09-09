@@ -15,7 +15,10 @@ export function HeroLogo() {
   return (
     <div className="inline-block">
       <HeroMark className="mx-auto mb-4 h-40 w-40 sm:h-48 sm:w-48" />
-      <span className="font-mincho text-7xl font-bold tracking-[0.18em] text-kinari sm:text-8xl">
+      {/* **段階ではなく画面幅に比例させる。** 320px では text-7xl のワードマークが
+          351px になり、使える幅（272px）を超えて横スクロールが出る。sm(640px) で
+          段階的に切り替えると、その手前の幅が必ず溢れる */}
+      <span className="font-mincho text-[clamp(2.6rem,12vw,6rem)] font-bold tracking-[0.18em] text-kinari">
         HENGE
       </span>
     </div>

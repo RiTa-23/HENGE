@@ -9,9 +9,12 @@ import { AppIcon } from "./AppIcon";
  * `beta` のときは横に「ベータ版」を出す。**アンカーの外側に置く。**
  * バッジは表示であって操作ではないので、リンクの内側に不要。
  *
- * **外側の `shrink-0` を外さない。** ヘッダーはモバイル幅で中身が収まっておらず
- * （Issue 121「ヘッダーがモバイル幅で収まっていない」）、縮むのを許すとバッジが
- * ワードマークに重なる。それを直すまでの防波堤で、はみ出し自体はそちらで解決する。
+ * **狭い画面ではバッジを出さない。** ロゴだけで280px（うちバッジ78px）あり、
+ * 375px幅では入らない。バッジは表示であって操作ではないので、幅が足りないときに
+ * 最初に落とす。ブランド名は残るので「ここが何のサイトか」は伝わる。
+ *
+ * **外側の `shrink-0` を外さない。** 縮むのを許すと、バッジが出ている幅で
+ * ワードマークに重なる。
  *
  * このpropは**クライアントコンポーネント（PlayScreen）からも渡れる**よう
  * 単純なbooleanにしている。判定そのものはサーバー側の `betaBadgeVisible()`
@@ -25,7 +28,7 @@ export function Logo({ href = "/", beta = false }: { href?: string; beta?: boole
         <span className="font-mincho text-3xl font-bold tracking-[0.18em] text-kinari">HENGE</span>
       </a>
       {beta && (
-        <span className="rounded border border-kin/60 px-2 py-0.5 text-xs tracking-[0.25em] text-kin">
+        <span className="hidden rounded border border-kin/60 px-2 py-0.5 text-xs tracking-[0.25em] text-kin sm:inline-block">
           ベータ版
         </span>
       )}

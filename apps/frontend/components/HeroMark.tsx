@@ -73,8 +73,12 @@ export function HeroMark({ className }: { className?: string }) {
 
     let frame = 0;
     let cancelled = false;
+    let observer: IntersectionObserver | undefined;
 
-    void Promise.all([load("/logo-brush.png"), load("/logo-star.png")]).then(([strip, star]) => {
+    const started = Promise.all([load("/logo-brush.png"), load("/logo-star.png")]);
+    // 失敗しても ready を立てない。静止画（/icon.png）が残るので、動かないだけで済む
+    started.catch((error: unknown) => console.error("ロゴの画像を読めなかった", error));
+    void started.then(([strip, star]) => {
       if (cancelled) return;
       setReady(true);
 
@@ -142,9 +146,26 @@ export function HeroMark({ className }: { className?: string }) {
         render(0);
         return;
       }
-      const start = performance.now();
+      // **画面外では描かない。** トップは開きっぱなしにされるページで、下まで
+      // スクロールしている間も 128 枚を毎フレーム描き続けると、見えないものに
+      // 電池を使うことになる。
+      //
+      // **ループ自体は止めない。** 止めて再開する作りにすると、再開の通知を
+      // 取りこぼしたときに二度と動かなくなる。空の rAF は無視できる負荷で、
+      // 描画だけ飛ばせば同じだけ節約できる。
+      let visible = true;
+      observer = new IntersectionObserver((entries) => {
+        visible = entries[entries.length - 1]?.isIntersecting ?? true;
+      });
+      observer.observe(canvas);
+
+      // 経過時間を自分で積む。見えていない間は進めない（戻ったとき位相が飛ばない）
+      let elapsed = 0;
+      let last = 0;
       const tick = (now: number) => {
-        render((now - start) / 1000);
+        if (last !== 0 && visible) elapsed += (now - last) / 1000;
+        last = now;
+        if (visible) render(elapsed);
         frame = requestAnimationFrame(tick);
       };
       frame = requestAnimationFrame(tick);
@@ -152,6 +173,7 @@ export function HeroMark({ className }: { className?: string }) {
 
     return () => {
       cancelled = true;
+      observer?.disconnect();
       cancelAnimationFrame(frame);
     };
   }, []);

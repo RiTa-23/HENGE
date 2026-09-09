@@ -9,7 +9,7 @@ import { HeroMark } from "./HeroMark";
  * **ワードマークの下に朱の一筆を引かない。** 朱はアイコンの弧が担う。両方置くと
  * 朱の一筆が縦に2本並ぶ（docs/07-ui.md）。
  *
- * 試行中: アイコンを動かしている（`HeroMark`）。ヘッダーの `Logo` は静止のまま。
+ * アイコンは動く（`HeroMark`）。ヘッダーの `Logo` は静止のまま。
  */
 export function HeroLogo() {
   return (

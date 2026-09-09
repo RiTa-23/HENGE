@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { AdjustingView } from "@/components/Adjusting";
+import { SiteFooter } from "@/components/SiteFooter";
 import { SiteHeader } from "@/components/SiteHeader";
 import { CreateThemeForm } from "@/components/CreateThemeForm";
 import { betaLimitedPage } from "@/lib/api/admin-page";
@@ -22,6 +23,7 @@ export default async function NewThemePage() {
         </p>
         <CreateThemeForm kind="theme" />
       </main>
+      <SiteFooter />
     </>
   );
 }

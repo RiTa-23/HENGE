@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { HeroLogo } from "@/components/HeroLogo";
 import { PracticeMark, ThemeMark } from "@/components/ModeMark";
+import { SiteFooter } from "@/components/SiteFooter";
 import { SiteHeader } from "@/components/SiteHeader";
 import { ThemeCard } from "@/components/ThemeCard";
 import { ogFields, pageTitle } from "@/lib/og";
@@ -107,6 +108,7 @@ export default async function HomePage() {
           </a>
         </section>
       </main>
+      <SiteFooter />
     </>
   );
 }

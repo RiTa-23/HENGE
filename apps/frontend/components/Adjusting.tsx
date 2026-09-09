@@ -1,3 +1,4 @@
+import { SiteFooter } from "@/components/SiteFooter";
 import { SiteHeader } from "@/components/SiteHeader";
 
 /**
@@ -23,6 +24,7 @@ export function AdjustingView({ what }: { what: string }) {
           </a>
         </p>
       </main>
+      <SiteFooter />
     </>
   );
 }

@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
+import { SiteFooter } from "@/components/SiteFooter";
 import { SiteHeader } from "@/components/SiteHeader";
 import { ogFields, pageTitle } from "@/lib/og";
 import { decodePageParam, findTheme } from "@/lib/api/themes";
@@ -69,6 +70,7 @@ export default async function ThemeDetailPage({ params }: { params: Promise<{ na
           </a>
         </p>
       </main>
+      <SiteFooter />
     </>
   );
 }

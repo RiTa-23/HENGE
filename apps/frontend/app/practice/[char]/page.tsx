@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import { AdjustingView } from "@/components/Adjusting";
+import { SiteFooter } from "@/components/SiteFooter";
 import { SiteHeader } from "@/components/SiteHeader";
 import { betaLimitedPage } from "@/lib/api/admin-page";
 import { ogFields, pageTitle } from "@/lib/og";
@@ -86,6 +87,7 @@ export default async function PracticeDetailPage({
           </a>
         </p>
       </main>
+      <SiteFooter />
     </>
   );
 }

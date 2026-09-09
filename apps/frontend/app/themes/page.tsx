@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { ModeTabs } from "@/components/ModeTabs";
+import { SiteFooter } from "@/components/SiteFooter";
 import { SiteHeader } from "@/components/SiteHeader";
 import { ThemeCard } from "@/components/ThemeCard";
 import { ogFields, pageTitle } from "@/lib/og";
@@ -67,6 +68,7 @@ export default async function ThemesPage({
           {themes.length === 0 && <p className="text-kinari/50">まだお題がありません。</p>}
         </div>
       </main>
+      <SiteFooter />
     </>
   );
 }

@@ -27,16 +27,23 @@ export function toNextKey(letter: string): NextKey {
   return { key: letter.toUpperCase(), shift: false };
 }
 
+/**
+ * キーの見た目。**色でしか区別しない状態を作らない**（形と塗りも変える）。
+ *
+ * 次に打つキーは橙で、枠だけでなく**キーの面を塗る**。枠だけだと、視線が
+ * 巻物とキーボードのあいだを往復する速さに追いつかない。文字は地の色に
+ * 落として読ませる。
+ */
 function keyClass(state: "idle" | "candidate" | "modifier"): string {
   const base =
     "flex h-11 min-w-11 items-center justify-center rounded-md border px-3 font-mono text-sm transition-colors";
   if (state === "candidate") {
     // 候補違い（どちらか一方を押す）はすべて同じ強さで光らせる
-    return `${base} border-shu bg-shu/20 text-kinari shadow-[0_0_10px_var(--color-shu)]`;
+    return `${base} border-daidai bg-daidai font-bold text-sumi shadow-[0_0_12px_var(--color-daidai)]`;
   }
   if (state === "modifier") {
     // 修飾キー（両方同時に押す）は別扱い。破線にして「単独では押さない」を示す
-    return `${base} border-2 border-dashed border-shu bg-transparent text-shu`;
+    return `${base} border-2 border-dashed border-daidai bg-transparent text-daidai`;
   }
   return `${base} border-kinari/10 bg-kinari/5 text-kinari/60`;
 }

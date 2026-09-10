@@ -580,6 +580,7 @@ export function PlayScreen({
         onRetry={start}
         listHref={backToList}
         kind={kind}
+        form={form}
         shareUrl={shareUrl}
       />
     );

@@ -1,4 +1,4 @@
-import { PLAY_SIZE, type ThemeKind } from "@henge/shared";
+import { playSize, type PromptForm, type ThemeKind } from "@henge/shared";
 import { topMissedKeys } from "@/lib/play/misses";
 import {
   accuracyRatio,
@@ -28,10 +28,11 @@ export function Result({
   themeName,
   listHref,
   kind,
+  form,
   shareUrl,
 }: {
   stats: PlayStats;
-  /** 打ち損ねた文字と回数。15問の通算 */
+  /** 打ち損ねた文字と回数。1プレイ（短文15問／単語30問）の通算 */
   missedKeys: ReadonlyMap<string, number>;
   onRetry: () => void;
   themeName: string;
@@ -39,6 +40,11 @@ export function Result({
   listHref: string;
   /** 投稿テキストの文面を分けるため */
   kind: ThemeKind;
+  /**
+   * 出題の形式。**問題数も投稿の文面もこれで変わる。**
+   * 同じテーマ名で中身が違うので、どちらの記録かを画面にも投稿にも残す。
+   */
+  form: PromptForm;
   /** X投稿で共有するURL（着地ページの絶対URL）。サーバー側で組み立て済み */
   shareUrl: string;
 }) {
@@ -53,9 +59,16 @@ export function Result({
   return (
     <div className="flex min-h-dvh items-center justify-center p-6">
       <div className="w-full max-w-2xl rounded-lg border border-kin/60 bg-kinari/5 px-10 py-12">
-        <p className="text-center text-sm tracking-widest text-kinari/60">{themeName}</p>
-        <h1 className="mt-2 text-center font-mincho text-2xl tracking-widest text-kinari">
-          {PLAY_SIZE}問 走破
+        <p className="flex items-center justify-center gap-3 text-sm tracking-widest text-kinari/60">
+          {themeName}
+          {/* **形式を出す。** テーマ名だけだと、あとから見て短文の記録か
+              単語の記録か分からない */}
+          <span className="rounded-full border border-kinari/20 px-3 py-0.5 text-xs text-kinari/70">
+            {form === "word" ? "単語" : "短文"}
+          </span>
+        </p>
+        <h1 className="mt-3 text-center font-mincho text-2xl tracking-widest text-kinari">
+          {playSize(form)}問 走破
         </h1>
 
         <div className="mt-10 text-center">
@@ -108,7 +121,7 @@ export function Result({
           <a
             href={buildTweetIntentUrl({
               url: shareUrl,
-              text: buildShareText({ kind, themeName, stats }),
+              text: buildShareText({ kind, form, themeName, stats }),
             })}
             target="_blank"
             rel="noreferrer"

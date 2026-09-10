@@ -116,7 +116,7 @@ packages/
 - X投稿で共有されるURL（`docs/09-share.md`）
 - OGPの `metadataBase`（`og:image` の絶対URL）
 
-**1つの値で3つが動くので、順序を守らないとログインが壊れる。**
+**1つの値で3つが動くので、順序を守らないとログインが壊れる。** これとは別に、`BETTER_AUTH_URL` から引いていない場所（Web Analytics のホスト名と、workers.dev のリダイレクト先）が2つあるので、そこは手で直す。
 
 1. **先に** Google Cloud Console へ新しいリダイレクトURI（`https://<新ドメイン>/api/auth/callback/google`）を追加する。旧URIはまだ消さない
 2. `BETTER_AUTH_URL` を新ドメインに更新する（`bunx wrangler secret put BETTER_AUTH_URL`。シークレットは即時反映で、再デプロイは不要）
@@ -126,12 +126,26 @@ packages/
 curl -s https://<新ドメイン>/ | grep -o 'og:image" content="[^"]*"'
 ```
 
-4. 旧ドメインを残すか決める。残すと**同じ内容が2つのホスト名で配信され**、検索エンジンから重複コンテンツとして扱われる。止めるなら `apps/frontend/wrangler.jsonc` に `"workers_dev": false` を足して再デプロイする（Hono Worker は既にそうしている）
+4. 旧ドメインを残すか決める。残すと**同じ内容が2つのホスト名で配信され**、検索エンジンから重複コンテンツとして扱われる。**正規のホストへリダイレクトする**（下の「workers.dev のURL」と同じやり方）。リダイレクトを置かずに止めるだけなら `apps/frontend/wrangler.jsonc` に `"workers_dev": false` を足して再デプロイする（Hono Worker は既にそうしている）
 5. 落ち着いたら Google Console から旧リダイレクトURIを消す
 6. **Cloudflare Web Analytics の Configured hostname を新ドメインに直す。** Cloudflare は登録したホスト名以外からの計測を受け付けないので、ここを忘れるとアクセス解析だけ黙って止まる（トークンは変えなくてよい）
 7. **プライバシーポリシー（`/privacy`）に旧ドメインが出ていないか確認する**
+8. **`apps/frontend/next.config.ts` の `CANONICAL_ORIGIN` を新ドメインに直して再デプロイする。** workers.dev からのリダイレクト先はここに書いてある。**2番と違い、シークレットの更新では変わらない**（ビルドに焼かれるので再デプロイが要る）
 
 **2を先にやるとログインが `redirect_uri_mismatch` で壊れる。** 新しいコールバック先が Google に登録されていない状態で認証が始まるため。
+
+### workers.dev のURL
+
+デプロイすると `henge-frontend.<アカウント>.workers.dev` が自動で付く。**ここを開けたままにしない。** 正規のホストへ **308** で寄せる。規則は `apps/frontend/next.config.ts` の `redirects()` にある。
+
+**行き先は `next.config.ts` の定数（`CANONICAL_ORIGIN`）で、`BETTER_AUTH_URL` からは引いていない。** `next.config.ts` が評価されるのはビルド時で、そこにWranglerのシークレットは無いため。**正規のURLを2か所に持つことになるので、ドメインを変えるときは両方直す**（上の手順の8番）。片方だけだと、workers.dev から来た人が**旧ドメインへ飛ばされる**。
+
+- 放っておくと**サイト全体が2つのホストで開ける**。テーマ詳細は検索からの着地ページ（`docs/07-ui.md`）なので、評価が割れるのは実害になる
+- workers.dev 側は**ログインが通らない**。Google OAuth のコールバックは正規のホストにしか登録されていない。入口として機能しないURLを公開したままにしない
+
+**Cloudflareの管理画面では設定できない。** Redirect Rules / Page Rules は自分のゾーンにしか置けず、`workers.dev` は自分のゾーンではない。管理画面でできるのは workers.dev のルートを**無効化**することだけで、それは到達不能にする設定であってリダイレクトではない。だからWorker側（Next.js）で返す。
+
+**ホストは完全一致で見る。** `*.workers.dev` をまとめて弾くと、バージョンごとのプレビューURL（`<version>-henge-frontend...`）まで本番へ飛び、**デプロイ前に本番と同じWorkerを確かめる手段が無くなる。**
 
 ### ローカルのD1は両Workerで共有する
 

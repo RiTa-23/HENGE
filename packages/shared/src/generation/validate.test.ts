@@ -3,10 +3,14 @@ import {
   containsKanji,
   countConstraint,
   includesConstraint,
+  isHiraganaOnlyWord,
   isKeystrokeCountInRange,
   isTypableText,
+  isTypableWord,
   KEYSTROKE_MAX,
   KEYSTROKE_MIN,
+  WORD_KEYSTROKE_MAX,
+  WORD_KEYSTROKE_MIN,
 } from "./validate";
 
 describe("isTypableText", () => {
@@ -133,5 +137,50 @@ describe("countConstraint", () => {
   test("includesConstraint と食い違わない", () => {
     expect(includesConstraint("ざぜん", "ざ")).toBe(countConstraint("ざぜん", "ざ") > 0);
     expect(includesConstraint("しゅりけん", "ざ")).toBe(countConstraint("しゅりけん", "ざ") > 0);
+  });
+});
+
+describe("単語の検証", () => {
+  test("句読点を含む語は弾く（単語に句読点は現れない）", () => {
+    expect(isTypableWord("手裏剣")).toBe(true);
+    expect(isTypableWord("手裏剣。")).toBe(false);
+    expect(isTypableWord("忍者、影")).toBe(false);
+  });
+
+  test("長音符と々は語の一部として通す", () => {
+    expect(isTypableWord("ラーメン")).toBe(true);
+    expect(isTypableWord("人々")).toBe(true);
+  });
+
+  test("打てない文字は短文と同じく弾く", () => {
+    expect(isTypableWord("忍者（にんじゃ）")).toBe(false);
+    expect(isTypableWord("ninja")).toBe(false);
+  });
+
+  /**
+   * **単語に `containsKanji` を使わない。** 「ラーメン」のようなカタカナ語まで
+   * 落ちる。狙いは「表記がひらがなだけの、読むまでもないお題」を弾くことなので、
+   * 単語ではひらがな限定の側から判定する。
+   */
+  test("ひらがなだけの語を弾く。カタカナ語は通す", () => {
+    expect(isHiraganaOnlyWord("にんじゃ")).toBe(true);
+    expect(isHiraganaOnlyWord("らーめん")).toBe(true);
+    expect(isHiraganaOnlyWord("ラーメン")).toBe(false);
+    expect(isHiraganaOnlyWord("忍者")).toBe(false);
+  });
+
+  test("単語の打鍵数は短文より狭く、下限も上限も別に持つ", () => {
+    expect(isKeystrokeCountInRange(WORD_KEYSTROKE_MIN, "word")).toBe(true);
+    expect(isKeystrokeCountInRange(WORD_KEYSTROKE_MAX, "word")).toBe(true);
+    expect(isKeystrokeCountInRange(WORD_KEYSTROKE_MIN - 1, "word")).toBe(false);
+    expect(isKeystrokeCountInRange(WORD_KEYSTROKE_MAX + 1, "word")).toBe(false);
+  });
+
+  test("形式を渡さなければ短文の範囲（既存の呼び出しを壊さない）", () => {
+    expect(isKeystrokeCountInRange(KEYSTROKE_MIN)).toBe(true);
+    expect(isKeystrokeCountInRange(KEYSTROKE_MIN - 1)).toBe(false);
+    // 短文で通る25打は、単語としては長すぎる
+    expect(isKeystrokeCountInRange(25)).toBe(true);
+    expect(isKeystrokeCountInRange(25, "word")).toBe(false);
   });
 });

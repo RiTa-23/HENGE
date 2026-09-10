@@ -28,10 +28,14 @@ export {
   containsKanji,
   countConstraint,
   includesConstraint,
+  isHiraganaOnlyWord,
   isKeystrokeCountInRange,
   isTypableText,
+  isTypableWord,
   KEYSTROKE_MAX,
   KEYSTROKE_MIN,
+  WORD_KEYSTROKE_MAX,
+  WORD_KEYSTROKE_MIN,
 } from "./generation/validate";
 export {
   apiError,
@@ -45,7 +49,12 @@ export {
   DAILY_NEURON_LIMIT,
   GENERATION_WAIT_LIMIT_MS,
   PLAY_SIZE,
+  PLAY_SIZE_WORD,
+  playSize,
+  type PromptForm,
   STOCK_TARGET,
+  STOCK_TARGET_WORD,
+  stockTarget,
   THEME_LOCK_TTL_SECONDS,
 } from "./session";
 export { canGenerate, remainingNeurons } from "./quota";

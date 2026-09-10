@@ -1,4 +1,5 @@
 import { normalizeConstraintChar } from "../normalize";
+import type { PromptForm } from "../session";
 
 /**
  * 生成されたお題の検証。読み取得の前に無料で弾けるものと、取得後にしか判定できないものがある。
@@ -38,12 +39,59 @@ export function containsKanji(text: string): boolean {
   return /[一-鿿]/u.test(text);
 }
 
+/**
+ * 単語として打てる文字。**句読点を含めない。**
+ *
+ * 短文の許可文字から `、` `。` `！` `？` を落としたもの。単語に句読点は現れず、
+ * 通してしまうと「単語」と言いながら文の断片が混ざる。長音符 `ー`（ラーメン）と
+ * 々（人々）は語の一部として現れるので残す。
+ */
+const TYPABLE_WORD = /^[ぁ-ゖァ-ヺ一-鿿々ー]+$/u;
+
+/** 単語の本文が使用可能な文字だけでできているか（読み取得の前に呼ぶ） */
+export function isTypableWord(text: string): boolean {
+  return TYPABLE_WORD.test(text);
+}
+
+/**
+ * ひらがな（と長音符）だけの語か。**単語モードで弾くために使う。**
+ *
+ * 短文では「漢字を1つ以上含むか」（`containsKanji`）で同じことを判定しているが、
+ * **単語にその条件は使えない。**「ラーメン」「モツ鍋」のようなカタカナ語まで
+ * 落としてしまうため。狙いは「画面に出る表記がひらがなだけの、読むまでもない
+ * お題」を弾くことなので、単語では条件をひらがな限定の側から書く。
+ *
+ * `isHiraganaOnly`（含む文字の入力検証）は流用できない。あちらは長音符を
+ * 許さないので、「らーめん」が「ひらがなだけではない」と判定される。
+ */
+export function isHiraganaOnlyWord(text: string): boolean {
+  return /^[ぁ-ゖー]+$/u.test(text.normalize("NFC"));
+}
+
 /** 打鍵数の下限・上限。この範囲を外れたお題は却下する。上限≒ローマ字35文字 */
 export const KEYSTROKE_MIN = 10;
 export const KEYSTROKE_MAX = 35;
 
-export function isKeystrokeCountInRange(count: number): boolean {
-  return count >= KEYSTROKE_MIN && count <= KEYSTROKE_MAX;
+/**
+ * 単語の打鍵数。**短文とは別の範囲。**
+ *
+ * 下限4は「忍者（ninja=5）」「城（shiro=5）」が通り、「木（ki=2）」のような
+ * 打ち応えの無い語が落ちる位置。上限12は「手裏剣（shuriken=9）」が通り、
+ * 短い文（10打〜）と重ならない位置に置く。
+ */
+export const WORD_KEYSTROKE_MIN = 4;
+export const WORD_KEYSTROKE_MAX = 12;
+
+/**
+ * 打鍵数が範囲内か。**形式で範囲が変わる。**
+ *
+ * 既定を短文にしてあるのは、呼び出し側（`rebuild-roman` など形式を持たない経路）が
+ * これまでどおり動くようにするため。
+ */
+export function isKeystrokeCountInRange(count: number, form: PromptForm = "sentence"): boolean {
+  const [min, max] =
+    form === "word" ? [WORD_KEYSTROKE_MIN, WORD_KEYSTROKE_MAX] : [KEYSTROKE_MIN, KEYSTROKE_MAX];
+  return count >= min && count <= max;
 }
 
 /**

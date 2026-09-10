@@ -10,7 +10,15 @@ import type { NextConfig } from "next";
  */
 const WORKERS_DEV_HOST = "henge-frontend.rita-tifrt.workers.dev";
 
-/** 正規のホスト。`BETTER_AUTH_URL` と同じ（OAuthのコールバックもこちら） */
+/**
+ * 正規のホスト。`BETTER_AUTH_URL`（＝OAuthのコールバック先・共有URLの基準）と
+ * 同じ値だが、**ここでは定数で持つ**。`next.config.ts` が評価されるのはビルド時で、
+ * そこにWranglerのシークレットは無い。
+ *
+ * **正規のURLを2か所に持つことになる。** ドメインを変えるときは両方直すこと
+ * （手順は docs/02-architecture.md）。ここだけ古いと、workers.dev から来た人が
+ * 旧ドメインへ飛ばされる。
+ */
 const CANONICAL_ORIGIN = "https://henge.ritane.co";
 
 const nextConfig: NextConfig = {

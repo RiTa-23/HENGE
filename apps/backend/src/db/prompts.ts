@@ -103,10 +103,14 @@ export async function recentPromptTexts(
  * 1つのINSERT文に載せるお題の数。
  *
  * **D1のバインド変数の上限は1クエリにつき100個**（db.batch() の中の各文にも個別に適用される）。
- * お題1件で8個使うため、13件以上を1文で挿入すると
- * `too many SQL variables` で失敗する。N_request が20なので分割は必須。
+ * お題1件で**10個**使う（id / theme_id / form / text / reading_kana /
+ * reading_roman_json / keystroke_count / source / model / sequence_number。
+ * created_at は列の既定値なのでバインドしない）。
+ *
+ * **`form` を足したぶん1件あたり1つ増えた。** 10件だとちょうど100個で上限に
+ * 張り付くため、9件に下げて余白を作ってある。次に列を足すときもここを見直すこと。
  */
-const INSERT_CHUNK_SIZE = 10;
+const INSERT_CHUNK_SIZE = 9;
 
 type BatchStatement = Parameters<Db["batch"]>[0][number];
 

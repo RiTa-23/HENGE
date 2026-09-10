@@ -13,7 +13,8 @@ D1（SQLite）+ Drizzle ORM。Better Auth管理下のテーブル（`user` / `se
 | `name` | TEXT | NOT NULL | 表示名（入力されたまま） |
 | `normalized_name` | TEXT | NOT NULL | 重複判定用の正規化キー |
 | `created_by` | TEXT | NULL可, FK→`user.id` ON DELETE SET NULL | `user.id`。運営投入分はNULL。作成者が退会してもテーマは公開コンテンツとして残すためCASCADEにしない |
-| `generation_status` | TEXT | NOT NULL, default `'ok'` | `'ok'` / `'difficult'` |
+| `generation_status` | TEXT | NOT NULL, default `'ok'` | `'ok'` / `'difficult'`。**短文プールの分** |
+| `word_generation_status` | TEXT | NOT NULL, default `'ok'` | 同上。**単語プールの分**。1本にまとめない（単語が作れないテーマで短文の補充まで止まる） |
 | `total_play_count` | INTEGER | NOT NULL, default 0 | 人気順ソート用。プレイ開始のたび+1 |
 | `created_at` | INTEGER | NOT NULL | unixepoch |
 
@@ -63,12 +64,16 @@ CREATE INDEX themes_kind_created ON themes (kind, created_at DESC);
 | `keystroke_count` | INTEGER | NOT NULL | 打鍵数（10〜35） |
 | `source` | TEXT | NOT NULL | `'workers_ai'` |
 | `model` | TEXT | NULL可 | 生成に使ったモデル名 |
-| `sequence_number` | INTEGER | NOT NULL | テーマ内で1始まりの連番 |
+| `form` | TEXT | NOT NULL, default `'sentence'` | `'sentence'` / `'word'`。**プールはこれで分かれる** |
+| `sequence_number` | INTEGER | NOT NULL | テーマ内・**形式内**で1始まりの連番 |
 | `created_at` | INTEGER | NOT NULL | unixepoch |
 
 ```sql
-CREATE UNIQUE INDEX prompts_theme_seq ON prompts (theme_id, sequence_number);
+CREATE UNIQUE INDEX prompts_theme_form_seq ON prompts (theme_id, form, sequence_number);
 ```
+
+**`form` をインデックスに含める。** 連番は形式ごとに1から振り直すため、含めないと
+単語の1番が短文の1番と衝突する。採番（`MAX + 1`）もプールをまたいで飛ぶ。
 
 このインデックス1本で、配信・管理一覧のページネーション（`ORDER BY sequence_number LIMIT ? OFFSET ?`）と**次の採番**（`SELECT MAX(sequence_number)`）を賄える。**在庫数は `COUNT(*)` で数える。** 管理画面からお題を1件消すと連番に穴が空くため、最大値で数えると在庫を多く見積もりすぎる。配信も連番の「値」で範囲指定せず、行数で位置を数える（`OFFSET`）。そうしないと穴を含む15問ブロックが足りなくなり、1件の削除でテーマが遊べなくなる。
 
@@ -82,12 +87,20 @@ CREATE UNIQUE INDEX prompts_theme_seq ON prompts (theme_id, sequence_number);
 |---|---|---|
 | `user_id` | TEXT | FK→`user.id` ON DELETE CASCADE |
 | `theme_id` | TEXT | FK→`themes.id` ON DELETE CASCADE |
-| `play_count` | INTEGER | 15の倍数。次に配信する範囲のオフセット |
+| `form` | TEXT | `'sentence'` / `'word'`。**進捗は形式ごとに持つ** |
+| `play_count` | INTEGER | その形式の1プレイ分（短文15／単語30）の倍数。次に配信する範囲のオフセット |
 | `updated_at` | INTEGER | unixepoch |
 
 ```sql
-PRIMARY KEY (user_id, theme_id)
+PRIMARY KEY (user_id, theme_id, form)
 ```
+
+**`form` を主キーに含める。** 含めないと、単語を1プレイ（30問）遊んだぶんだけ
+短文のオフセットも進み、**まだ遊んでいない短文のお題が飛ばされる**。
+
+匿名側のキーも同じ理由で分ける（`henge:offset:<themeId>` / `…:word`）。
+**短文は接尾辞なしのまま**にしてある。付け替えると既存の進捗が0に戻り、
+一度見たお題がもう一度配られる。
 
 ## user_generation_usage
 
@@ -121,7 +134,7 @@ MVPでは日次上限のみ（**500ニューロン/日**）。月次上限は設
 | キー                               | 値       | TTL     | 用途                |
 | -------------------------------- | ------- | ------- | ----------------- |
 | `theme:<kind>:<normalized_name>` | テーマID   | なし      | 重複チェック・ID解決のキャッシュ |
-| `theme:<theme_id>:lock`          | `"1"` 等 | 60秒 | バックグラウンド生成の多重起動防止 |
+| `theme:<theme_id>:<form>:lock`   | `"1"` 等 | 60秒 | バックグラウンド生成の多重起動防止。**形式ごとに分ける**（単語の補充中に短文の補充がスキップされないように） |
 
 ロックのTTLは**最低60秒**（KVの制約）。生成処理がクラッシュしてもTTLで自動的に復旧するため、古いロックを掃除するバッチ処理は不要。
 
@@ -135,7 +148,7 @@ MVPでは日次上限のみ（**500ニューロン/日**）。月次上限は設
 |---|---|
 | `prompts` | FKのCASCADEで自動削除 |
 | `user_theme_progress` | 同上 |
-| **KVのキャッシュ・ロック** | **自動では消えない。削除処理で明示的に削除する** |
+| **KVのキャッシュ・ロック** | **自動では消えない。削除処理で明示的に削除する**（ロックは**形式ぶんすべて**） |
 
 D1のCASCADEはD1の中でしか効かない。KVを消し忘れると「削除したテーマがキャッシュ経由で復活したように見える」不具合になる。
 
@@ -172,7 +185,30 @@ bun run db:migrate:local   # ローカルD1に適用
 
 **1クエリにつき100個まで。** `db.batch()` の中の各文にも個別に適用される。
 
-お題1件の挿入で8個使うため、**13件以上を1文で挿入すると `too many SQL variables` で落ちる**。生成は1ラウンド20件なので、お題の挿入は必ず分割すること（`apps/backend/src/db/prompts.ts` で10件ずつに分けている）。テーマ行とお題は分割してもバッチの中に収める。
+お題1件の挿入で**10個**使う（`form` を足して1つ増えた）ため、**11件以上を1文で挿入すると `too many SQL variables` で落ちる**。10件でもちょうど上限100個に張り付くので、`apps/backend/src/db/prompts.ts` では**9件ずつ**に分けている。生成は1ラウンド20件なので分割は必須。テーマ行とお題は分割してもバッチの中に収める。**列を足すときはこの数を見直すこと。**
 
 Drizzleで`references()`を明示しないとFK自体が作られない。ローカルD1で外部キー制約が有効であることと、
 CASCADEが実際に効くことは `apps/backend/test/schema.test.ts` で検証している。
+
+## 出題の形式（form）
+
+`prompts.form` で短文と単語のプールを分ける。**`kind`（テーマ／最適化）とは直交する軸**で、
+同じテーマを2つの形式で遊ぶための区別。
+
+**`kind` に値を足す形にしない。** 一意制約が `(kind, normalized_name)` なので、
+「福岡（短文）」と「福岡（単語）」が別のテーマ行になり、一覧に同じ名前が2つ並ぶ。
+プレイ回数も作成者も分かれてしまう。
+
+| 形式 | 1プレイ | 在庫目標 | 打鍵数 |
+|---|---|---|---|
+| `sentence` | 15問 | 30 | 10〜35 |
+| `word` | 30問 | **30** | 4〜12 |
+
+**単語の在庫目標を2プレイ分（60）にしない。** 補充が1回で作れるのは最大40件
+（20件×2ラウンド）で、在庫0から60は埋められない。目標未達は `'difficult'` を立てる
+条件なので、**普通に作れているテーマに「生成困難」の印が付き、以後の補充が止まる**。
+値は `packages/shared/src/session.ts` にあり、`session.test.ts` で「1回の補充で
+作れる上限を超えない」ことを固定している。
+
+**単語モードはテーマだけ。** 最適化練習（`kind: 'constraint'`）には付けない。
+短い語に指定の音を入れさせるのは短文よりさらに却下率が上がる（`docs/05-generation.md`）。

@@ -4,6 +4,8 @@ import { isApiError } from "@henge/shared";
 import { useCallback, useEffect, useState } from "react";
 
 interface AdminPrompt {
+  /** 出題の形式。連番は形式ごとに1から振り直されるので、番号だけでは区別できない */
+  form: "sentence" | "word";
   id: string;
   text: string;
   readingKana: string;
@@ -113,6 +115,7 @@ export function AdminPromptList({ themeId }: { themeId: string }) {
       <thead>
         <tr className="border-b border-kinari/10 text-left tracking-widest text-kinari/50">
           <th className="py-3 font-normal">番</th>
+          <th className="py-3 font-normal">形式</th>
           <th className="py-3 font-normal">本文</th>
           <th className="py-3 font-normal">読み</th>
           <th className="py-3 text-right font-normal">打鍵</th>
@@ -123,6 +126,9 @@ export function AdminPromptList({ themeId }: { themeId: string }) {
         {prompts.map((prompt) => (
           <tr key={prompt.id} className="border-b border-kinari/5 align-top">
             <td className="py-3 font-mono text-kinari/40">{prompt.sequenceNumber}</td>
+            <td className="py-3 pr-4 text-xs whitespace-nowrap text-kinari/50">
+              {prompt.form === "word" ? "単語" : "短文"}
+            </td>
             <td className="py-3 pr-4 font-mincho text-base text-kinari">
               {editingId === prompt.id ? (
                 <div>
@@ -184,7 +190,7 @@ export function AdminPromptList({ themeId }: { themeId: string }) {
         ))}
         {prompts.length === 0 && (
           <tr>
-            <td colSpan={5} className="py-10 text-center text-kinari/50">
+            <td colSpan={6} className="py-10 text-center text-kinari/50">
               お題がありません
             </td>
           </tr>
@@ -193,7 +199,7 @@ export function AdminPromptList({ themeId }: { themeId: string }) {
       {nextCursor !== null && (
         <tfoot>
           <tr>
-            <td colSpan={5} className="pt-4 text-center">
+            <td colSpan={6} className="pt-4 text-center">
               <button
                 type="button"
                 onClick={() => void load(nextCursor)}

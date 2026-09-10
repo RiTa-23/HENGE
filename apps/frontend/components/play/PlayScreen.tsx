@@ -24,6 +24,7 @@ import { ProgressDots } from "./ProgressDots";
 import { Result, type PlayStats } from "./Result";
 import { Scroll } from "./Scroll";
 import { SoundToggle } from "./SoundToggle";
+import { readJsonBody } from "@/lib/api/json";
 import { readOffset, writeOffset } from "@/lib/play/offset";
 import { mergeMissedKeys } from "@/lib/play/misses";
 import { playHit, playMiss, primeAudio, readMuted, writeMuted } from "@/lib/play/sound";
@@ -195,7 +196,8 @@ export function PlayScreen({
       // 匿名のときだけこの値が使われる
       body: JSON.stringify({ themeId, form, offset: readOffset(themeId, form) }),
     });
-    const body: unknown = await response.json();
+    // **本文が空でも落とさない。** エラーを表示しようとして別の例外で画面が落ちる
+    const body: unknown = await readJsonBody(response);
 
     if (!response.ok) {
       const { code, message } = isApiError(body)
@@ -341,7 +343,7 @@ export function PlayScreen({
       return;
     }
 
-    const body: unknown = await response.json();
+    const body: unknown = await readJsonBody(response);
     const { code, message } = isApiError(body)
       ? body.error
       : { code: "UNKNOWN", message: "お題を作れませんでした" };

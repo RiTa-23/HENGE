@@ -12,7 +12,7 @@ const DESCRIPTION = "HENGEが扱う情報と、その使い道について。";
  * **ビルド中に Miniflare（workerd）が起動**し、Nextのビルドワーカー3並列が
  * 同じローカルSQLite（`.wrangler/state`）を奪い合って `SQLITE_BUSY` で落ちる。
  * 走るたびに当たり外れがあるので、**PRのCIは通ってmainのデプロイだけ落ちる**
- * という形で出る（#140）。`next dev` を動かしたまま `bun run preview` すると
+ * という形で出る（Issue 140）。`next dev` を動かしたまま `bun run preview` すると
  * 100%再現する。
  *
  * `SiteHeader` を置く他のページはすべてこれを宣言している。**ヘッダーを足す

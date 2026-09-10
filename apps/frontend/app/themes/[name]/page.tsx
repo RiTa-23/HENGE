@@ -49,7 +49,7 @@ export default async function ThemeDetailPage({ params }: { params: Promise<{ na
         <dl className="mt-10 flex gap-10 text-sm">
           <div>
             <dt className="tracking-widest text-kinari/50">お題数</dt>
-            <dd className="mt-1 font-mono text-2xl text-kin">{theme.promptCount}</dd>
+            <dd className="mt-1 font-mono text-2xl text-kin">{theme.promptCounts.sentence}</dd>
           </div>
           <div>
             <dt className="tracking-widest text-kinari/50">プレイ回数</dt>

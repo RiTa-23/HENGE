@@ -2,11 +2,15 @@ import {
   containsKanji,
   countKeystrokes,
   includesConstraint,
+  isHiraganaOnlyWord,
   isKeystrokeCountInRange,
   isTypableText,
+  isTypableWord,
   KEYSTROKE_MAX,
   KEYSTROKE_MIN,
   UnsupportedKanaError,
+  WORD_KEYSTROKE_MAX,
+  WORD_KEYSTROKE_MIN,
 } from "@henge/shared";
 import { Hono } from "hono";
 import { createDb } from "../db/client";
@@ -21,7 +25,7 @@ import { createGetReading } from "../reading/index";
 import { deleteTheme, LIST_LIMIT_DEFAULT, listThemesForAdmin } from "../db/themes";
 import { listUsers, USER_LIST_LIMIT_DEFAULT } from "../db/users";
 import { fail } from "../http/error";
-import { releaseThemeLock } from "../kv/lock";
+import { releaseAllThemeLocks } from "../kv/lock";
 import { deleteCachedThemeId } from "../kv/themes";
 
 /**
@@ -63,8 +67,9 @@ export const adminRoutes = new Hono<{ Bindings: Env }>()
     // **KVは明示的に消す。** D1のCASCADEはD1の中でしか効かないため、
     // 消し忘れると削除したテーマがキャッシュ経由で復活したように見える
     await deleteCachedThemeId(c.env.KV, deleted.kind, deleted.normalizedName);
-    // 削除の瞬間に補充が走っていた場合に備えてロックも落とす（TTL任せにしない）
-    await releaseThemeLock(c.env.KV, themeId);
+    // 削除の瞬間に補充が走っていた場合に備えてロックも落とす（TTL任せにしない）。
+    // **形式ぶんすべて消す**（短文と単語で別のキーになっている）
+    await releaseAllThemeLocks(c.env.KV, themeId);
 
     return c.json({ deleted: true, themeId });
   })
@@ -100,11 +105,22 @@ export const adminRoutes = new Hono<{ Bindings: Env }>()
     // **本文だけ差し替えてはいけない。** 打鍵判定は読み仮名に対して行うので、
     // 読みを取り直さないと「画面の文と打つべきローマ字が食い違う」お題ができる。
     // 生成時と同じ検査を通す。ここを緩めると、生成では弾かれる文が手動で入る
-    if (!isTypableText(text)) {
-      return fail(c, "VALIDATION_ERROR", "打てない文字が含まれています");
+    // **検査は元のお題の形式に合わせる。** 単語のお題を短文の規則で通すと、
+    // 句読点入りの「単語」や35打の「単語」が手動で入ってしまう
+    const isWord = target.form === "word";
+    if (isWord ? !isTypableWord(text) : !isTypableText(text)) {
+      return fail(
+        c,
+        "VALIDATION_ERROR",
+        isWord ? "単語に使えない文字が含まれています" : "打てない文字が含まれています",
+      );
     }
-    if (!containsKanji(text)) {
-      return fail(c, "VALIDATION_ERROR", "漢字を1つ以上入れてください");
+    if (isWord ? isHiraganaOnlyWord(text) : !containsKanji(text)) {
+      return fail(
+        c,
+        "VALIDATION_ERROR",
+        isWord ? "ひらがなだけの単語は登録できません" : "漢字を1つ以上入れてください",
+      );
     }
 
     let reading: Awaited<ReturnType<ReturnType<typeof createGetReading>>>;
@@ -119,11 +135,14 @@ export const adminRoutes = new Hono<{ Bindings: Env }>()
     }
 
     const keystrokeCount = countKeystrokes(reading.roman);
-    if (!isKeystrokeCountInRange(keystrokeCount)) {
+    if (!isKeystrokeCountInRange(keystrokeCount, target.form)) {
+      const [min, max] = isWord
+        ? [WORD_KEYSTROKE_MIN, WORD_KEYSTROKE_MAX]
+        : [KEYSTROKE_MIN, KEYSTROKE_MAX];
       return fail(
         c,
         "VALIDATION_ERROR",
-        `打鍵数が${KEYSTROKE_MIN}〜${KEYSTROKE_MAX}の範囲外です（${keystrokeCount}打）`,
+        `打鍵数が${min}〜${max}の範囲外です（${keystrokeCount}打）`,
       );
     }
     if (target.kind === "constraint" && !includesConstraint(reading.kana, target.themeName)) {

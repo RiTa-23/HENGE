@@ -1,8 +1,8 @@
-import { desc, eq, sql } from "drizzle-orm";
+import { and, desc, eq, sql } from "drizzle-orm";
 import type { Db } from "./client";
 import { prompts, themes } from "./schema";
 import type { ValidPrompt } from "../generation/batch";
-import type { ThemeKind } from "@henge/shared";
+import type { PromptForm, ThemeKind } from "@henge/shared";
 
 /**
  * テーマ内のお題の数。**`COUNT(*)` で数える（`MAX(sequence_number)` ではない）。**
@@ -11,11 +11,11 @@ import type { ThemeKind } from "@henge/shared";
  * 多く見積もり、配信側は「在庫はあるのに15問揃わない」状態になって、そのテーマが
  * 遊べなくなる。実際に配れる数を数えること。
  */
-export async function countPrompts(db: Db, themeId: string): Promise<number> {
+export async function countPrompts(db: Db, themeId: string, form: PromptForm): Promise<number> {
   const [row] = await db
     .select({ count: sql<number>`count(*)` })
     .from(prompts)
-    .where(eq(prompts.themeId, themeId));
+    .where(and(eq(prompts.themeId, themeId), eq(prompts.form, form)));
   return row?.count ?? 0;
 }
 
@@ -25,11 +25,15 @@ export async function countPrompts(db: Db, themeId: string): Promise<number> {
  * 件数（`COUNT`）で採番すると、削除で穴が空いたテーマに追加したときに既存の番号と
  * 衝突して一意制約に当たる。「いくつあるか」と「次に何番を振るか」は別物。
  */
-export async function nextSequenceNumber(db: Db, themeId: string): Promise<number> {
+export async function nextSequenceNumber(
+  db: Db,
+  themeId: string,
+  form: PromptForm,
+): Promise<number> {
   const [row] = await db
     .select({ max: sql<number | null>`max(${prompts.sequenceNumber})` })
     .from(prompts)
-    .where(eq(prompts.themeId, themeId));
+    .where(and(eq(prompts.themeId, themeId), eq(prompts.form, form)));
   return (row?.max ?? 0) + 1;
 }
 
@@ -54,6 +58,7 @@ export interface PlayablePrompt {
 export async function fetchPromptPage(
   db: Db,
   themeId: string,
+  form: PromptForm,
   offset: number,
   limit: number,
 ): Promise<PlayablePrompt[]> {
@@ -65,7 +70,7 @@ export async function fetchPromptPage(
       readingRomanJson: prompts.readingRomanJson,
     })
     .from(prompts)
-    .where(eq(prompts.themeId, themeId))
+    .where(and(eq(prompts.themeId, themeId), eq(prompts.form, form)))
     .orderBy(prompts.sequenceNumber)
     .limit(limit)
     .offset(offset);
@@ -79,11 +84,16 @@ export async function fetchPromptPage(
 }
 
 /** 重複回避の文脈として渡す既存お題（直近から） */
-export async function recentPromptTexts(db: Db, themeId: string, limit: number): Promise<string[]> {
+export async function recentPromptTexts(
+  db: Db,
+  themeId: string,
+  form: PromptForm,
+  limit: number,
+): Promise<string[]> {
   const rows = await db
     .select({ text: prompts.text })
     .from(prompts)
-    .where(eq(prompts.themeId, themeId))
+    .where(and(eq(prompts.themeId, themeId), eq(prompts.form, form)))
     .orderBy(desc(prompts.sequenceNumber))
     .limit(limit);
   return rows.map((row) => row.text);
@@ -111,10 +121,17 @@ function chunk<T>(items: T[], size: number): T[][] {
   return chunks;
 }
 
-function toRows(themeId: string, model: string, from: number, items: ValidPrompt[]) {
+function toRows(
+  themeId: string,
+  form: PromptForm,
+  model: string,
+  from: number,
+  items: ValidPrompt[],
+) {
   return items.map((item, index) => ({
     id: crypto.randomUUID(),
     themeId,
+    form,
     text: item.text,
     readingKana: item.readingKana,
     readingRomanJson: item.readingRomanJson,
@@ -143,7 +160,9 @@ export async function insertThemeWithPrompts(
   items: ValidPrompt[],
   model: string,
 ): Promise<void> {
-  const rows = toRows(theme.id, model, 1, items);
+  // 新規作成で作るのは短文のプールだけ。**単語を同じリクエストで作らない**
+  // （1実行の外部サブリクエスト上限50回に対し、2形式で最大80回になる）
+  const rows = toRows(theme.id, "sentence", model, 1, items);
   const inserts = chunk(rows, INSERT_CHUNK_SIZE).map((part) => db.insert(prompts).values(part));
   // テーマ行とお題を同じバッチで入れる。分割してもバッチの中に収める
   await db.batch(asBatch([db.insert(themes).values(theme), ...inserts]));
@@ -158,12 +177,13 @@ export async function insertThemeWithPrompts(
 export async function appendPrompts(
   db: Db,
   themeId: string,
+  form: PromptForm,
   items: ValidPrompt[],
   model: string,
 ): Promise<number> {
   if (items.length === 0) return 0;
-  const from = await nextSequenceNumber(db, themeId);
-  const rows = toRows(themeId, model, from, items);
+  const from = await nextSequenceNumber(db, themeId, form);
+  const rows = toRows(themeId, form, model, from, items);
   const inserts = chunk(rows, INSERT_CHUNK_SIZE).map((part) => db.insert(prompts).values(part));
   await db.batch(asBatch(inserts));
   return from + items.length - 1;
@@ -171,6 +191,7 @@ export async function appendPrompts(
 
 export interface AdminPrompt {
   id: string;
+  form: PromptForm;
   text: string;
   readingKana: string;
   keystrokeCount: number;
@@ -197,6 +218,7 @@ export async function listPromptsForAdmin(
   const rows = await db
     .select({
       id: prompts.id,
+      form: prompts.form,
       text: prompts.text,
       readingKana: prompts.readingKana,
       keystrokeCount: prompts.keystrokeCount,
@@ -206,7 +228,9 @@ export async function listPromptsForAdmin(
     })
     .from(prompts)
     .where(eq(prompts.themeId, themeId))
-    .orderBy(prompts.sequenceNumber)
+    // 形式ごとに連番が1から振り直されるので、**form を先に並べる**。
+    // 連番だけで並べると短文と単語が交互に出て読めない
+    .orderBy(prompts.form, prompts.sequenceNumber)
     .limit(page.limit + 1)
     .offset(page.cursor);
 
@@ -217,15 +241,25 @@ export async function listPromptsForAdmin(
   };
 }
 
-/** お題1件と、それが属するテーマの種別・名前。編集時の「含む」検査に要る */
+/**
+ * お題1件と、それが属するテーマの種別・名前。編集時の「含む」検査に要る。
+ * **形式も返す**（打鍵数の範囲と文字種の検査が形式で変わるため）。
+ */
 export async function getPromptWithTheme(
   db: Db,
   promptId: string,
-): Promise<{ id: string; themeId: string; kind: ThemeKind; themeName: string } | null> {
+): Promise<{
+  id: string;
+  themeId: string;
+  form: PromptForm;
+  kind: ThemeKind;
+  themeName: string;
+} | null> {
   const [row] = await db
     .select({
       id: prompts.id,
       themeId: prompts.themeId,
+      form: prompts.form,
       kind: themes.kind,
       themeName: themes.name,
     })

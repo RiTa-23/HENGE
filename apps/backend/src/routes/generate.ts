@@ -1,8 +1,13 @@
-import { normalizeName, PLAY_SIZE, type ThemeKind } from "@henge/shared";
+import { normalizeName, playSize, type PromptForm, type ThemeKind } from "@henge/shared";
 import { type Context, Hono } from "hono";
 import { createDb } from "../db/client";
 import { appendPrompts, insertThemeWithPrompts, recentPromptTexts } from "../db/prompts";
-import { findThemeByName, getThemeDetail, setGenerationStatus } from "../db/themes";
+import {
+  findThemeByName,
+  generationStatusOf,
+  getThemeDetail,
+  setGenerationStatus,
+} from "../db/themes";
 import { recordUsage } from "../db/usage";
 import { generateBatch } from "../generation/batch";
 import { AiQuotaExceededError, AiUnavailableError } from "../generation/ai";
@@ -22,6 +27,8 @@ interface CreateBody {
 interface RegenerateBody {
   themeId: string;
   userId: string;
+  /** どちらのプールに作り足すか。省略時は短文 */
+  form?: PromptForm;
 }
 
 /**
@@ -69,7 +76,8 @@ export const generateRoutes = new Hono<{ Bindings: Env }>()
         name: body.name,
         themeId,
         path: "create",
-        target: PLAY_SIZE,
+        // 新規作成で作るのは短文のプールだけ（単語は別リクエストで作る）
+        target: playSize("sentence"),
         existing: [],
         model,
         getReading: createGetReading(c.env),
@@ -111,8 +119,10 @@ export const generateRoutes = new Hono<{ Bindings: Env }>()
     const theme = await getThemeDetail(db, body.themeId);
     if (theme === null) return fail(c, "NOT_FOUND", "テーマが見つかりません");
 
-    // 背景補充が走っている最中なら、二重に生成しない
-    if (!(await acquireThemeLock(c.env.KV, body.themeId))) {
+    const form: PromptForm = body.form ?? "sentence";
+
+    // 背景補充が走っている最中なら、二重に生成しない。**ロックは形式ごと**
+    if (!(await acquireThemeLock(c.env.KV, body.themeId, form))) {
       return fail(c, "GENERATION_IN_PROGRESS");
     }
 
@@ -126,8 +136,8 @@ export const generateRoutes = new Hono<{ Bindings: Env }>()
         name: theme.name,
         themeId: theme.id,
         path: "regenerate",
-        target: PLAY_SIZE,
-        existing: await recentPromptTexts(db, theme.id, EXISTING_CONTEXT_SIZE),
+        target: playSize(form),
+        existing: await recentPromptTexts(db, theme.id, form, EXISTING_CONTEXT_SIZE),
         model,
         getReading: createGetReading(c.env),
         waitUntil: (promise) => c.executionCtx.waitUntil(promise),
@@ -140,9 +150,11 @@ export const generateRoutes = new Hono<{ Bindings: Env }>()
 
       if (!result.reachedTarget) return fail(c, "GENERATION_FAILED");
 
-      await appendPrompts(db, theme.id, result.valid, model);
+      await appendPrompts(db, theme.id, form, result.valid, model);
       // 生成できることが実証されたので「生成困難」の印を外す
-      if (theme.generationStatus === "difficult") await setGenerationStatus(db, theme.id, "ok");
+      if (generationStatusOf(theme, form) === "difficult") {
+        await setGenerationStatus(db, theme.id, form, "ok");
+      }
 
       return c.json({
         theme: await getThemeDetail(db, theme.id),
@@ -153,6 +165,6 @@ export const generateRoutes = new Hono<{ Bindings: Env }>()
       return failFromAiError(c, error);
     } finally {
       // 記録は onNeurons で済んでいる。ここはロックを返すだけ
-      await releaseThemeLock(c.env.KV, body.themeId);
+      await releaseThemeLock(c.env.KV, body.themeId, form);
     }
   });

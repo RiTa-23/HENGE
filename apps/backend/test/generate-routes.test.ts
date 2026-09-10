@@ -94,7 +94,7 @@ beforeEach(async () => {
   await db.delete(themes);
   await db.delete(user);
   await env.KV.delete(themeIdKey("theme", "忍びの心得"));
-  await env.KV.delete(themeLockKey("t1"));
+  await env.KV.delete(themeLockKey("t1", "sentence"));
 });
 
 describe("POST /themes", () => {
@@ -212,7 +212,7 @@ describe("Workers AI 側の事情は、テーマ名の問題と区別して返�
 
     expect(status).toBe(429);
     expect((body.error as { code: string }).code).toBe("AI_QUOTA_EXCEEDED");
-    expect(await env.KV.get(themeLockKey("t1"))).toBeNull();
+    expect(await env.KV.get(themeLockKey("t1", "sentence"))).toBeNull();
   });
 });
 
@@ -283,7 +283,9 @@ describe("同期生成の消費記録（成否によらず実消費を加算す�
     const { status, body } = await post("/prompts/regenerate", { themeId: "t1", userId: "u1" });
 
     expect(status).toBe(200);
-    expect((body.theme as { promptCount: number }).promptCount).toBeGreaterThanOrEqual(15);
+    expect(
+      (body.theme as { promptCounts: { sentence: number } }).promptCounts.sentence,
+    ).toBeGreaterThanOrEqual(15);
     expect(body.neuronsUsed).toBeCloseTo(PER_ROUND);
     expect((await getUsage(db, "u1")).neurons).toBeCloseTo(PER_ROUND);
   });
@@ -296,7 +298,7 @@ describe("同期生成の消費記録（成否によらず実消費を加算す�
       name: "忍びの心得",
       normalizedName: "忍びの心得",
     });
-    await env.KV.put(themeLockKey("t1"), "1", { expirationTtl: 60 });
+    await env.KV.put(themeLockKey("t1", "sentence"), "1", { expirationTtl: 60 });
 
     await post("/prompts/regenerate", { themeId: "t1", userId: "u1" });
 
@@ -327,7 +329,7 @@ describe("POST /prompts/regenerate", () => {
       name: "忍びの心得",
       normalizedName: "忍びの心得",
     });
-    await env.KV.put(themeLockKey("t1"), "1", { expirationTtl: 60 });
+    await env.KV.put(themeLockKey("t1", "sentence"), "1", { expirationTtl: 60 });
 
     const { status, body } = await post("/prompts/regenerate", { themeId: "t1", userId: "u1" });
 
@@ -347,7 +349,7 @@ describe("POST /prompts/regenerate", () => {
 
     await post("/prompts/regenerate", { themeId: "t1", userId: "u1" });
 
-    expect(await env.KV.get(themeLockKey("t1"))).toBeNull();
+    expect(await env.KV.get(themeLockKey("t1", "sentence"))).toBeNull();
   });
 
   it("存在しないテーマは NOT_FOUND を返す", async () => {

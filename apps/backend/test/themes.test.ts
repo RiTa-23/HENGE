@@ -82,7 +82,7 @@ describe("GET /themes", () => {
 });
 
 describe("GET /themes/:id", () => {
-  it("総生成数を MAX(sequence_number) で返す", async () => {
+  it("在庫数を形式ごとに COUNT で返す", async () => {
     await seedTheme({ id: "t1" });
     await db.insert(prompts).values(
       [1, 2, 3].map((n) => ({
@@ -98,13 +98,13 @@ describe("GET /themes/:id", () => {
     );
 
     const { body } = await get("/themes/t1");
-    expect((body.theme as { promptCount: number }).promptCount).toBe(3);
+    expect((body.theme as { promptCounts: { sentence: number } }).promptCounts.sentence).toBe(3);
   });
 
   it("お題が無いテーマは0件として返す", async () => {
     await seedTheme({ id: "t1" });
     const { body } = await get("/themes/t1");
-    expect((body.theme as { promptCount: number }).promptCount).toBe(0);
+    expect((body.theme as { promptCounts: { sentence: number } }).promptCounts.sentence).toBe(0);
   });
 
   it("存在しないテーマは NOT_FOUND を返す（入力の形式は正しいため）", async () => {

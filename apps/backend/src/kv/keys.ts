@@ -1,4 +1,4 @@
-import type { ThemeKind } from "@henge/shared";
+import type { PromptForm, ThemeKind } from "@henge/shared";
 
 /**
  * KVのキーはここでだけ組み立てる。文字列を直書きしない。
@@ -12,9 +12,19 @@ export function themeIdKey(kind: ThemeKind, normalizedName: string): string {
   return `theme:${kind}:${normalizedName}`;
 }
 
-/** バックグラウンド生成の多重起動防止 */
-export function themeLockKey(themeId: string): string {
-  return `theme:${themeId}:lock`;
+/**
+ * バックグラウンド生成の多重起動防止。**形式ごとに別のキーにする。**
+ *
+ * 1つにまとめると、単語を補充している間は短文の補充がスキップされる（逆も同じ）。
+ * プールが別なら同時に作って構わない。
+ */
+export function themeLockKey(themeId: string, form: PromptForm): string {
+  return `theme:${themeId}:${form}:lock`;
+}
+
+/** テーマ削除時に消すロックのキー。**形式ぶんすべて消す**（不変条件6） */
+export function themeLockKeys(themeId: string): string[] {
+  return [themeLockKey(themeId, "sentence"), themeLockKey(themeId, "word")];
 }
 
 /**

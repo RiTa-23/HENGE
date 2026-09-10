@@ -169,11 +169,11 @@ describe("DELETE /admin/themes/:id", () => {
 
   it("生成ロックも消える（TTLの満了を待たない）", async () => {
     await seedTheme({ id: "t1" });
-    await env.KV.put(themeLockKey("t1"), "1");
+    await env.KV.put(themeLockKey("t1", "sentence"), "1");
 
     await request("/admin/themes/t1", { method: "DELETE" });
 
-    expect(await env.KV.get(themeLockKey("t1"))).toBeNull();
+    expect(await env.KV.get(themeLockKey("t1", "sentence"))).toBeNull();
   });
 
   it("存在しないテーマは NOT_FOUND", async () => {

@@ -1,7 +1,9 @@
-import { normalizeName, type ThemeKind } from "@henge/shared";
+import { normalizeName, type PromptForm, type ThemeKind } from "@henge/shared";
 import { and, desc, eq, sql } from "drizzle-orm";
 import type { Db } from "./client";
 import { prompts, themes } from "./schema";
+
+export type GenerationStatus = "ok" | "difficult";
 
 export interface ThemeSummary {
   id: string;
@@ -9,7 +11,26 @@ export interface ThemeSummary {
   name: string;
   totalPlayCount: number;
   createdAt: number;
-  generationStatus: "ok" | "difficult";
+  /** 短文プールの「生成困難」の印 */
+  generationStatus: GenerationStatus;
+  /** 単語プールの「生成困難」の印。**短文と分けて持つ**（片方の失敗で両方止めない） */
+  wordGenerationStatus: GenerationStatus;
+}
+
+/** その形式の印を取る。呼び出し側に `form === "word" ? ... : ...` を書かせない */
+export function generationStatusOf(theme: ThemeSummary, form: PromptForm): GenerationStatus {
+  return form === "word" ? theme.wordGenerationStatus : theme.generationStatus;
+}
+
+/** 形式ごとの在庫数 */
+export interface PromptCounts {
+  sentence: number;
+  word: number;
+}
+
+/** その形式の在庫数 */
+export function promptCountOf(counts: PromptCounts, form: PromptForm): number {
+  return form === "word" ? counts.word : counts.sentence;
 }
 
 export const LIST_LIMIT_DEFAULT = 20;
@@ -34,6 +55,7 @@ export async function listThemes(
       totalPlayCount: themes.totalPlayCount,
       createdAt: themes.createdAt,
       generationStatus: themes.generationStatus,
+      wordGenerationStatus: themes.wordGenerationStatus,
     })
     .from(themes)
     .where(eq(themes.kind, params.kind))
@@ -63,6 +85,7 @@ export async function findThemeByName(
       totalPlayCount: themes.totalPlayCount,
       createdAt: themes.createdAt,
       generationStatus: themes.generationStatus,
+      wordGenerationStatus: themes.wordGenerationStatus,
     })
     .from(themes)
     .where(and(eq(themes.kind, kind), eq(themes.normalizedName, normalizeName(kind, name))))
@@ -71,9 +94,21 @@ export async function findThemeByName(
 }
 
 export interface ThemeDetail extends ThemeSummary {
-  /** 総生成数。MAX(sequence_number) で取れる */
-  promptCount: number;
+  /** 形式ごとの在庫数 */
+  promptCounts: PromptCounts;
 }
+
+/**
+ * 形式ごとの在庫数。**`COUNT` で数える（`MAX(sequence_number)` ではない）。**
+ *
+ * 連番は形式ごとに1から振り直されるので、最大値では両方のプールを混ぜて数えられない。
+ * そもそも管理画面から1件消すと連番に穴が空くため、最大値は在庫を多く見積もる
+ * （`docs/03-data-model.md`）。実際に配れる数を数える。
+ */
+const promptCountColumns = {
+  sentence: sql<number>`coalesce(sum(case when ${prompts.form} = 'sentence' then 1 else 0 end), 0)`,
+  word: sql<number>`coalesce(sum(case when ${prompts.form} = 'word' then 1 else 0 end), 0)`,
+};
 
 export async function getThemeDetail(db: Db, id: string): Promise<ThemeDetail | null> {
   const [row] = await db
@@ -84,14 +119,18 @@ export async function getThemeDetail(db: Db, id: string): Promise<ThemeDetail | 
       totalPlayCount: themes.totalPlayCount,
       createdAt: themes.createdAt,
       generationStatus: themes.generationStatus,
-      promptCount: sql<number>`coalesce(max(${prompts.sequenceNumber}), 0)`,
+      wordGenerationStatus: themes.wordGenerationStatus,
+      sentenceCount: promptCountColumns.sentence,
+      wordCount: promptCountColumns.word,
     })
     .from(themes)
     .leftJoin(prompts, eq(prompts.themeId, themes.id))
     .where(eq(themes.id, id))
     .groupBy(themes.id)
     .limit(1);
-  return row ?? null;
+  if (row === undefined) return null;
+  const { sentenceCount, wordCount, ...theme } = row;
+  return { ...theme, promptCounts: { sentence: sentenceCount, word: wordCount } };
 }
 
 /** プレイ開始のたびに+1。人気順ソートの材料 */
@@ -102,18 +141,28 @@ export async function incrementPlayCount(db: Db, themeId: string): Promise<void>
     .where(eq(themes.id, themeId));
 }
 
-/** 生成できることが実証されたら 'ok' に戻す。生成困難の印を残し続けない */
+/**
+ * 生成できることが実証されたら 'ok' に戻す。生成困難の印を残し続けない。
+ * **印は形式ごと。** 単語が作れないテーマで短文の補充まで止めない。
+ */
 export async function setGenerationStatus(
   db: Db,
   themeId: string,
-  status: "ok" | "difficult",
+  form: PromptForm,
+  status: GenerationStatus,
 ): Promise<void> {
-  await db.update(themes).set({ generationStatus: status }).where(eq(themes.id, themeId));
+  const column = form === "word" ? { wordGenerationStatus: status } : { generationStatus: status };
+  await db.update(themes).set(column).where(eq(themes.id, themeId));
 }
 
-export interface AdminThemeRow extends ThemeDetail {
+export interface AdminThemeRow extends ThemeSummary {
   /** 運営投入分は NULL。作成者を辿るために管理用一覧にだけ含める */
   createdBy: string | null;
+  /**
+   * 短文と単語の**合計**。管理画面が見たいのは「このテーマにお題が何件あるか」で、
+   * 形式ごとの内訳はテーマ1つ分の一覧（`/admin/themes/[id]`）側で見る
+   */
+  promptCount: number;
 }
 
 /**
@@ -135,8 +184,10 @@ export async function listThemesForAdmin(
       totalPlayCount: themes.totalPlayCount,
       createdAt: themes.createdAt,
       generationStatus: themes.generationStatus,
+      wordGenerationStatus: themes.wordGenerationStatus,
       createdBy: themes.createdBy,
-      promptCount: sql<number>`coalesce(max(${prompts.sequenceNumber}), 0)`,
+      sentenceCount: promptCountColumns.sentence,
+      wordCount: promptCountColumns.word,
     })
     .from(themes)
     .leftJoin(prompts, eq(prompts.themeId, themes.id))
@@ -148,7 +199,10 @@ export async function listThemesForAdmin(
 
   const hasMore = rows.length > limit;
   return {
-    themes: rows.slice(0, limit),
+    themes: rows.slice(0, limit).map(({ sentenceCount, wordCount, ...theme }) =>
+      // 分割で作った新しいオブジェクトなので、そのまま足してよい（spread を重ねない）
+      Object.assign(theme, { promptCount: sentenceCount + wordCount }),
+    ),
     nextCursor: hasMore ? params.cursor + limit : null,
   };
 }

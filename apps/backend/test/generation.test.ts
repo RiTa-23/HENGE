@@ -118,6 +118,7 @@ function envWithAiResponses(rounds: string[][], logs: PatchedLog[] = []): Env {
 function input(overrides: Partial<GenerateBatchInput> = {}): GenerateBatchInput {
   return {
     kind: "theme",
+    form: "sentence",
     name: "忍びの心得",
     themeId: "t1",
     path: "create",
@@ -320,5 +321,38 @@ describe("generateBatch", () => {
     expect(first?.readingKana).toBe("しのびはやみをはしる。");
     expect(first?.keystrokeCount).toBeGreaterThanOrEqual(10);
     expect(JSON.parse(first?.readingRomanJson ?? "[]")[0]).toContain("shi");
+  });
+});
+
+/** 単語の読み。漢字はテーブルに無いので、テスト側で読みを与える */
+const wordReading: GetReading = async (text) => {
+  const kana = { 忍者: "にんじゃ", 城: "しろ", ラーメン: "らーめん" }[text] ?? text;
+  return { kana, roman: buildRomanCandidates(kana) };
+};
+
+describe("単語モードの検証", () => {
+  /** 単語は句読点を許さない。短文の文字種で通すと文の断片が混ざる */
+  it("句読点の付いた語を charset として却下する", async () => {
+    const result = await generateBatch(envWithAiResponses([["忍者", "手裏剣。", "城"]]), {
+      ...input({ form: "word", target: 3 }),
+      getReading: wordReading,
+    });
+
+    expect(result.valid.map((p) => p.text)).toEqual(["忍者", "城"]);
+    expect(result.rejected.charset).toBe(1);
+  });
+
+  /**
+   * **単語に「漢字を1つ以上」は使えない。**「ラーメン」のようなカタカナ語まで
+   * 落ちる。ひらがなだけの語を弾く側から判定する
+   */
+  it("カタカナ語は通し、ひらがなだけの語を却下する", async () => {
+    const result = await generateBatch(envWithAiResponses([["ラーメン", "にんじゃ"]]), {
+      ...input({ form: "word", target: 2 }),
+      getReading: wordReading,
+    });
+
+    expect(result.valid.map((p) => p.text)).toEqual(["ラーメン"]);
+    expect(result.rejected.kanji).toBe(1);
   });
 });

@@ -7,7 +7,7 @@ import { acquireThemeLock, releaseThemeLock } from "../kv/lock";
 import { createGetReading } from "../reading/index";
 import { generateBatch } from "./batch";
 import { resolveModel } from "./model";
-import { EXISTING_CONTEXT_SIZE } from "./prompt";
+import { existingContextSize } from "./prompt";
 
 /**
  * バックグラウンド補充。
@@ -47,12 +47,13 @@ async function refill(env: Env, input: RefillInput): Promise<void> {
     const model = resolveModel(env.GENERATION_MODEL);
     const result = await generateBatch(env, {
       kind: theme.kind,
+      form,
       name: theme.name,
       themeId: theme.id,
       path: "refill",
       // 在庫水準まで戻すのに必要な件数
       target: nextOffset + stockTarget(form) - promptCountOf(theme.promptCounts, form),
-      existing: await recentPromptTexts(db, theme.id, form, EXISTING_CONTEXT_SIZE),
+      existing: await recentPromptTexts(db, theme.id, form, existingContextSize(form)),
       model,
       getReading: createGetReading(env),
       // **消費が確定した直後に記録する。** 補充は waitUntil の中で走り、

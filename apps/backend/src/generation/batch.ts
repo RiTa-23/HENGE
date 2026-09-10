@@ -7,8 +7,11 @@ import {
   countConstraint,
   countKeystrokes,
   includesConstraint,
+  isHiraganaOnlyWord,
   isKeystrokeCountInRange,
   isTypableText,
+  isTypableWord,
+  type PromptForm,
   type ThemeKind,
   UnsupportedKanaError,
 } from "@henge/shared";
@@ -56,7 +59,11 @@ export interface ValidPrompt {
 export interface RejectionCounts {
   /** 使用できない文字が含まれていた（読みにテーブル外のかなが残った場合を含む） */
   charset: number;
-  /** 漢字が1つも無い（ひらがなだけの文）*/
+  /**
+   * 表記がひらがなだけだった。**単語でもこのラベルを使う**（単語の条件は
+   * 「漢字を1つ以上」ではなく「ひらがなだけにしない」だが、狙いは同じ）。
+   * ラベルを増やすと AI Gateway のメタデータ5件の枠に収まらなくなる
+   */
   kanji: number;
   /** 同じ書き出しの文が既に採用上限まである */
   opening: number;
@@ -77,6 +84,8 @@ export interface BatchResult {
 
 export interface GenerateBatchInput {
   kind: ThemeKind;
+  /** 出題の形式。指示も検証もここで変わる */
+  form: PromptForm;
   /** テーマ名、または「含む文字」 */
   name: string;
   /** メタデータ用。新規作成時はまだIDが無いので採番前の値を渡す */
@@ -139,10 +148,21 @@ export async function generateBatch(env: Env, input: GenerateBatchInput): Promis
     } = await requestPrompts(env, {
       model: input.model,
       kind: input.kind,
+      form: input.form,
       name: input.name,
       count: N_REQUEST,
       existing: input.existing,
-      metadata: { themeId: input.themeId, kind: input.kind, round, path: input.path },
+      metadata: {
+        themeId: input.themeId,
+        kind: input.kind,
+        round,
+        // 形式はメタデータの枠が無いので経路の値に畳む（ai.ts の GenerationPath）。
+        // 新規作成は短文しか作らないので `create:word` は存在しない
+        path:
+          input.form === "word" && input.path !== "create"
+            ? (`${input.path}:word` as const)
+            : input.path,
+      },
     });
 
     // **検証より先に記録を済ませる。** この行より後で何が起きても（読み取得の例外、
@@ -211,17 +231,23 @@ async function validateInto(
   valid: ValidPrompt[],
   rejected: RejectionCounts,
 ): Promise<void> {
+  const isWord = input.form === "word";
+
   // 重複・文字種・漢字の有無は、読み取得の前に無料で弾く（外部サブリクエストを使わない）
   const candidates = texts.filter((text) => {
     if (seen.has(text)) return false;
     seen.add(text);
-    if (!isTypableText(text)) {
+    // **単語は句読点を許さない。** 短文の文字種で通すと、「単語」と言いながら
+    // 文の断片（「忍者、影」）が混ざる
+    if (isWord ? !isTypableWord(text) : !isTypableText(text)) {
       rejected.charset++;
       return false;
     }
-    // **ひらがなだけの文を通さない。** 打鍵は読み仮名に対して行うので「打てる」が、
-    // 画面に出るのは表記の方で、漢字かな混じり文を読みながら打つ練習から外れる
-    if (!containsKanji(text)) {
+    // **表記がひらがなだけの文・語を通さない。** 打鍵は読み仮名に対して行うので
+    // 「打てる」が、画面に出るのは表記の方で、読みながら打つ練習から外れる。
+    // **単語に「漢字を1つ以上」は使えない**（「ラーメン」まで落ちる）ので、
+    // 単語ではひらがな限定の側から判定する
+    if (isWord ? isHiraganaOnlyWord(text) : !containsKanji(text)) {
       rejected.kanji++;
       return false;
     }
@@ -253,7 +279,7 @@ async function validateInto(
 
     const { text, reading } = result.value;
     const keystrokeCount = countKeystrokes(reading.roman);
-    if (!isKeystrokeCountInRange(keystrokeCount)) {
+    if (!isKeystrokeCountInRange(keystrokeCount, input.form)) {
       rejected.keystroke++;
       continue;
     }

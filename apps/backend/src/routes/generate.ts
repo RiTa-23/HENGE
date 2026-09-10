@@ -12,7 +12,7 @@ import { recordUsage } from "../db/usage";
 import { generateBatch } from "../generation/batch";
 import { AiQuotaExceededError, AiUnavailableError } from "../generation/ai";
 import { resolveModel } from "../generation/model";
-import { EXISTING_CONTEXT_SIZE } from "../generation/prompt";
+import { existingContextSize } from "../generation/prompt";
 import { fail } from "../http/error";
 import { cacheThemeId, getCachedThemeId } from "../kv/themes";
 import { acquireThemeLock, releaseThemeLock } from "../kv/lock";
@@ -73,6 +73,8 @@ export const generateRoutes = new Hono<{ Bindings: Env }>()
     try {
       result = await generateBatch(c.env, {
         kind: body.kind,
+        // 新規作成で作るのは短文だけ。単語は別リクエストで作る（不変条件4）
+        form: "sentence",
         name: body.name,
         themeId,
         path: "create",
@@ -133,11 +135,12 @@ export const generateRoutes = new Hono<{ Bindings: Env }>()
 
       const result = await generateBatch(c.env, {
         kind: theme.kind,
+        form,
         name: theme.name,
         themeId: theme.id,
         path: "regenerate",
         target: playSize(form),
-        existing: await recentPromptTexts(db, theme.id, form, EXISTING_CONTEXT_SIZE),
+        existing: await recentPromptTexts(db, theme.id, form, existingContextSize(form)),
         model,
         getReading: createGetReading(c.env),
         waitUntil: (promise) => c.executionCtx.waitUntil(promise),

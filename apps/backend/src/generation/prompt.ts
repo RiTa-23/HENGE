@@ -1,4 +1,5 @@
-import type { ThemeKind } from "@henge/shared";
+import type { PromptForm, ThemeKind } from "@henge/shared";
+import { WORD_KEYSTROKE_MAX, WORD_KEYSTROKE_MIN } from "@henge/shared";
 
 /**
  * 生成プロンプト。**全モデルで共通のものを1つだけ持つ。**
@@ -10,6 +11,23 @@ import type { ThemeKind } from "@henge/shared";
 
 /** 既存お題を何件遡って持ってくるか。プロンプトの文脈と、完全一致の重複除去に使う */
 export const EXISTING_CONTEXT_SIZE = 30;
+
+/**
+ * 単語のときに遡る件数。**短文よりずっと多く取る。**
+ *
+ * 完全一致の重複除去（`batch.ts` の `seen`）はここで渡した分しか見ない。単語は
+ * 短文と違って言い換えの幅が無く、テーマから素直に連想すると同じ語が何度でも
+ * 返る（「福岡」なら「屋台」「明太子」）。30件では、31件目より前に作った語が
+ * そのまま二度入る。プール全体を渡せるだけの件数にしておく。
+ *
+ * D1の読み取りが増えるだけで、AIには渡さない（`INCLUDE_EXISTING_PROMPTS` は false）。
+ */
+export const WORD_EXISTING_CONTEXT_SIZE = 200;
+
+/** その形式で遡る件数 */
+export function existingContextSize(form: PromptForm): number {
+  return form === "word" ? WORD_EXISTING_CONTEXT_SIZE : EXISTING_CONTEXT_SIZE;
+}
 
 /**
  * 既存お題をプロンプトに載せるか。**いまは載せない（2026-09-06 から試行中）。**
@@ -33,6 +51,12 @@ const SYSTEM = [
   "指示された条件を厳密に守り、余計な説明を一切書かず、短文だけを出力します。",
 ].join("");
 
+/** 単語モードのシステムプロンプト。**「短文」と言わない**（言うと文を返してくる） */
+const SYSTEM_WORD = [
+  "あなたは日本語タイピング練習用の単語を集める職人です。",
+  "指示された条件を厳密に守り、余計な説明を一切書かず、単語だけを出力します。",
+].join("");
+
 function rules(count: number): string[] {
   return [
     `- ちょうど${count}個の短文を作る`,
@@ -43,6 +67,30 @@ function rules(count: number): string[] {
     "- 1文はひらがなに直して8〜18文字程度。**これを超えると長すぎて拒否される**（打鍵数は35打まで。1かなは平均2打程度なので、20文字の文は40打前後になる）",
     "- 漢字をかならず1つ以上使う。ひらがなだけの文にしない",
     "- 意味の通る自然な日本語にする",
+  ];
+}
+
+/**
+ * 単語モードの指示。**短文用（`rules`）とは別に持つ。**
+ *
+ * 短文の指示をそのまま流用できない。「8〜18文字」「文を途中で終わらせない」は
+ * 単語には有害で、**語ではなく短い文を返させる**方向に働く。
+ *
+ * 打鍵数の範囲はかな文字数で近似して伝える。モデルは打鍵数を数えられないため
+ * （短文側と同じ理由）。4〜12打はおおむねかな2〜6文字にあたる。
+ */
+function wordRules(count: number): string[] {
+  return [
+    `- ちょうど${count}個の単語を挙げる`,
+    "- 1行に1語ずつ、番号や記号を付けずに出力する",
+    "- **文にしない。** 助詞を付けず、単語そのものだけを書く",
+    "- 句読点（、。）や！？を使わない",
+    "- 使ってよい文字は、ひらがな・カタカナ・漢字と長音符（ー）だけ",
+    "- アルファベット・数字・空白・記号は絶対に使わない",
+    `- 読み仮名が2〜6文字程度の語にする（打鍵数${WORD_KEYSTROKE_MIN}〜${WORD_KEYSTROKE_MAX}に相当）`,
+    "- ひらがなだけの語にしない。漢字かカタカナを含む語を選ぶ",
+    "- 実在する言葉だけを使う。**造語を作らない**",
+    `- ${count}個すべて違う語にする`,
   ];
 }
 
@@ -106,12 +154,26 @@ function constraintRules(char: string, count: number): string[] {
 
 export function buildGenerationPrompt(input: {
   kind: ThemeKind;
+  /** 出題の形式。省略時は短文 */
+  form?: PromptForm;
   /** テーマ名、または「含む文字」 */
   name: string;
   count: number;
   /** 重複回避の文脈。直近の既存お題 */
   existing: string[];
 }): { system: string; user: string } {
+  // **単語モードはテーマだけ**（最適化練習には付けない。短い語に指定の音を
+  // 入れさせるのは、短文よりさらに却下率が上がる）
+  if (input.form === "word") {
+    const lines = [
+      `テーマ「${input.name}」から連想する単語を挙げてください。`,
+      "",
+      "条件:",
+      ...wordRules(input.count),
+    ];
+    return { system: SYSTEM_WORD, user: lines.join("\n") };
+  }
+
   const subject =
     input.kind === "theme"
       ? `テーマ「${input.name}」に沿った短文を作ってください。`

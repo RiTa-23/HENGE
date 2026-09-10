@@ -6,7 +6,7 @@ import {
   neuronsUsed,
   type TokenUsage,
 } from "./model";
-import type { ThemeKind } from "@henge/shared";
+import type { PromptForm, ThemeKind } from "@henge/shared";
 
 /**
  * Workers AI 側の事情で生成できなかったことを表す。**テーマ名の問題と区別する。**
@@ -58,12 +58,22 @@ export function classifyAiError(error: unknown): Error | null {
   return null;
 }
 
+/**
+ * 生成の経路。**単語のときは `:word` を付ける。**
+ *
+ * AI Gatewayのメタデータは1リクエスト5件までで、リクエスト時に4件
+ * （themeId / kind / round / path）、`patchLog` で1件（counts）を使い切っている。
+ * **形式のためのキーを増やせない**（6件目は例外もログも無く捨てられる）ので、
+ * 経路の値に畳む。短文の値はこれまでのままなので、既存の絞り込みは壊れない。
+ */
+export type GenerationPath = "create" | "regenerate" | "refill" | "regenerate:word" | "refill:word";
+
 /** AI Gatewayのメタデータは1リクエスト5件まで。値は文字列・数値・真偽値のみ */
 export interface GenerationMetadata {
   themeId: string;
   kind: ThemeKind;
   round: number;
-  path: "create" | "regenerate" | "refill";
+  path: GenerationPath;
 }
 
 /**
@@ -105,6 +115,8 @@ export async function requestPrompts(
   input: {
     model: ModelId;
     kind: ThemeKind;
+    /** 出題の形式。単語は指示そのものが別になる */
+    form: PromptForm;
     name: string;
     count: number;
     existing: string[];

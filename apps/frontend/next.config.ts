@@ -43,11 +43,24 @@ const nextConfig: NextConfig = {
    * 万一 POST で叩かれても GET に化けない。
    */
   async redirects() {
+    const fromWorkersDev = [{ type: "host" as const, value: WORKERS_DEV_HOST }];
     return [
+      // **ルートだけ別に書く。** `/:path*` の1本にまとめると、パスが空の
+      // ときに OpenNext のワーカー上では `:path*` が展開されず、
+      // `https://henge.ritane.co/:path*` という壊れたURLへ飛ばしてしまう。
+      // `next dev` では正しく展開されるので、**ローカルでは気付けない**。
+      // いちばん踏まれるURL（ホスト名だけ）がこれに当たる。
       {
-        source: "/:path*",
-        has: [{ type: "host", value: WORKERS_DEV_HOST }],
-        destination: `${CANONICAL_ORIGIN}/:path*`,
+        source: "/",
+        has: fromWorkersDev,
+        destination: CANONICAL_ORIGIN,
+        permanent: true,
+      },
+      {
+        // `*`（0個以上）ではなく `+`（1個以上）。空の場合は上の規則が受ける
+        source: "/:path+",
+        has: fromWorkersDev,
+        destination: `${CANONICAL_ORIGIN}/:path+`,
         permanent: true,
       },
     ];

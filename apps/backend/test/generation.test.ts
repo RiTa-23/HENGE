@@ -306,9 +306,13 @@ describe("generateBatch", () => {
     );
 
     expect(logs).toHaveLength(2);
-    expect(logs[0]?.metadata?.counts).toBe("charset:1,kanji:0,opening:0,keystroke:0,constraint:0");
+    expect(logs[0]?.metadata?.counts).toBe(
+      "charset:1,kanji:0,opening:0,keystroke:0,constraint:0,dup:0",
+    );
     // 累積を渡していれば charset:2 になる
-    expect(logs[1]?.metadata?.counts).toBe("charset:1,kanji:0,opening:0,keystroke:0,constraint:0");
+    expect(logs[1]?.metadata?.counts).toBe(
+      "charset:1,kanji:0,opening:0,keystroke:0,constraint:0,dup:0",
+    );
   });
 
   it("有効なお題は読みと打鍵数を持って返る", async () => {
@@ -326,7 +330,8 @@ describe("generateBatch", () => {
 
 /** 単語の読み。漢字はテーブルに無いので、テスト側で読みを与える */
 const wordReading: GetReading = async (text) => {
-  const kana = { 忍者: "にんじゃ", 城: "しろ", ラーメン: "らーめん" }[text] ?? text;
+  const kana =
+    { 忍者: "にんじゃ", 城: "しろ", 手裏剣: "しゅりけん", ラーメン: "らーめん" }[text] ?? text;
   return { kana, roman: buildRomanCandidates(kana) };
 };
 
@@ -354,5 +359,33 @@ describe("単語モードの検証", () => {
 
     expect(result.valid.map((p) => p.text)).toEqual(["ラーメン"]);
     expect(result.rejected.kanji).toBe(1);
+  });
+});
+
+describe("重複の計測", () => {
+  /**
+   * **重複を無言で捨てない。** 単語はテーマあたりの語彙が有限で、プールが育つほど
+   * 既出だらけになる。カウンタを通さずに落としていたため、AI Gateway 上は
+   * 「ほとんど却下されていない」ように見えるのに採用がごくわずか、という
+   * 食い違いが起きていた（福岡の単語プールで実際に起きた）。
+   */
+  it("既存プールと同じものは dup として数える", async () => {
+    const result = await generateBatch(envWithAiResponses([["忍者", "手裏剣"]]), {
+      ...input({ form: "word", target: 2, existing: ["忍者"] }),
+      getReading: wordReading,
+    });
+
+    expect(result.valid.map((p) => p.text)).toEqual(["手裏剣"]);
+    expect(result.rejected.dup).toBe(1);
+  });
+
+  it("同じ生成の中で重なったものも数える", async () => {
+    const result = await generateBatch(envWithAiResponses([["忍者", "忍者", "城"]]), {
+      ...input({ form: "word", target: 3 }),
+      getReading: wordReading,
+    });
+
+    expect(result.valid.map((p) => p.text)).toEqual(["忍者", "城"]);
+    expect(result.rejected.dup).toBe(1);
   });
 });

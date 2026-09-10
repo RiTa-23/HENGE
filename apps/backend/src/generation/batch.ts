@@ -71,6 +71,15 @@ export interface RejectionCounts {
   keystroke: number;
   /** 「含む」モードで、指定文字が読み仮名に無かった */
   constraint: number;
+  /**
+   * 既にプールにある（または同じ生成の中で重複した）ため落としたもの。
+   *
+   * **これが見えないと診断できない。** 重複は読み取得の前に無言で捨てていたので、
+   * ダッシュボード上は「ほとんど却下されていない健全な生成」に見えるのに、
+   * 実際の採用はごくわずか、という食い違いが起きていた。単語はテーマあたりの
+   * 語彙が有限で、プールが育つほどここが増える。
+   */
+  dup: number;
 }
 
 export interface BatchResult {
@@ -128,6 +137,7 @@ export async function generateBatch(env: Env, input: GenerateBatchInput): Promis
     opening: 0,
     keystroke: 0,
     constraint: 0,
+    dup: 0,
   };
   const seen = new Set(input.existing);
   // **既存お題は数えない。** 止めたいのは「1回の生成が1つの型で埋まる」ことで、
@@ -215,6 +225,7 @@ function subtract(after: RejectionCounts, before: RejectionCounts): RejectionCou
     opening: after.opening - before.opening,
     keystroke: after.keystroke - before.keystroke,
     constraint: after.constraint - before.constraint,
+    dup: after.dup - before.dup,
   };
 }
 
@@ -235,7 +246,10 @@ async function validateInto(
 
   // 重複・文字種・漢字の有無は、読み取得の前に無料で弾く（外部サブリクエストを使わない）
   const candidates = texts.filter((text) => {
-    if (seen.has(text)) return false;
+    if (seen.has(text)) {
+      rejected.dup++;
+      return false;
+    }
     seen.add(text);
     // **単語は句読点を許さない。** 短文の文字種で通すと、「単語」と言いながら
     // 文の断片（「忍者、影」）が混ざる

@@ -74,17 +74,20 @@ export function Keyboard({ nextKeys, missKey = null }: KeyboardProps) {
       {ROWS.map((row, rowIndex) => (
         <div key={rowIndex} className="flex gap-1.5">
           {row.map((key, keyIndex) => {
-            // **ミスを候補より優先する。** 打ち間違えたキーが候補であることは
-            // 無い（候補なら受理されている）ので、両方に該当することはない
+            // **候補をミスより優先する。** 打った瞬間は両方に該当しないが、
+            // 赤が消える前に打ち直して先へ進むと、**さっき打ち間違えたキーが
+            // 次に打つキーになる**ことがある（`し` の `h` を先に打ってから `s`
+            // を打つと、次は `h`）。ここでミスを優先すると、いま押すべきキーが
+            // 赤いままになり、この画面で消したかった混同がそのまま起きる
             const state =
               key === "Shift"
                 ? needsShift
                   ? "modifier"
                   : "idle"
-                : key === missKey
-                  ? "miss"
-                  : lit.has(key)
-                    ? "candidate"
+                : lit.has(key)
+                  ? "candidate"
+                  : key === missKey
+                    ? "miss"
                     : "idle";
             return (
               <span

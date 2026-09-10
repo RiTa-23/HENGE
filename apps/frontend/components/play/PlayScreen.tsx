@@ -274,13 +274,15 @@ export function PlayScreen({
       // スペースでの画面スクロールを止める
       event.preventDefault();
       // **音はユーザー操作の中で起こす。** 操作を伴わずに作った AudioContext は
-      // ブラウザに止められたままになり、1問目が無音になる
-      primeAudio();
+      // ブラウザに止められたままになり、1問目が無音になる。
+      // 消しているなら作らない（鳴らさない人のために音の器を持たない）
+      if (!muted) primeAudio();
       setAttempt((count) => count + 1);
     };
     globalThis.addEventListener("keydown", onKey);
     return () => globalThis.removeEventListener("keydown", onKey);
-  }, [phase.name]);
+    // muted を見ているので、開始前に音を切り替えたら登録し直す（古い値で判断しない）
+  }, [phase.name, muted]);
 
   /**
    * 結果の `R` で「もう一度」。開始が Space、中断が Esc で済むのに、

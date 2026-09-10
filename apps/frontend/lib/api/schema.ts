@@ -21,13 +21,24 @@ export const themeNameSchema = z
 /** 匿名時のオフセット。改ざんは許容するが、範囲外の値は弾く */
 const offsetSchema = z.number().int().min(0).max(100_000);
 
+/**
+ * 出題の形式。**省略時は短文。**
+ *
+ * 既定を持たせるのは、形式を持たない古いクライアント（共有された古いURLなど）が
+ * そのまま短文で動くようにするため。未知の値は弾く（存在しないプールをHonoに
+ * 引かせない）。
+ */
+const formSchema = z.enum(["sentence", "word"]).default("sentence");
+
 export const sessionStartSchema = z.object({
   themeId: z.string().min(1),
+  form: formSchema,
   offset: offsetSchema.optional(),
 });
 
 export const regenerateSchema = z.object({
   themeId: z.string().min(1),
+  form: formSchema,
 });
 
 export const themeListQuerySchema = z.object({

@@ -79,3 +79,23 @@ describe("regenerateSchema", () => {
     expect(regenerateSchema.safeParse({}).success).toBe(false);
   });
 });
+
+describe("出題の形式（form）", () => {
+  test("省略すると短文になる（形式を持たない古いURL・クライアントが動く）", () => {
+    const parsed = sessionStartSchema.safeParse({ themeId: "t1" });
+
+    expect(parsed.success).toBe(true);
+    expect(parsed.data?.form).toBe("sentence");
+  });
+
+  test("単語を指定できる", () => {
+    expect(sessionStartSchema.safeParse({ themeId: "t1", form: "word" }).data?.form).toBe("word");
+    expect(regenerateSchema.safeParse({ themeId: "t1", form: "word" }).data?.form).toBe("word");
+  });
+
+  // 存在しないプールをHonoに引かせない
+  test("知らない形式は弾く", () => {
+    expect(sessionStartSchema.safeParse({ themeId: "t1", form: "poem" }).success).toBe(false);
+    expect(regenerateSchema.safeParse({ themeId: "t1", form: "" }).success).toBe(false);
+  });
+});

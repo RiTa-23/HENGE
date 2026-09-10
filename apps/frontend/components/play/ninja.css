@@ -132,17 +132,45 @@
 /* ---- 撒菱（ミス表示） ----------------------------------------------------
  * ミスしたローマ字の**真上**に置く。苦無は下、撒菱は上なので衝突しない。
  * 色は朱より暗く鈍い赤（朱に墨を混ぜたもの）。
+ *
+ * **形はSVG側（Makibishi.tsx）が持つ。** ここは置き場所と色だけ。棘ごとに
+ * 長さと太さを変えないと星に見えてしまい、`clip-path` の多角形では書き分けられない。
  */
 .makibishi {
   position: absolute;
   bottom: calc(100% + 3px);
   left: 50%;
   translate: -50% 0;
-  width: 15px;
-  height: 15px;
-  background: var(--color-makibishi);
-  /* 四方に棘が出た形。棘を太めに取らないと小さい表示で潰れて見えなくなる */
-  clip-path: polygon(50% 0, 66% 34%, 100% 50%, 66% 66%, 50% 100%, 34% 66%, 0 50%, 34% 34%);
+  width: 20px;
+  height: 20px;
+  color: var(--color-makibishi);
+}
+
+/* ---- 開始の合図 ---------------------------------------------------------
+ * 「はじめ！」。**お題が出る前**に一度だけ出して、構える間を作る。
+ * 大きく踏み込むように、少し大きい状態から原寸へ落として止める。
+ */
+.start-cue {
+  animation: start-cue 320ms cubic-bezier(0.2, 0.9, 0.3, 1) both;
+  text-shadow: 0 0 24px color-mix(in oklab, var(--color-shu) 60%, transparent);
+}
+
+@keyframes start-cue {
+  from {
+    opacity: 0;
+    scale: 1.4;
+  }
+  to {
+    opacity: 1;
+    scale: 1;
+  }
+}
+
+/* 視差効果を減らす設定では動かさない。合図としては出しっぱなしで足りる */
+@media (prefers-reduced-motion: reduce) {
+  .start-cue {
+    animation: none;
+  }
 }
 
 /* ---- 手裏剣（生成待ちのスピナー） ---------------------------------------

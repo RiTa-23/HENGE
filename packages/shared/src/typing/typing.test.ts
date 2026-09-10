@@ -125,6 +125,23 @@ describe("外来語のかな", () => {
     expect(accepts("じぇ", 0, "jixe")).toBe(true);
   });
 
+  // 「ウォーミングアップ」「フォロー」など頻出なのに、うぉ が無く uxo でしか
+  // 打てなかった。wh 系は4つまとめて固定する
+  test("わ行の外来語は wh 系で打てる（うぉ は who）", () => {
+    expect(accepts("うぉ", 0, "who")).toBe(true);
+    expect(accepts("うぁ", 0, "wha")).toBe(true);
+    expect(accepts("うぃ", 0, "whi")).toBe(true);
+    expect(accepts("うぇ", 0, "whe")).toBe(true);
+  });
+
+  // wh 系を足しても、これまでの打ち方は残す
+  test("うぃ / うぇ の wi / we と、分解入力は残る", () => {
+    expect(accepts("うぃ", 0, "wi")).toBe(true);
+    expect(accepts("うぇ", 0, "we")).toBe(true);
+    expect(accepts("うぉ", 0, "uxo")).toBe(true);
+    expect(accepts("うぉ", 0, "ulo")).toBe(true);
+  });
+
   test("ぢぇ は dye", () => {
     expect(accepts("ぢぇ", 0, "dye")).toBe(true);
   });

@@ -27,16 +27,27 @@ export function toNextKey(letter: string): NextKey {
   return { key: letter.toUpperCase(), shift: false };
 }
 
-function keyClass(state: "idle" | "candidate" | "modifier"): string {
+/**
+ * キーの見た目。**色でしか区別しない状態を作らない**（形と塗りも変える）。
+ *
+ * 次に打つキーは橙で、枠だけでなく**キーの面を塗る**。枠だけだと、視線が
+ * 巻物とキーボードのあいだを往復する速さに追いつかない。文字は地の色に
+ * 落として読ませる。
+ */
+function keyClass(state: "idle" | "candidate" | "modifier" | "miss"): string {
   const base =
     "flex h-11 min-w-11 items-center justify-center rounded-md border px-3 font-mono text-sm transition-colors";
   if (state === "candidate") {
     // 候補違い（どちらか一方を押す）はすべて同じ強さで光らせる
-    return `${base} border-shu bg-shu/20 text-kinari shadow-[0_0_10px_var(--color-shu)]`;
+    return `${base} border-daidai bg-daidai font-bold text-sumi shadow-[0_0_12px_var(--color-daidai)]`;
+  }
+  if (state === "miss") {
+    // 直前に打ち間違えたキー。**撒菱と同じ赤**にして「これはミス」と読ませる
+    return `${base} border-makibishi bg-makibishi font-bold text-kinari shadow-[0_0_12px_var(--color-makibishi)]`;
   }
   if (state === "modifier") {
     // 修飾キー（両方同時に押す）は別扱い。破線にして「単独では押さない」を示す
-    return `${base} border-2 border-dashed border-shu bg-transparent text-shu`;
+    return `${base} border-2 border-dashed border-daidai bg-transparent text-daidai`;
   }
   return `${base} border-kinari/10 bg-kinari/5 text-kinari/60`;
 }
@@ -44,9 +55,17 @@ function keyClass(state: "idle" | "candidate" | "modifier"): string {
 interface KeyboardProps {
   /** 次に打てるキー。複数あるときは「どれか一方」を押す */
   nextKeys: NextKey[];
+  /**
+   * 直前に打ち間違えたキー（キーボード上の表示）。少しのあいだ赤くする。
+   *
+   * 巻物の撒菱が「どこでつまずいたか」を残すのに対し、こちらは
+   * **何を押してしまったか**をその場で返す。押した本人にしか分からない情報で、
+   * 出さないと隣を叩いたのか別の指が動いたのかが判別できない。
+   */
+  missKey?: string | null;
 }
 
-export function Keyboard({ nextKeys }: KeyboardProps) {
+export function Keyboard({ nextKeys, missKey = null }: KeyboardProps) {
   const lit = new Set(nextKeys.map((next) => next.key));
   const needsShift = nextKeys.some((next) => next.shift);
 
@@ -55,6 +74,11 @@ export function Keyboard({ nextKeys }: KeyboardProps) {
       {ROWS.map((row, rowIndex) => (
         <div key={rowIndex} className="flex gap-1.5">
           {row.map((key, keyIndex) => {
+            // **候補をミスより優先する。** 打った瞬間は両方に該当しないが、
+            // 赤が消える前に打ち直して先へ進むと、**さっき打ち間違えたキーが
+            // 次に打つキーになる**ことがある（`し` の `h` を先に打ってから `s`
+            // を打つと、次は `h`）。ここでミスを優先すると、いま押すべきキーが
+            // 赤いままになり、この画面で消したかった混同がそのまま起きる
             const state =
               key === "Shift"
                 ? needsShift
@@ -62,7 +86,9 @@ export function Keyboard({ nextKeys }: KeyboardProps) {
                   : "idle"
                 : lit.has(key)
                   ? "candidate"
-                  : "idle";
+                  : key === missKey
+                    ? "miss"
+                    : "idle";
             return (
               <span
                 key={`${key}-${keyIndex}`}

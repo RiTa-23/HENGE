@@ -1,5 +1,6 @@
 import type { TypingProgress } from "@henge/shared";
 import { romanDisplay } from "@henge/shared";
+import { Makibishi } from "./Makibishi";
 import "./ninja.css";
 
 /** 打鍵済み・現在・未来でかなの明度を変える。朱は「いま打つ1かな」だけ */
@@ -58,7 +59,7 @@ export function Scroll({ text, kanaUnits, progress }: ScrollProps) {
               }
             >
               {letter}
-              {progress.misses.has(index) && <span className="makibishi" aria-hidden="true" />}
+              {progress.misses.has(index) && <Makibishi />}
               {index === cursor && (
                 <span className="kunai" aria-hidden="true">
                   <span className="kunai__blade" />

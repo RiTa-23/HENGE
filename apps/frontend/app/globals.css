@@ -25,9 +25,19 @@
   --font-mono: var(--font-jetbrains-mono), ui-monospace, monospace;
 }
 
-/* 撒菱の色。「朱より暗く鈍い赤」を、色を足さずに墨を混ぜて作る */
+/**
+ * 4色から混ぜて作る色。**5色目を足しているのではない。**
+ * 混ぜ元は上の4色だけで、比率を変えても世界観の外へ出ない。
+ */
 @theme {
+  /* 撒菱とミスの色。「朱より暗く鈍い赤」を、色を足さずに墨を混ぜて作る */
   --color-makibishi: color-mix(in oklab, var(--color-shu) 62%, var(--color-sumi));
+  /**
+   * 橙: キーボードの「次に打つキー」。朱に金を混ぜて作る。
+   * 朱のままだとミスの赤と紛らわしく、**打つべきキーと打ち間違えたキーが
+   * 同じ色に見える**。巻物側（苦無・かな）の朱はそのまま。
+   */
+  --color-daidai: color-mix(in oklab, var(--color-shu) 60%, var(--color-kin));
 }
 
 html {

@@ -79,31 +79,97 @@ function envelope(ctx: AudioContext, peak: number, attack: number, release: numb
   return gain;
 }
 
-/** 打鍵音。硬く短い「カチッ」。長く鳴らすと連打で音が積み上がって濁る */
+/**
+ * 打鍵音の作り。**拍子木（木と木を打ち合わせる音）を目指す。**
+ *
+ * 三味線でいう撥音のような、単一の正弦波だけの音は電子音に聞こえる。木の音は
+ * 3つの層でできているので、そのまま3層で組む。
+ *
+ * | 層 | 役割 | 作り方 |
+ * |---|---|---|
+ * | あたり | 押した瞬間の輪郭。ここが遅れると「重い」と感じる | 雑音の一瞬（10ms）を高い帯域で抜く |
+ * | 鳴り | 木らしさ。ここだけで音色が決まる | 雑音を**高いQの帯域**で細く残す |
+ * | 胴 | 手応え（重み） | 低い三角波を短く鳴らす |
+ */
+interface Clack {
+  /** あたりの帯域と音量 */
+  tickHz: number;
+  tickGain: number;
+  /** 鳴りの帯域・鋭さ・音量・長さ */
+  ringHz: number;
+  ringQ: number;
+  ringGain: number;
+  ringRelease: number;
+  /** 胴の高さと音量 */
+  bodyHz: number;
+  bodyGain: number;
+}
+
+/**
+ * 打鍵音の設定。**全体を短く保つ**（合計 60ms 程度）。
+ * 長くすると、速く打ったときに前の音が残って濁る。
+ */
+const HIT: Clack = {
+  tickHz: 3400,
+  tickGain: 0.05,
+  ringHz: 1150,
+  ringQ: 9,
+  ringGain: 0.9,
+  ringRelease: 0.045,
+  bodyHz: 210,
+  bodyGain: 0.05,
+};
+
+/**
+ * 木を打つ音を1つ鳴らす。
+ *
+ * **1打ごとに高さと音量を少しずらす。** まったく同じ音が並ぶと、打鍵ではなく
+ * 機械の警告音に聞こえる。実際のキーボードも1打ごとに違う音が鳴っている。
+ */
+function clack(ctx: AudioContext, spec: Clack): void {
+  const now = ctx.currentTime;
+  const detune = 1 + (Math.random() - 0.5) * 0.12;
+  const level = 0.88 + Math.random() * 0.24;
+  // 雑音は毎回違うところから読む。同じ波形を鳴らすと「同じ音」に聞こえる
+  const offset = Math.random() * 0.15;
+
+  const tick = ctx.createBufferSource();
+  tick.buffer = noise(ctx);
+  const tickBand = ctx.createBiquadFilter();
+  tickBand.type = "bandpass";
+  tickBand.frequency.value = spec.tickHz * detune;
+  tickBand.Q.value = 1.2;
+  const tickGain = envelope(ctx, spec.tickGain * level, 0.001, 0.01);
+  tick.connect(tickBand).connect(tickGain).connect(ctx.destination);
+  tick.start(now, offset);
+  tick.stop(now + 0.02);
+
+  const ring = ctx.createBufferSource();
+  ring.buffer = noise(ctx);
+  const ringBand = ctx.createBiquadFilter();
+  ringBand.type = "bandpass";
+  ringBand.frequency.value = spec.ringHz * detune;
+  ringBand.Q.value = spec.ringQ;
+  const ringGain = envelope(ctx, spec.ringGain * level, 0.002, spec.ringRelease);
+  ring.connect(ringBand).connect(ringGain).connect(ctx.destination);
+  ring.start(now, offset);
+  ring.stop(now + spec.ringRelease + 0.02);
+
+  const body = ctx.createOscillator();
+  body.type = "triangle";
+  body.frequency.setValueAtTime(spec.bodyHz * detune, now);
+  body.frequency.exponentialRampToValueAtTime(spec.bodyHz * 0.72, now + 0.05);
+  const bodyGain = envelope(ctx, spec.bodyGain * level, 0.002, 0.05);
+  body.connect(bodyGain).connect(ctx.destination);
+  body.start(now);
+  body.stop(now + 0.08);
+}
+
+/** 打鍵音。短い木の音。長く鳴らすと連打で音が積み上がって濁る */
 export function playHit(): void {
   const ctx = audioContext();
   if (ctx === null) return;
-  const now = ctx.currentTime;
-
-  const osc = ctx.createOscillator();
-  osc.type = "triangle";
-  osc.frequency.setValueAtTime(1700, now);
-  osc.frequency.exponentialRampToValueAtTime(760, now + 0.04);
-  const tone = envelope(ctx, 0.07, 0.004, 0.05);
-  osc.connect(tone).connect(ctx.destination);
-  osc.start(now);
-  osc.stop(now + 0.08);
-
-  // 雑音を薄く重ねる。純粋な正弦波だけだと電子音に聞こえて硬さが出ない
-  const click = ctx.createBufferSource();
-  click.buffer = noise(ctx);
-  const band = ctx.createBiquadFilter();
-  band.type = "bandpass";
-  band.frequency.value = 2600;
-  const clickGain = envelope(ctx, 0.05, 0.002, 0.018);
-  click.connect(band).connect(clickGain).connect(ctx.destination);
-  click.start(now);
-  click.stop(now + 0.03);
+  clack(ctx, HIT);
 }
 
 /** ミス音。鈍く低い音。**打鍵音より長く、音程を下げる**（外したと分かる） */

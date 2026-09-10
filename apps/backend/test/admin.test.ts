@@ -85,7 +85,7 @@ describe("GET /admin/themes", () => {
     expect((body.themes as { id: string }[]).map((t) => t.id)).toEqual(["c1", "t1"]);
   });
 
-  it("お題数（sequence_number の最大値）を含む", async () => {
+  it("お題数を形式ごとに含む", async () => {
     await seedTheme({ id: "t1" });
     await db.insert(prompts).values(
       [1, 2, 3].map((n) => ({
@@ -102,15 +102,19 @@ describe("GET /admin/themes", () => {
 
     const { body } = await request("/admin/themes");
 
-    expect((body.themes as { promptCount: number }[])[0]?.promptCount).toBe(3);
+    expect(
+      (body.themes as { promptCounts: { sentence: number } }[])[0]?.promptCounts.sentence,
+    ).toBe(3);
   });
 
-  it("お題が1件も無いテーマは promptCount=0 で返る（一覧から消えない）", async () => {
+  it("お題が1件も無いテーマは0件として返る（一覧から消えない）", async () => {
     await seedTheme({ id: "t1" });
 
     const { body } = await request("/admin/themes");
 
-    expect((body.themes as { promptCount: number }[])[0]?.promptCount).toBe(0);
+    expect(
+      (body.themes as { promptCounts: { sentence: number } }[])[0]?.promptCounts.sentence,
+    ).toBe(0);
   });
 
   it("limit を超えると nextCursor が返る", async () => {
@@ -289,6 +293,33 @@ describe("GET /admin/prompts", () => {
       model: "model-x",
     });
     expect(list[1]?.createdAt).toBeTypeOf("number");
+  });
+
+  /**
+   * **短文と単語はプールが別で、連番も1から振り直される。** 混ぜて出すと番号が
+   * 2回りして、管理者がどの行を消せばよいか読めなくなる。
+   */
+  it("形式で絞る。単語を指定すると単語だけが返る", async () => {
+    await seedTheme({ id: "t1" });
+    await seedPrompt({ id: "p1", themeId: "t1", sequenceNumber: 1 });
+    await seedPrompt({ id: "w1", themeId: "t1", form: "word", sequenceNumber: 1, text: "手裏剣" });
+    await seedPrompt({ id: "w2", themeId: "t1", form: "word", sequenceNumber: 2, text: "忍者" });
+
+    const words = await request("/admin/prompts?themeId=t1&form=word");
+    const sentences = await request("/admin/prompts?themeId=t1&form=sentence");
+
+    expect((words.body.prompts as { id: string }[]).map((p) => p.id)).toEqual(["w1", "w2"]);
+    expect((sentences.body.prompts as { id: string }[]).map((p) => p.id)).toEqual(["p1"]);
+  });
+
+  it("形式を省略すると短文が返る", async () => {
+    await seedTheme({ id: "t1" });
+    await seedPrompt({ id: "p1", themeId: "t1", sequenceNumber: 1 });
+    await seedPrompt({ id: "w1", themeId: "t1", form: "word", sequenceNumber: 1, text: "手裏剣" });
+
+    const { body } = await request("/admin/prompts?themeId=t1");
+
+    expect((body.prompts as { id: string }[]).map((p) => p.id)).toEqual(["p1"]);
   });
 
   it("違うテーマのお題は混ざらない", async () => {

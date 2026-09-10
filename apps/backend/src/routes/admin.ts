@@ -91,6 +91,8 @@ export const adminRoutes = new Hono<{ Bindings: Env }>()
       await listPromptsForAdmin(
         db,
         c.req.query("themeId") ?? "",
+        // 検証は公開API側（Next.js）で済んでいる。ここは既定に倒すだけ
+        c.req.query("form") === "word" ? "word" : "sentence",
         pagination(c.req.query.bind(c.req), PROMPT_LIST_LIMIT_DEFAULT),
       ),
     );

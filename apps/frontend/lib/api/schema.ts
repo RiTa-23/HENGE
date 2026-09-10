@@ -54,6 +54,16 @@ export const adminListQuerySchema = z.object({
   cursor: z.coerce.number().int().min(0).optional(),
 });
 
+/**
+ * テーマ1つ分のお題一覧。**形式で絞る。**
+ *
+ * 短文と単語はプールが別で、連番も1から振り直される。混ぜて出すと番号が2回りして、
+ * 管理者がどの行を消せばよいか読めない。省略時は短文。
+ */
+export const adminPromptListQuerySchema = adminListQuerySchema.extend({
+  form: formSchema,
+});
+
 /** 削除対象のテーマID（パスパラメータ） */
 export const themeIdParamSchema = z.object({ id: z.string().min(1) });
 

@@ -159,10 +159,11 @@ export interface AdminThemeRow extends ThemeSummary {
   /** 運営投入分は NULL。作成者を辿るために管理用一覧にだけ含める */
   createdBy: string | null;
   /**
-   * 短文と単語の**合計**。管理画面が見たいのは「このテーマにお題が何件あるか」で、
-   * 形式ごとの内訳はテーマ1つ分の一覧（`/admin/themes/[id]`）側で見る
+   * **形式ごとの在庫数。** 合計にしない。短文と単語はプールが別で、
+   * 補充も生成困難の印も別に動くため、合計では「どちらが足りていないか」が
+   * 分からない（管理画面がいちばん見たいのがそこ）
    */
-  promptCount: number;
+  promptCounts: PromptCounts;
 }
 
 /**
@@ -201,7 +202,7 @@ export async function listThemesForAdmin(
   return {
     themes: rows.slice(0, limit).map(({ sentenceCount, wordCount, ...theme }) =>
       // 分割で作った新しいオブジェクトなので、そのまま足してよい（spread を重ねない）
-      Object.assign(theme, { promptCount: sentenceCount + wordCount }),
+      Object.assign(theme, { promptCounts: { sentence: sentenceCount, word: wordCount } }),
     ),
     nextCursor: hasMore ? params.cursor + limit : null,
   };

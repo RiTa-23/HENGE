@@ -8,9 +8,16 @@ interface AdminTheme {
   id: string;
   kind: "theme" | "constraint";
   name: string;
-  promptCount: number;
+  /**
+   * 形式ごとの在庫数。**合計にしない。**
+   * 短文と単語はプールも補充も生成困難の印も別に動くので、合計では
+   * 「どちらが足りていないか」が分からない。
+   */
+  promptCounts: { sentence: number; word: number };
   totalPlayCount: number;
   generationStatus: "ok" | "difficult";
+  /** 単語プールの生成困難の印。短文とは別に立つ */
+  wordGenerationStatus: "ok" | "difficult";
   createdBy: string | null;
 }
 
@@ -67,7 +74,8 @@ export function AdminThemeList() {
         <tr className="border-b border-kinari/10 text-left tracking-widest text-kinari/50">
           <th className="py-3 font-normal">名前</th>
           <th className="py-3 font-normal">種別</th>
-          <th className="py-3 text-right font-normal">お題数</th>
+          <th className="py-3 text-right font-normal">短文</th>
+          <th className="py-3 text-right font-normal">単語</th>
           <th className="py-3 text-right font-normal">プレイ</th>
           <th className="py-3 text-right font-normal" />
         </tr>
@@ -82,12 +90,19 @@ export function AdminThemeList() {
               >
                 {theme.name}
               </Link>
+              {/* 印は形式ごとに立つ。どちらが困難なのかを書き分ける */}
               {theme.generationStatus === "difficult" && (
-                <span className="ml-3 text-xs tracking-widest text-kinari/40">生成困難</span>
+                <span className="ml-3 text-xs tracking-widest text-kinari/40">短文が生成困難</span>
+              )}
+              {theme.wordGenerationStatus === "difficult" && (
+                <span className="ml-3 text-xs tracking-widest text-kinari/40">単語が生成困難</span>
               )}
             </td>
             <td className="py-3 text-kinari/60">{theme.kind === "theme" ? "テーマ" : "最適化"}</td>
-            <td className="py-3 text-right font-mono text-kinari/70">{theme.promptCount}</td>
+            <td className="py-3 text-right font-mono text-kinari/70">
+              {theme.promptCounts.sentence}
+            </td>
+            <td className="py-3 text-right font-mono text-kinari/70">{theme.promptCounts.word}</td>
             <td className="py-3 text-right font-mono text-kinari/70">{theme.totalPlayCount}</td>
             <td className="py-3 text-right">
               <button
@@ -103,7 +118,7 @@ export function AdminThemeList() {
         ))}
         {themes.length === 0 && (
           <tr>
-            <td colSpan={5} className="py-10 text-center text-kinari/50">
+            <td colSpan={6} className="py-10 text-center text-kinari/50">
               テーマがありません
             </td>
           </tr>

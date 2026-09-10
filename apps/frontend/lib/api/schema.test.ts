@@ -1,5 +1,6 @@
 import { describe, expect, test } from "bun:test";
 import {
+  adminPromptListQuerySchema,
   regenerateSchema,
   sessionStartSchema,
   themeListQuerySchema,
@@ -97,5 +98,25 @@ describe("出題の形式（form）", () => {
   test("知らない形式は弾く", () => {
     expect(sessionStartSchema.safeParse({ themeId: "t1", form: "poem" }).success).toBe(false);
     expect(regenerateSchema.safeParse({ themeId: "t1", form: "" }).success).toBe(false);
+  });
+});
+
+describe("管理用のお題一覧（形式で絞る）", () => {
+  test("形式を省略すると短文", () => {
+    expect(adminPromptListQuerySchema.safeParse({}).data?.form).toBe("sentence");
+  });
+
+  test("単語を指定できる。ページングと併用できる", () => {
+    const parsed = adminPromptListQuerySchema.safeParse({
+      form: "word",
+      limit: "50",
+      cursor: "50",
+    });
+
+    expect(parsed.data).toMatchObject({ form: "word", limit: 50, cursor: 50 });
+  });
+
+  test("知らない形式は弾く", () => {
+    expect(adminPromptListQuerySchema.safeParse({ form: "poem" }).success).toBe(false);
   });
 });

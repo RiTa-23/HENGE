@@ -208,7 +208,7 @@ export interface AdminPrompt {
 export const PROMPT_LIST_LIMIT_DEFAULT = 50;
 
 /**
- * テーマ1つ分のお題を生成順で返す。**管理画面専用。**
+ * テーマ1つ分のお題を、**指定した形式だけ**生成順で返す。**管理画面専用。**
  *
  * 配信用の `fetchPromptPage` と分けているのは、見せたいものが違うため。
  * 管理者は中身を確認して直すので、読み仮名・打鍵数・連番・生成モデルが要る。
@@ -217,6 +217,7 @@ export const PROMPT_LIST_LIMIT_DEFAULT = 50;
 export async function listPromptsForAdmin(
   db: Db,
   themeId: string,
+  form: PromptForm,
   page: { limit: number; cursor: number },
 ): Promise<{ prompts: AdminPrompt[]; nextCursor: number | null }> {
   const rows = await db
@@ -231,10 +232,10 @@ export async function listPromptsForAdmin(
       createdAt: prompts.createdAt,
     })
     .from(prompts)
-    .where(eq(prompts.themeId, themeId))
-    // 形式ごとに連番が1から振り直されるので、**form を先に並べる**。
-    // 連番だけで並べると短文と単語が交互に出て読めない
-    .orderBy(prompts.form, prompts.sequenceNumber)
+    // **形式で絞る。** 短文と単語はプールが別で、連番も1から振り直される。
+    // 混ぜて出すと番号が2回りして、どの行を消せばよいか読めない
+    .where(and(eq(prompts.themeId, themeId), eq(prompts.form, form)))
+    .orderBy(prompts.sequenceNumber)
     .limit(page.limit + 1)
     .offset(page.cursor);
 

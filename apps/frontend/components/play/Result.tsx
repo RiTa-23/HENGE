@@ -32,7 +32,7 @@ export function Result({
   shareUrl,
 }: {
   stats: PlayStats;
-  /** 打ち損ねた文字と回数。1プレイ（短文15問／単語30問）の通算 */
+  /** 打ち損ねた文字と回数。1プレイ（短文15問／単語20問）の通算 */
   missedKeys: ReadonlyMap<string, number>;
   onRetry: () => void;
   themeName: string;

@@ -88,14 +88,14 @@ CREATE UNIQUE INDEX prompts_theme_form_seq ON prompts (theme_id, form, sequence_
 | `user_id` | TEXT | FK→`user.id` ON DELETE CASCADE |
 | `theme_id` | TEXT | FK→`themes.id` ON DELETE CASCADE |
 | `form` | TEXT | `'sentence'` / `'word'`。**進捗は形式ごとに持つ** |
-| `play_count` | INTEGER | その形式の1プレイ分（短文15／単語30）の倍数。次に配信する範囲のオフセット |
+| `play_count` | INTEGER | その形式の1プレイ分（短文15／単語20）の倍数。次に配信する範囲のオフセット |
 | `updated_at` | INTEGER | unixepoch |
 
 ```sql
 PRIMARY KEY (user_id, theme_id, form)
 ```
 
-**`form` を主キーに含める。** 含めないと、単語を1プレイ（30問）遊んだぶんだけ
+**`form` を主キーに含める。** 含めないと、単語を1プレイ（20問）遊んだぶんだけ
 短文のオフセットも進み、**まだ遊んでいない短文のお題が飛ばされる**。
 
 匿名側のキーも同じ理由で分ける（`henge:offset:<themeId>` / `…:word`）。
@@ -202,7 +202,7 @@ CASCADEが実際に効くことは `apps/backend/test/schema.test.ts` で検証�
 | 形式 | 1プレイ | 在庫目標 | 打鍵数 |
 |---|---|---|---|
 | `sentence` | 15問 | 30 | 10〜35 |
-| `word` | 30問 | **30** | 4〜12 |
+| `word` | 20問 | **30** | 4〜12 |
 
 **単語の在庫目標を2プレイ分（60）にしない。** 補充が1回で作れるのは最大40件
 （20件×2ラウンド）で、在庫0から60は埋められない。目標未達は `'difficult'` を立てる

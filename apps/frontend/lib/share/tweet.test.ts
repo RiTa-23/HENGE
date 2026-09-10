@@ -25,7 +25,7 @@ describe("buildShareText", () => {
    */
   it("テーマモード（単語）。形式と問題数が短文と変わる", () => {
     expect(buildShareText({ kind: "theme", form: "word", themeName: "忍びの心得", stats })).toBe(
-      `HENGEで「忍びの心得」の単語を打った。\n30問 スコア 249／打鍵/秒 4.4／正確率 98%\n#HENGE`,
+      `HENGEで「忍びの心得」の単語を打った。\n20問 スコア 249／打鍵/秒 4.4／正確率 98%\n#HENGE`,
     );
   });
 

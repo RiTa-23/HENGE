@@ -35,7 +35,7 @@ export function buildShareText({
       ? `HENGEで「${themeName}」の最適化練習を打った。`
       : `HENGEで「${themeName}」の${form === "word" ? "単語" : "短文"}を打った。`;
 
-  // 問題数は形式で変わる（短文15／単語30）。同じスコアでも重みが違うので添える
+  // 問題数は形式で変わる（短文15／単語20）。同じスコアでも重みが違うので添える
   const line = `${playSize(form)}問 スコア ${etypingScore(stats)}／打鍵/秒 ${keysPerSecond(stats).toFixed(1)}／正確率 ${Math.floor(accuracyRatio(stats) * 100)}%`;
 
   // ハッシュタグは投稿の集計・検索のため。それ以上は280字を圧迫する

@@ -28,7 +28,7 @@ import { readJsonBody } from "@/lib/api/json";
 import { readOffset, writeOffset } from "@/lib/play/offset";
 import { mergeMissedKeys } from "@/lib/play/misses";
 import { playHit, playMiss, primeAudio, readMuted, writeMuted } from "@/lib/play/sound";
-import { formLabel, kindLabel, listHref } from "@/lib/ui/kind";
+import { detailHref, formLabel, kindLabel, listHref } from "@/lib/ui/kind";
 
 interface Prompt {
   id: string;
@@ -135,6 +135,14 @@ export function PlayScreen({
 }) {
   const { data: authSession } = authClient.useSession();
   const backToList = listHref(kind);
+  /**
+   * いま遊んでいたテーマの詳細。**プレイ画面からの離脱先はここにする。**
+   *
+   * トップへ返すと、遊んでいた文脈が消えて探し直しになる。詳細には短文と単語の
+   * 選択と在庫数があるので、**同じテーマの別の形式へそのまま移れる**。
+   * URLの組み立ては lib/ui/kind.ts に閉じる（手で /themes を書かない）。
+   */
+  const backToDetail = detailHref(kind, themeName);
   const [phase, setPhase] = useState<Phase>({ name: "ready" });
   const [promptIndex, setPromptIndex] = useState(0);
   const [progress, setProgress] = useState<TypingProgress>(() => startTyping([]));
@@ -564,8 +572,8 @@ export function PlayScreen({
           </div>
 
           <p className="mt-8 text-sm">
-            <a href="/" className="tracking-widest text-kinari/50 hover:text-kinari">
-              トップへ戻る
+            <a href={backToDetail} className="tracking-widest text-kinari/50 hover:text-kinari">
+              「{themeName}」へ戻る
             </a>
           </p>
         </div>
@@ -576,6 +584,7 @@ export function PlayScreen({
   if (phase.name === "result") {
     return (
       <Result
+        detailHref={backToDetail}
         stats={stats}
         missedKeys={missedKeys}
         themeName={themeName}

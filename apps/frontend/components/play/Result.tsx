@@ -27,6 +27,7 @@ export function Result({
   onRetry,
   themeName,
   listHref,
+  detailHref,
   kind,
   form,
   shareUrl,
@@ -38,6 +39,12 @@ export function Result({
   themeName: string;
   /** 離脱先の一覧。テーマなら /themes、最適化する音なら /practice */
   listHref: string;
+  /**
+   * いま遊んでいたテーマの詳細。**トップへ返さない。**
+   * 遊んでいた文脈が消えて探し直しになるうえ、詳細には短文と単語の選択があるので、
+   * 同じテーマの別の形式へそのまま移れる。
+   */
+  detailHref: string;
   /** 投稿テキストの文面を分けるため */
   kind: ThemeKind;
   /**
@@ -138,8 +145,8 @@ export function Result({
         </div>
 
         <p className="mt-8 text-center text-sm">
-          <a href="/" className="tracking-widest text-kinari/50 hover:text-kinari">
-            トップへ戻る
+          <a href={detailHref} className="tracking-widest text-kinari/50 hover:text-kinari">
+            「{themeName}」へ戻る
           </a>
         </p>
       </div>

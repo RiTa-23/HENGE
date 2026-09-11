@@ -32,6 +32,8 @@
 
 テーマと含む文字は同じエンドポイントで`kind`により分岐する。DB上も同じテーブルのため。
 
+**マイページ（`/me`）は Route Handler を持たない。** SSRで Service Bindings を直接使う（`lib/api/me.ts`。`/themes` と同じ）。残ニューロンは `GET /api/me` と同じ材料（Hono の `GET /usage/:userId`）から作り、作ったお題は `GET /users/themes` に**セッションのIDだけ**を渡す。Hono 側は渡されたIDで引くだけで本人かどうかを見ないので、他人のIDを渡す口を Next.js に作らない。
+
 **ユーザー名（表示名）の更新は Route Handler を持たない。** Better Auth の `POST /api/auth/update-user`（`authClient.updateUser({ displayName })`）で行う。このルートは Better Auth が `/api/auth/*` に生やしていて外から叩けるので、**入力検証はそこにかける**（`lib/auth.ts` の `additionalFields.displayName.validator.input` に `displayNameSchema` を渡している）。別に `PATCH /api/me` を作って検証しても、Better Auth のルートが検証なしで残るだけ。
 
 ### POST /api/sessions/start
@@ -177,6 +179,7 @@
 | POST | `/themes` | 作成＋初回15問の同期生成 |
 | POST | `/prompts/regenerate` | 枯渇時の同期再生成 |
 | GET | `/usage/:userId` | 当日の `{ count, neurons }`（Next.js側の判定の材料）。**上限値はHono側に持たない** |
+| GET | `/users/themes` | ある利用者が作ったテーマ／含む文字の一覧（`userId` / `limit` / `cursor` をクエリで受ける）。`kind` で絞らず作成順。マイページ用 |
 | GET | `/admin/themes` | 管理用一覧 |
 | DELETE | `/admin/themes/:id` | 削除 |
 | GET | `/admin/prompts` | テーマ1つ分のお題一覧（`themeId` / `limit` / `cursor` をクエリで受ける） |

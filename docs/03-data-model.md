@@ -22,9 +22,11 @@ D1（SQLite）+ Drizzle ORM。Better Auth管理下のテーブル（`user` / `se
 CREATE UNIQUE INDEX themes_kind_normalized ON themes (kind, normalized_name);
 CREATE INDEX themes_kind_popular ON themes (kind, total_play_count DESC);
 CREATE INDEX themes_kind_created ON themes (kind, created_at DESC);
+CREATE INDEX themes_created_by ON themes (created_by, created_at DESC);
 ```
 
 一意制約に`kind`を含めるのは、テーマ名「ざ」と含む文字「ざ」を共存させるため。
+`themes_created_by` はマイページの「作ったお題」（作成者で絞って作成順。`kind` をまたぐ）のためで、上の2本では賄えない。
 
 ### normalized_name の作り方
 

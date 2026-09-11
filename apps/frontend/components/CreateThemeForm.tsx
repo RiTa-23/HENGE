@@ -3,6 +3,7 @@
 import { isApiError, isHiraganaOnly, type ThemeKind } from "@henge/shared";
 import { useEffect, useState } from "react";
 import { authClient } from "@/lib/api/auth-client";
+import { LoginRequired } from "@/components/LoginRequired";
 import { Shuriken } from "@/components/play/Shuriken";
 import { playHref } from "@/lib/ui/kind";
 
@@ -87,20 +88,7 @@ export function CreateThemeForm({
 
   if (isPending) return null;
 
-  if (session === null) {
-    return (
-      <div className="mt-10 rounded-md border border-kinari/15 bg-kinari/5 px-8 py-10 text-center">
-        <p className="text-kinari/80">お題を作るにはログインが必要です。</p>
-        <button
-          type="button"
-          onClick={() => authClient.signIn.social({ provider: "google" })}
-          className="mt-6 rounded-md border border-shu bg-shu/15 px-8 py-3 tracking-widest text-kinari"
-        >
-          Googleでログイン
-        </button>
-      </div>
-    );
-  }
+  if (session === null) return <LoginRequired message="お題を作るにはログインが必要です。" />;
 
   const create = async (trimmed: string) => {
     const response = await fetch("/api/themes", {

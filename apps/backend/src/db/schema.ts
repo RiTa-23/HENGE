@@ -52,6 +52,9 @@ export const themes = sqliteTable(
     uniqueIndex("themes_kind_normalized").on(t.kind, t.normalizedName),
     index("themes_kind_popular").on(t.kind, desc(t.totalPlayCount)),
     index("themes_kind_created").on(t.kind, desc(t.createdAt)),
+    // マイページの「作ったお題」（作成者で絞って作成順）。kind をまたいで引くので
+    // 上の2本では賄えない
+    index("themes_created_by").on(t.createdBy, desc(t.createdAt)),
   ],
 );
 

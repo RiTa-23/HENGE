@@ -2,7 +2,7 @@
 import { env, SELF } from "cloudflare:test";
 import { beforeEach, describe, expect, it } from "vitest";
 import { createDb } from "../src/db/client";
-import { prompts, themes } from "../src/db/schema";
+import { prompts, themes, user } from "../src/db/schema";
 
 const db = createDb(env.DB);
 
@@ -15,6 +15,18 @@ async function seedTheme(over: Partial<typeof themes.$inferInsert> & { id: strin
   });
 }
 
+/** `created_by` の FK の親。作成者で絞るテストで使う */
+async function seedUser(id: string) {
+  await db.insert(user).values({
+    id,
+    name: id,
+    email: `${id}@example.com`,
+    emailVerified: false,
+    createdAt: new Date(),
+    updatedAt: new Date(),
+  });
+}
+
 async function get(path: string) {
   const res = await SELF.fetch(`http://backend${path}`);
   return { status: res.status, body: (await res.json()) as Record<string, unknown> };
@@ -23,6 +35,7 @@ async function get(path: string) {
 beforeEach(async () => {
   await db.delete(prompts);
   await db.delete(themes);
+  await db.delete(user);
 });
 
 describe("GET /themes", () => {
@@ -111,5 +124,41 @@ describe("GET /themes/:id", () => {
     const { status, body } = await get("/themes/none");
     expect(status).toBe(404);
     expect((body.error as { code: string }).code).toBe("NOT_FOUND");
+  });
+});
+
+describe("GET /users/themes", () => {
+  it("作成者で絞り、テーマと含む文字の両方を作成順（新しい順）で返す", async () => {
+    await seedUser("u1");
+    await seedUser("u2");
+    await seedTheme({ id: "mine-old", createdBy: "u1", createdAt: 100 });
+    await seedTheme({ id: "mine-new", kind: "constraint", createdBy: "u1", createdAt: 200 });
+    await seedTheme({ id: "theirs", createdBy: "u2", createdAt: 300 });
+    // 運営投入分（created_by が NULL）は誰の一覧にも出ない
+    await seedTheme({ id: "seeded", createdBy: null, createdAt: 400 });
+
+    const { status, body } = await get("/users/themes?userId=u1");
+
+    expect(status).toBe(200);
+    expect((body.themes as { id: string }[]).map((t) => t.id)).toEqual(["mine-new", "mine-old"]);
+    expect(body.nextCursor).toBeNull();
+  });
+
+  it("limit と cursor でページングし、続きがあれば nextCursor を返す", async () => {
+    await seedUser("u1");
+    for (let i = 0; i < 3; i++) await seedTheme({ id: `t${i}`, createdBy: "u1", createdAt: i });
+
+    const first = await get("/users/themes?userId=u1&limit=2");
+    expect((first.body.themes as unknown[]).length).toBe(2);
+    expect(first.body.nextCursor).toBe(2);
+
+    const second = await get("/users/themes?userId=u1&limit=2&cursor=2");
+    expect((second.body.themes as unknown[]).length).toBe(1);
+    expect(second.body.nextCursor).toBeNull();
+  });
+
+  it("作ったものが無ければ空で返す", async () => {
+    const { body } = await get("/users/themes?userId=nobody");
+    expect(body.themes).toEqual([]);
   });
 });

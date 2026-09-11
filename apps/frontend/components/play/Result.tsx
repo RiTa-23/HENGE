@@ -1,4 +1,4 @@
-import { playSize, type PromptForm, type ThemeKind } from "@henge/shared";
+import type { PromptForm, ThemeKind } from "@henge/shared";
 import { topMissedKeys } from "@/lib/play/misses";
 import {
   accuracyRatio,
@@ -66,16 +66,17 @@ export function Result({
   return (
     <div className="flex min-h-dvh items-center justify-center p-6">
       <div className="w-full max-w-2xl rounded-lg border border-kin/60 bg-kinari/5 px-10 py-12">
-        <p className="flex items-center justify-center gap-3 text-sm tracking-widest text-kinari/60">
+        {/*
+          見出しはテーマ名（または最適化の文字）だけ。**問題数は出さない。**
+          形式ごとに固定（短文15／単語20）なので、書いても情報が増えない。
+          **形式は出す。** テーマ名だけだと、あとから見て短文の記録か単語の記録か
+          分からない
+        */}
+        <h1 className="flex items-center justify-center gap-4 font-mincho text-2xl tracking-widest text-kinari">
           {themeName}
-          {/* **形式を出す。** テーマ名だけだと、あとから見て短文の記録か
-              単語の記録か分からない */}
-          <span className="rounded-full border border-kinari/20 px-3 py-0.5 text-xs text-kinari/70">
+          <span className="rounded-full border border-kinari/20 px-3 py-0.5 font-gothic text-xs tracking-widest text-kinari/70">
             {form === "word" ? "単語" : "短文"}
           </span>
-        </p>
-        <h1 className="mt-3 text-center font-mincho text-2xl tracking-widest text-kinari">
-          {playSize(form)}問 走破
         </h1>
 
         <div className="mt-10 text-center">

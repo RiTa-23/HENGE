@@ -2,6 +2,7 @@ import {
   buildRomanCandidates,
   countKeystrokes,
   isKeystrokeCountInRange,
+  type PromptForm,
   UnsupportedKanaError,
 } from "@henge/shared";
 
@@ -15,6 +16,8 @@ import {
 /** D1から読んだ1行 */
 export type StoredPrompt = {
   id: string;
+  /** 出題の形式。**打鍵数の範囲が形式で違う**（短文10〜35／単語4〜20）ので、範囲外の判定に要る */
+  form: PromptForm;
   readingKana: string;
   readingRomanJson: string;
   keystrokeCount: number;
@@ -28,8 +31,9 @@ export type ChangedPrompt = {
   keystrokeCount: number;
   previousKeystrokeCount: number;
   /**
-   * 作り直した結果、打鍵数が 10〜35 の外に出た行。
+   * 作り直した結果、打鍵数がその形式の範囲（短文10〜35／単語4〜20）の外に出た行。
    * **書き換えはする**（古い値も同じだけ間違っている）。消すかどうかは人が決める。
+   * 形式を見ずに短文の範囲で判定すると、**単語の行がほぼ全部「範囲外」に並ぶ**。
    */
   outOfRange: boolean;
 };
@@ -90,7 +94,7 @@ export function planRebuild(rows: readonly StoredPrompt[]): RebuildPlan {
       readingRomanJson,
       keystrokeCount,
       previousKeystrokeCount: row.keystrokeCount,
-      outOfRange: !isKeystrokeCountInRange(keystrokeCount),
+      outOfRange: !isKeystrokeCountInRange(keystrokeCount, row.form),
     });
   }
 

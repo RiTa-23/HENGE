@@ -1,5 +1,5 @@
 /* oxlint-disable no-await-in-loop -- D1のバインド変数上限に合わせて分割投入するため、順に入れる */
-import { PLAY_SIZE, STOCK_TARGET } from "@henge/shared";
+import { PLAY_SIZE, PLAY_SIZE_WORD, STOCK_TARGET } from "@henge/shared";
 import { env, SELF } from "cloudflare:test";
 import { eq } from "drizzle-orm";
 import { beforeEach, describe, expect, it, vi } from "vitest";
@@ -41,6 +41,24 @@ async function seed(promptCount: number, over: Partial<typeof themes.$inferInser
   }
 }
 
+/** 単語のプールを積む。短文とは別のプールなので連番も1から振る */
+async function seedWords(count: number) {
+  const rows = Array.from({ length: count }, (_, i) => ({
+    id: `w${i + 1}`,
+    themeId: "t1",
+    form: "word" as const,
+    text: `単語${i + 1}`,
+    readingKana: "にんじゃ",
+    readingRomanJson: '[["ni"],["n"],["ja"]]',
+    keystrokeCount: 6,
+    source: "workers_ai" as const,
+    sequenceNumber: i + 1,
+  }));
+  for (let i = 0; i < rows.length; i += 10) {
+    await db.insert(prompts).values(rows.slice(i, i + 10));
+  }
+}
+
 async function start(body: Record<string, unknown>) {
   const res = await SELF.fetch("http://backend/sessions/start", {
     method: "POST",
@@ -65,7 +83,7 @@ beforeEach(async () => {
   await db.delete(userThemeProgress);
   await db.delete(themes);
   await db.delete(user);
-  await env.KV.delete(themeLockKey("t1"));
+  await env.KV.delete(themeLockKey("t1", "sentence"));
 });
 
 describe("配信", () => {
@@ -177,7 +195,7 @@ describe("補充のキック", () => {
     expect(body.remainingInPool).toBe(STOCK_TARGET - 1);
     expect(body.refillKicked).toBe(true);
     // ロックを取っている
-    expect(await env.KV.get(themeLockKey("t1"))).not.toBeNull();
+    expect(await env.KV.get(themeLockKey("t1", "sentence"))).not.toBeNull();
   });
 
   it("残りがちょうど30ならキックしない（境界値）", async () => {
@@ -191,7 +209,7 @@ describe("補充のキック", () => {
     await seed(44);
     const { body } = await start({ themeId: "t1", offset: 0 });
     expect(body.refillKicked).toBe(false);
-    expect(await env.KV.get(themeLockKey("t1"))).toBeNull();
+    expect(await env.KV.get(themeLockKey("t1", "sentence"))).toBeNull();
   });
 
   it("生成困難なテーマではキックしない", async () => {
@@ -202,7 +220,7 @@ describe("補充のキック", () => {
 
   it("すでにロックが取られていればキックせず、クォータも消費しない", async () => {
     await seed(44);
-    await env.KV.put(themeLockKey("t1"), "1", { expirationTtl: 60 });
+    await env.KV.put(themeLockKey("t1", "sentence"), "1", { expirationTtl: 60 });
 
     const { body } = await start({ themeId: "t1", userId: "u1", allowRefill: true });
     expect(body.refillKicked).toBe(false);
@@ -212,7 +230,7 @@ describe("補充のキック", () => {
     await seed(44);
     const { body } = await start({ themeId: "t1", userId: "u1" });
     expect(body.refillKicked).toBe(false);
-    expect(await env.KV.get(themeLockKey("t1"))).toBeNull();
+    expect(await env.KV.get(themeLockKey("t1", "sentence"))).toBeNull();
   });
 
   it("許可フラグがfalseでもプレイ自体は成功する（プレイはクォータを消費しないため）", async () => {
@@ -246,7 +264,7 @@ describe("枯渇", () => {
 
   it("生成ロックがあれば GENERATION_IN_PROGRESS（本当に尽きたのと区別する）", async () => {
     await seed(14);
-    await env.KV.put(themeLockKey("t1"), "1", { expirationTtl: 60 });
+    await env.KV.put(themeLockKey("t1", "sentence"), "1", { expirationTtl: 60 });
 
     const { status, body } = await start({ themeId: "t1", offset: 0 });
     expect(status).toBe(409);
@@ -256,5 +274,58 @@ describe("枯渇", () => {
   it("存在しないテーマは NOT_FOUND を返す", async () => {
     const { status } = await start({ themeId: "none", offset: 0 });
     expect(status).toBe(404);
+  });
+});
+
+describe("形式ごとに別のプール・別の進捗", () => {
+  it("単語を指定すると、単語のお題が1プレイ分（30問）返る", async () => {
+    await seed(PLAY_SIZE);
+    await seedWords(PLAY_SIZE_WORD);
+
+    const { status, body } = await start({ themeId: "t1", form: "word", offset: 0 });
+
+    expect(status).toBe(200);
+    expect(body.prompts).toHaveLength(PLAY_SIZE_WORD);
+    // 短文が1問も混ざらない
+    expect((body.prompts as { text: string }[]).every((p) => p.text.startsWith("単語"))).toBe(true);
+    expect(body.nextOffset).toBe(PLAY_SIZE_WORD);
+  });
+
+  it("単語の在庫が無ければ、短文の在庫があっても枯渇として返る", async () => {
+    await seed(PLAY_SIZE * 3);
+
+    const { body } = await start({ themeId: "t1", form: "word", offset: 0 });
+
+    expect((body.error as { code: string }).code).toBe("THEME_EXHAUSTED");
+  });
+
+  /**
+   * **これが混ざると、遊んでいない短文のお題が飛ばされる。**
+   * 単語を1プレイ（30問）遊んだぶんだけ短文のオフセットも進むと、次に短文を
+   * 開いたときに31問目から配られる。
+   */
+  it("単語を遊んでも、短文の進捗は進まない", async () => {
+    await seed(PLAY_SIZE * 3);
+    await seedWords(PLAY_SIZE_WORD);
+
+    await start({ themeId: "t1", form: "word", userId: "u1" });
+
+    const rows = await db.select().from(userThemeProgress);
+    expect(rows).toHaveLength(1);
+    expect(rows[0]?.form).toBe("word");
+    expect(rows[0]?.playCount).toBe(PLAY_SIZE_WORD);
+
+    // 短文はまだ1問も配っていないので、1問目から始まる
+    const { body } = await start({ themeId: "t1", form: "sentence", userId: "u1" });
+    expect(body.nextOffset).toBe(PLAY_SIZE);
+    expect((body.prompts as { text: string }[]).some((p) => p.text === "お題1")).toBe(true);
+  });
+
+  it("形式を省略すると短文になる（既存のクライアントを壊さない）", async () => {
+    await seed(PLAY_SIZE);
+
+    const { body } = await start({ themeId: "t1", offset: 0 });
+
+    expect(body.prompts).toHaveLength(PLAY_SIZE);
   });
 });

@@ -10,14 +10,26 @@ describe("buildShareText", () => {
   // 550打中540打 正解、125秒。打鍵/秒 4.4、正確率 98%、スコア 249
   const stats = { hits: 540, misses: 10, elapsedMs: 125_000 };
 
-  it("テーマモード。テーマ名・スコア・打鍵/秒・正確率を含む", () => {
-    expect(buildShareText({ kind: "theme", themeName: "忍びの心得", stats })).toBe(
-      `HENGEで「忍びの心得」を打った。\nスコア 249／打鍵/秒 4.4／正確率 98%\n#HENGE`,
+  it("テーマモード（短文）。テーマ名・形式・スコア・打鍵/秒・正確率を含む", () => {
+    expect(
+      buildShareText({ kind: "theme", form: "sentence", themeName: "忍びの心得", stats }),
+    ).toBe(`HENGEで「忍びの心得」の短文を打った。\nスコア 249／打鍵/秒 4.4／正確率 98%\n#HENGE`);
+  });
+
+  /**
+   * **短文も単語も明記する。** 同じテーマ名で中身も問題数も違うので、書かないと
+   * どちらの記録か分からない。単語のときだけ書くと「書いていない＝短文」という
+   * 読み方を求めることになる。
+   */
+  it("テーマモード（単語）。形式の表記が短文と変わる", () => {
+    expect(buildShareText({ kind: "theme", form: "word", themeName: "忍びの心得", stats })).toBe(
+      `HENGEで「忍びの心得」の単語を打った。\nスコア 249／打鍵/秒 4.4／正確率 98%\n#HENGE`,
     );
   });
 
   it("最適化モード。文字だけだと文として成立しないため「最適化練習」を挟む", () => {
-    expect(buildShareText({ kind: "constraint", themeName: "ざ", stats })).toBe(
+    // 最適化練習に単語モードは無いので、形式を書き足さない
+    expect(buildShareText({ kind: "constraint", form: "sentence", themeName: "ざ", stats })).toBe(
       `HENGEで「ざ」の最適化練習を打った。\nスコア 249／打鍵/秒 4.4／正確率 98%\n#HENGE`,
     );
   });
@@ -27,10 +39,11 @@ describe("buildShareText", () => {
     expect(
       buildShareText({
         kind: "theme",
+        form: "sentence",
         themeName: "忍びの心得",
         stats: { hits: 0, misses: 0, elapsedMs: 1000 },
       }),
-    ).toBe(`HENGEで「忍びの心得」を打った。\nスコア 0／打鍵/秒 0.0／正確率 100%\n#HENGE`);
+    ).toBe(`HENGEで「忍びの心得」の短文を打った。\nスコア 0／打鍵/秒 0.0／正確率 100%\n#HENGE`);
   });
 });
 

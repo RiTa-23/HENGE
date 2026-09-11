@@ -88,7 +88,7 @@ beforeEach(async () => {
   await db.delete(userGenerationUsage);
   await db.delete(themes);
   await db.delete(user);
-  await env.KV.delete(themeLockKey("t1"));
+  await env.KV.delete(themeLockKey("t1", "sentence"));
 });
 
 describe("kickRefill の消費記録（実際に使ったニューロンを加算する）", () => {
@@ -103,6 +103,7 @@ describe("kickRefill の消費記録（実際に使ったニューロンを加�
     const kicked = await kickRefill(env, waitUntil, {
       db,
       theme,
+      form: "sentence",
       nextOffset: 15,
       userId: "u1",
     });
@@ -131,6 +132,7 @@ describe("kickRefill の消費記録（実際に使ったニューロンを加�
     const kicked = await kickRefill(env, waitUntil, {
       db,
       theme,
+      form: "sentence",
       nextOffset: 15,
       userId: "u1",
     });
@@ -164,7 +166,7 @@ describe("kickRefill の消費記録（実際に使ったニューロンを加�
     const { waitUntil, flush } = manualWaitUntil();
 
     const theme = (await getThemeDetail(db, "t1"))!;
-    await kickRefill(env, waitUntil, { db, theme, nextOffset: 15, userId: "u1" });
+    await kickRefill(env, waitUntil, { db, theme, form: "sentence", nextOffset: 15, userId: "u1" });
     await flush();
 
     expect(neuronsAtReadingTime).toBeCloseTo(PER_ROUND);
@@ -181,7 +183,7 @@ describe("kickRefill の消費記録（実際に使ったニューロンを加�
     const { waitUntil, flush } = manualWaitUntil();
 
     const theme = (await getThemeDetail(db, "t1"))!;
-    await kickRefill(env, waitUntil, { db, theme, nextOffset: 15, userId: "u1" });
+    await kickRefill(env, waitUntil, { db, theme, form: "sentence", nextOffset: 15, userId: "u1" });
     await flush();
 
     expect((await getUsage(db, "u1")).neurons).toBeCloseTo(PER_ROUND);
@@ -199,6 +201,7 @@ describe("kickRefill の消費記録（実際に使ったニューロンを加�
     const kicked = await kickRefill(env, waitUntil, {
       db,
       theme,
+      form: "sentence",
       nextOffset: 15,
       userId: "u1",
     });
@@ -210,7 +213,7 @@ describe("kickRefill の消費記録（実際に使ったニューロンを加�
     const [row] = await db.select().from(themes).where(eq(themes.id, "t1"));
     expect(row?.generationStatus).toBe("ok");
     // ロックは解放される（次のプレイで補充を再キックできる）
-    expect(await env.KV.get(themeLockKey("t1"))).toBeNull();
+    expect(await env.KV.get(themeLockKey("t1", "sentence"))).toBeNull();
   });
 
   /**
@@ -225,23 +228,24 @@ describe("kickRefill の消費記録（実際に使ったニューロンを加�
     const { waitUntil, flush } = manualWaitUntil();
 
     const theme = (await getThemeDetail(db, "t1"))!;
-    await kickRefill(env, waitUntil, { db, theme, nextOffset: 15, userId: "u1" });
+    await kickRefill(env, waitUntil, { db, theme, form: "sentence", nextOffset: 15, userId: "u1" });
     await flush();
 
     const [row] = await db.select().from(themes).where(eq(themes.id, "t1"));
     expect(row?.generationStatus).toBe("ok");
-    expect(await env.KV.get(themeLockKey("t1"))).toBeNull();
+    expect(await env.KV.get(themeLockKey("t1", "sentence"))).toBeNull();
   });
 
   it("ロックが取れなければキックせず、消費もしない", async () => {
     await seed();
-    await env.KV.put(themeLockKey("t1"), "1", { expirationTtl: 60 });
+    await env.KV.put(themeLockKey("t1", "sentence"), "1", { expirationTtl: 60 });
     const { waitUntil, flush } = manualWaitUntil();
 
     const theme = (await getThemeDetail(db, "t1"))!;
     const kicked = await kickRefill(env, waitUntil, {
       db,
       theme,
+      form: "sentence",
       nextOffset: 15,
       userId: "u1",
     });

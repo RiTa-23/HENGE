@@ -48,22 +48,22 @@ it("sequence_number は1始まりの連番になる", async () => {
 
 it("追加分は現在の最大値+1から採番される", async () => {
   await insertThemeWithPrompts(db, theme, [item("あ"), item("い")], "model-x");
-  await appendPrompts(db, "t1", [item("う"), item("え")], "model-x");
+  await appendPrompts(db, "t1", "sentence", [item("う"), item("え")], "model-x");
 
   const rows = await db.select().from(prompts);
   expect(rows.map((r) => r.sequenceNumber).toSorted()).toEqual([1, 2, 3, 4]);
 });
 
 it("総生成数は MAX(sequence_number) で取れる", async () => {
-  expect(await countPrompts(db, "t1")).toBe(0);
+  expect(await countPrompts(db, "t1", "sentence")).toBe(0);
   await insertThemeWithPrompts(db, theme, [item("あ"), item("い")], "model-x");
-  expect(await countPrompts(db, "t1")).toBe(2);
+  expect(await countPrompts(db, "t1", "sentence")).toBe(2);
 });
 
 it("重複回避の文脈は新しい順に取れる", async () => {
   await insertThemeWithPrompts(db, theme, [item("1つ目"), item("2つ目"), item("3つ目")], "model-x");
 
-  expect(await recentPromptTexts(db, "t1", 2)).toEqual(["3つ目", "2つ目"]);
+  expect(await recentPromptTexts(db, "t1", "sentence", 2)).toEqual(["3つ目", "2つ目"]);
 });
 
 it("N_request（20件）を一度に挿入できる", async () => {
@@ -73,7 +73,7 @@ it("N_request（20件）を一度に挿入できる", async () => {
   await insertThemeWithPrompts(db, theme, items, "model-x");
 
   expect(await db.select().from(prompts)).toHaveLength(20);
-  expect(await countPrompts(db, "t1")).toBe(20);
+  expect(await countPrompts(db, "t1", "sentence")).toBe(20);
 });
 
 it("追加分も分割して挿入できる", async () => {
@@ -81,11 +81,12 @@ it("追加分も分割して挿入できる", async () => {
   await appendPrompts(
     db,
     "t1",
+    "sentence",
     Array.from({ length: 20 }, (_, i) => item(`追加${i + 1}`)),
     "model-x",
   );
 
-  expect(await countPrompts(db, "t1")).toBe(21);
+  expect(await countPrompts(db, "t1", "sentence")).toBe(21);
 });
 
 it("生成に使ったモデル名を残す", async () => {
@@ -115,11 +116,11 @@ describe("連番に穴が空いた場合", () => {
 
   it("countPrompts は実際に配れる数を返す（最大値ではない）", async () => {
     // MAX(sequence_number) なら20。実際に残っているのは19件
-    expect(await countPrompts(db, theme.id)).toBe(19);
+    expect(await countPrompts(db, theme.id, "sentence")).toBe(19);
   });
 
   it("穴をまたいでも欠けずに取れる", async () => {
-    const page = await fetchPromptPage(db, theme.id, 0, 15);
+    const page = await fetchPromptPage(db, theme.id, "sentence", 0, 15);
 
     expect(page).toHaveLength(15);
     // 5番目が消えた分、6番目が繰り上がる
@@ -129,12 +130,52 @@ describe("連番に穴が空いた場合", () => {
 
   it("採番は MAX+1 のまま（件数で採ると既存と衝突する）", async () => {
     // COUNT で採ると20になり、既にある20番と衝突して一意制約に当たる
-    expect(await nextSequenceNumber(db, theme.id)).toBe(21);
+    expect(await nextSequenceNumber(db, theme.id, "sentence")).toBe(21);
   });
 
   it("穴が空いた後でも追記できる", async () => {
-    await appendPrompts(db, theme.id, [item("追加分")], "model-x");
+    await appendPrompts(db, theme.id, "sentence", [item("追加分")], "model-x");
 
-    expect(await countPrompts(db, theme.id)).toBe(20);
+    expect(await countPrompts(db, theme.id, "sentence")).toBe(20);
+  });
+});
+
+describe("形式ごとにプールが分かれる", () => {
+  /**
+   * **連番は形式ごとに1から振り直す。** 混ぜて採番すると、配信（OFFSET で位置を
+   * 数える）が短文の15問に単語を混ぜて返すことになる。
+   */
+  it("単語の連番は短文と独立に1から始まる", async () => {
+    await insertThemeWithPrompts(db, theme, [item("あ"), item("い")], "model-x");
+    await appendPrompts(db, "t1", "word", [item("忍者"), item("手裏剣")], "model-x");
+
+    const words = await db.select().from(prompts).where(eq(prompts.form, "word"));
+    expect(words.map((r) => r.sequenceNumber).toSorted()).toEqual([1, 2]);
+    expect(await nextSequenceNumber(db, "t1", "word")).toBe(3);
+    // 短文側の採番は単語に影響されない
+    expect(await nextSequenceNumber(db, "t1", "sentence")).toBe(3);
+  });
+
+  it("在庫数は形式ごとに数える", async () => {
+    await insertThemeWithPrompts(db, theme, [item("あ"), item("い")], "model-x");
+    await appendPrompts(db, "t1", "word", [item("忍者")], "model-x");
+
+    expect(await countPrompts(db, "t1", "sentence")).toBe(2);
+    expect(await countPrompts(db, "t1", "word")).toBe(1);
+  });
+
+  it("配信は指定した形式のお題だけを返す", async () => {
+    await insertThemeWithPrompts(db, theme, [item("短文1"), item("短文2")], "model-x");
+    await appendPrompts(db, "t1", "word", [item("忍者"), item("手裏剣")], "model-x");
+
+    const page = await fetchPromptPage(db, "t1", "word", 0, 2);
+    expect(page.map((p) => p.text)).toEqual(["忍者", "手裏剣"]);
+  });
+
+  it("重複回避の文脈も形式ごとに引く（単語の生成に短文を渡さない）", async () => {
+    await insertThemeWithPrompts(db, theme, [item("短文1")], "model-x");
+    await appendPrompts(db, "t1", "word", [item("忍者")], "model-x");
+
+    expect(await recentPromptTexts(db, "t1", "word", 10)).toEqual(["忍者"]);
   });
 });

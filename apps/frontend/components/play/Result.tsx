@@ -1,4 +1,5 @@
-import { PLAY_SIZE, type ThemeKind } from "@henge/shared";
+import type { PromptForm, ThemeKind } from "@henge/shared";
+import { SentenceMark, WordMark } from "@/components/FormMark";
 import { topMissedKeys } from "@/lib/play/misses";
 import {
   accuracyRatio,
@@ -27,18 +28,31 @@ export function Result({
   onRetry,
   themeName,
   listHref,
+  detailHref,
   kind,
+  form,
   shareUrl,
 }: {
   stats: PlayStats;
-  /** 打ち損ねた文字と回数。15問の通算 */
+  /** 打ち損ねた文字と回数。1プレイ（短文15問／単語20問）の通算 */
   missedKeys: ReadonlyMap<string, number>;
   onRetry: () => void;
   themeName: string;
   /** 離脱先の一覧。テーマなら /themes、最適化する音なら /practice */
   listHref: string;
+  /**
+   * いま遊んでいたテーマの詳細。**トップへ返さない。**
+   * 遊んでいた文脈が消えて探し直しになるうえ、詳細には短文と単語の選択があるので、
+   * 同じテーマの別の形式へそのまま移れる。
+   */
+  detailHref: string;
   /** 投稿テキストの文面を分けるため */
   kind: ThemeKind;
+  /**
+   * 出題の形式。**問題数も投稿の文面もこれで変わる。**
+   * 同じテーマ名で中身が違うので、どちらの記録かを画面にも投稿にも残す。
+   */
+  form: PromptForm;
   /** X投稿で共有するURL（着地ページの絶対URL）。サーバー側で組み立て済み */
   shareUrl: string;
 }) {
@@ -53,9 +67,22 @@ export function Result({
   return (
     <div className="flex min-h-dvh items-center justify-center p-6">
       <div className="w-full max-w-2xl rounded-lg border border-kin/60 bg-kinari/5 px-10 py-12">
-        <p className="text-center text-sm tracking-widest text-kinari/60">{themeName}</p>
-        <h1 className="mt-2 text-center font-mincho text-2xl tracking-widest text-kinari">
-          {PLAY_SIZE}問 走破
+        {/*
+          見出しはテーマ名（または最適化の文字）だけ。**問題数は出さない。**
+          形式ごとに固定（短文15／単語20）なので、書いても情報が増えない。
+          **形式は出す。** テーマ名だけだと、あとから見て短文の記録か単語の記録か
+          分からない
+        */}
+        <h1 className="flex items-center justify-center gap-4 font-mincho text-2xl tracking-widest text-kinari">
+          {themeName}
+          <span className="flex items-center gap-1.5 rounded-full border border-kinari/20 px-3 py-0.5 font-gothic text-xs tracking-widest text-kinari/70">
+            {form === "word" ? (
+              <WordMark className="size-3.5 text-kin" />
+            ) : (
+              <SentenceMark className="size-3.5 text-kin" />
+            )}
+            {form === "word" ? "単語" : "短文"}
+          </span>
         </h1>
 
         <div className="mt-10 text-center">
@@ -108,7 +135,7 @@ export function Result({
           <a
             href={buildTweetIntentUrl({
               url: shareUrl,
-              text: buildShareText({ kind, themeName, stats }),
+              text: buildShareText({ kind, form, themeName, stats }),
             })}
             target="_blank"
             rel="noreferrer"
@@ -125,8 +152,8 @@ export function Result({
         </div>
 
         <p className="mt-8 text-center text-sm">
-          <a href="/" className="tracking-widest text-kinari/50 hover:text-kinari">
-            トップへ戻る
+          <a href={detailHref} className="tracking-widest text-kinari/50 hover:text-kinari">
+            「{themeName}」へ戻る
           </a>
         </p>
       </div>

@@ -1,4 +1,5 @@
 import { env, SELF } from "cloudflare:test";
+import { eq } from "drizzle-orm";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { createDb } from "../src/db/client";
 import { prompts, themes, user, userGenerationUsage } from "../src/db/schema";
@@ -94,7 +95,7 @@ beforeEach(async () => {
   await db.delete(themes);
   await db.delete(user);
   await env.KV.delete(themeIdKey("theme", "忍びの心得"));
-  await env.KV.delete(themeLockKey("t1"));
+  await env.KV.delete(themeLockKey("t1", "sentence"));
 });
 
 describe("POST /themes", () => {
@@ -212,7 +213,7 @@ describe("Workers AI 側の事情は、テーマ名の問題と区別して返�
 
     expect(status).toBe(429);
     expect((body.error as { code: string }).code).toBe("AI_QUOTA_EXCEEDED");
-    expect(await env.KV.get(themeLockKey("t1"))).toBeNull();
+    expect(await env.KV.get(themeLockKey("t1", "sentence"))).toBeNull();
   });
 });
 
@@ -283,7 +284,9 @@ describe("同期生成の消費記録（成否によらず実消費を加算す�
     const { status, body } = await post("/prompts/regenerate", { themeId: "t1", userId: "u1" });
 
     expect(status).toBe(200);
-    expect((body.theme as { promptCount: number }).promptCount).toBeGreaterThanOrEqual(15);
+    expect(
+      (body.theme as { promptCounts: { sentence: number } }).promptCounts.sentence,
+    ).toBeGreaterThanOrEqual(15);
     expect(body.neuronsUsed).toBeCloseTo(PER_ROUND);
     expect((await getUsage(db, "u1")).neurons).toBeCloseTo(PER_ROUND);
   });
@@ -296,7 +299,7 @@ describe("同期生成の消費記録（成否によらず実消費を加算す�
       name: "忍びの心得",
       normalizedName: "忍びの心得",
     });
-    await env.KV.put(themeLockKey("t1"), "1", { expirationTtl: 60 });
+    await env.KV.put(themeLockKey("t1", "sentence"), "1", { expirationTtl: 60 });
 
     await post("/prompts/regenerate", { themeId: "t1", userId: "u1" });
 
@@ -327,7 +330,7 @@ describe("POST /prompts/regenerate", () => {
       name: "忍びの心得",
       normalizedName: "忍びの心得",
     });
-    await env.KV.put(themeLockKey("t1"), "1", { expirationTtl: 60 });
+    await env.KV.put(themeLockKey("t1", "sentence"), "1", { expirationTtl: 60 });
 
     const { status, body } = await post("/prompts/regenerate", { themeId: "t1", userId: "u1" });
 
@@ -347,11 +350,75 @@ describe("POST /prompts/regenerate", () => {
 
     await post("/prompts/regenerate", { themeId: "t1", userId: "u1" });
 
-    expect(await env.KV.get(themeLockKey("t1"))).toBeNull();
+    expect(await env.KV.get(themeLockKey("t1", "sentence"))).toBeNull();
   });
 
   it("存在しないテーマは NOT_FOUND を返す", async () => {
     const { status } = await post("/prompts/regenerate", { themeId: "none", userId: "u1" });
     expect(status).toBe(404);
+  });
+
+  /**
+   * **単語だけ挙動が違う。** 目標は1プレイ分の30語なのに、1回で作れるのは最大
+   * 40件しかない。短文と同じ「未達なら1件も保存しない」にすると、有効な語と
+   * 消費したニューロンを捨てて何度も押させることになる。
+   */
+  it("単語は目標に届かなくても、取れた分を保存する", async () => {
+    await seedUser("u1");
+    await db.insert(themes).values({
+      id: "t1",
+      kind: "theme",
+      name: "忍びの心得",
+      normalizedName: "忍びの心得",
+    });
+    stubGeneration([["忍者", "手裏剣", "城"]], "しのび");
+
+    const { status, body } = await post("/prompts/regenerate", {
+      themeId: "t1",
+      userId: "u1",
+      form: "word",
+    });
+
+    expect(status).toBe(200);
+    expect(body.added).toBe(3);
+    expect(await db.select().from(prompts).where(eq(prompts.form, "word"))).toHaveLength(3);
+  });
+
+  it("短文はこれまでどおり、目標未達なら1件も保存しない", async () => {
+    await seedUser("u1");
+    await db.insert(themes).values({
+      id: "t1",
+      kind: "theme",
+      name: "忍びの心得",
+      normalizedName: "忍びの心得",
+    });
+    stubGeneration([["一の忍びが闇を走る。"]], "しのびはやみをはしる。");
+
+    const { status, body } = await post("/prompts/regenerate", { themeId: "t1", userId: "u1" });
+
+    expect(status).toBe(422);
+    expect((body.error as { code: string }).code).toBe("GENERATION_FAILED");
+    expect(await db.select().from(prompts)).toHaveLength(0);
+  });
+
+  it("単語も1件も作れなければ失敗として返す", async () => {
+    await seedUser("u1");
+    await db.insert(themes).values({
+      id: "t1",
+      kind: "theme",
+      name: "忍びの心得",
+      normalizedName: "忍びの心得",
+    });
+    // ひらがなだけの語は却下される
+    stubGeneration([["にんじゃ"]], "しのび");
+
+    const { status, body } = await post("/prompts/regenerate", {
+      themeId: "t1",
+      userId: "u1",
+      form: "word",
+    });
+
+    expect((body.error as { code: string }).code).toBe("GENERATION_FAILED");
+    expect(status).toBe(422);
   });
 });

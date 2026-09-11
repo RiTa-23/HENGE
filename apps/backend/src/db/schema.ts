@@ -28,8 +28,18 @@ export const themes = sqliteTable(
     normalizedName: text("normalized_name").notNull(),
     /** 運営投入分はNULL。作成者が退会してもテーマ自体は残す */
     createdBy: text("created_by").references(() => user.id, { onDelete: "set null" }),
-    /** 'difficult' は「何度やっても在庫が積み上がらないテーマ」の印 */
+    /** 'difficult' は「何度やっても在庫が積み上がらないテーマ」の印。**短文のプールの分** */
     generationStatus: text("generation_status", { enum: ["ok", "difficult"] })
+      .notNull()
+      .default("ok"),
+    /**
+     * 単語のプールの「生成困難」の印。**短文と1本にまとめない。**
+     *
+     * まとめると、単語が作れないテーマで印が立った瞬間に**短文の補充まで止まる**。
+     * 形式ごとに作りやすさは違う（短文は作れるが単語が出てこないテーマがある）ので、
+     * 印も形式ごとに持つ。3つ目の形式が来たら theme_pools テーブルへ寄せる。
+     */
+    wordGenerationStatus: text("word_generation_status", { enum: ["ok", "difficult"] })
       .notNull()
       .default("ok"),
     /** 人気順ソート用。プレイ開始のたび+1 */
@@ -66,15 +76,26 @@ export const prompts = sqliteTable(
     source: text("source", { enum: ["workers_ai"] }).notNull(),
     /** 生成に使ったモデル名。どのモデルが作ったお題か後から辿るため */
     model: text("model"),
-    /** テーマ内で1始まりの連番。ページネーションの基準 */
+    /**
+     * 出題の形式。**プールはこれで分かれる。**
+     *
+     * 既存の行はすべて 'sentence'。`kind`（テーマ／最適化）とは直交する軸で、
+     * `kind` に値を足す形にすると同じテーマが一覧に2つ並ぶことになる。
+     */
+    form: text("form", { enum: ["sentence", "word"] })
+      .notNull()
+      .default("sentence"),
+    /** テーマ内・形式内で1始まりの連番。ページネーションの基準 */
     sequenceNumber: integer("sequence_number").notNull(),
     createdAt: integer("created_at")
       .notNull()
       .default(sql`(unixepoch())`),
   },
   (t) => [
-    // このインデックス1本で、ページネーションと総生成数の取得の両方を賄う
-    uniqueIndex("prompts_theme_seq").on(t.themeId, t.sequenceNumber),
+    // このインデックス1本で、ページネーションと総生成数の取得の両方を賄う。
+    // **form を含める。** 含めないと単語の連番が短文と衝突し、採番（MAX+1）も
+    // プールをまたいで飛ぶ
+    uniqueIndex("prompts_theme_form_seq").on(t.themeId, t.form, t.sequenceNumber),
   ],
 );
 
@@ -90,13 +111,22 @@ export const userThemeProgress = sqliteTable(
     themeId: text("theme_id")
       .notNull()
       .references(() => themes.id, { onDelete: "cascade" }),
-    /** 15の倍数。次に配信する範囲のオフセット */
+    /**
+     * 出題の形式。**進捗は形式ごとに持つ。**
+     *
+     * 1つにまとめると、単語を遊んだぶんだけ短文のオフセットも進み、
+     * **遊んでいない短文のお題が飛ばされる**。
+     */
+    form: text("form", { enum: ["sentence", "word"] })
+      .notNull()
+      .default("sentence"),
+    /** その形式の1プレイ分の倍数。次に配信する範囲のオフセット */
     playCount: integer("play_count").notNull().default(0),
     updatedAt: integer("updated_at")
       .notNull()
       .default(sql`(unixepoch())`),
   },
-  (t) => [primaryKey({ columns: [t.userId, t.themeId] })],
+  (t) => [primaryKey({ columns: [t.userId, t.themeId, t.form] })],
 );
 
 /**

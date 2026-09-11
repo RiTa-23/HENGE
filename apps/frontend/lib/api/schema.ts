@@ -21,13 +21,24 @@ export const themeNameSchema = z
 /** 匿名時のオフセット。改ざんは許容するが、範囲外の値は弾く */
 const offsetSchema = z.number().int().min(0).max(100_000);
 
+/**
+ * 出題の形式。**省略時は短文。**
+ *
+ * 既定を持たせるのは、形式を持たない古いクライアント（共有された古いURLなど）が
+ * そのまま短文で動くようにするため。未知の値は弾く（存在しないプールをHonoに
+ * 引かせない）。
+ */
+const formSchema = z.enum(["sentence", "word"]).default("sentence");
+
 export const sessionStartSchema = z.object({
   themeId: z.string().min(1),
+  form: formSchema,
   offset: offsetSchema.optional(),
 });
 
 export const regenerateSchema = z.object({
   themeId: z.string().min(1),
+  form: formSchema,
 });
 
 export const themeListQuerySchema = z.object({
@@ -41,6 +52,16 @@ export const themeListQuerySchema = z.object({
 export const adminListQuerySchema = z.object({
   limit: z.coerce.number().int().min(1).max(50).optional(),
   cursor: z.coerce.number().int().min(0).optional(),
+});
+
+/**
+ * テーマ1つ分のお題一覧。**形式で絞る。**
+ *
+ * 短文と単語はプールが別で、連番も1から振り直される。混ぜて出すと番号が2回りして、
+ * 管理者がどの行を消せばよいか読めない。省略時は短文。
+ */
+export const adminPromptListQuerySchema = adminListQuerySchema.extend({
+  form: formSchema,
 });
 
 /** 削除対象のテーマID（パスパラメータ） */

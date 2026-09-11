@@ -1,5 +1,13 @@
 import { describe, expect, it } from "bun:test";
-import { detailHref, kindLabel, listHref, parseThemeKind, playHref } from "./kind";
+import {
+  detailHref,
+  formLabel,
+  kindLabel,
+  listHref,
+  parsePlayForm,
+  parseThemeKind,
+  playHref,
+} from "./kind";
 
 /**
  * テーマ「ざ」と最適化する音「ざ」は一意制約上**共存できる**ため、名前だけでは
@@ -46,5 +54,36 @@ describe("listHref / kindLabel", () => {
     expect(listHref("constraint")).toBe("/practice");
     expect(kindLabel("theme")).toBe("このテーマ");
     expect(kindLabel("constraint")).toBe("この音");
+  });
+});
+
+describe("出題の形式とURL", () => {
+  /**
+   * **短文にクエリを付けない。** 付けると、これまでに共有された `/play/福岡` と
+   * 見た目の違うURLが2つ並ぶことになる（中身は同じ）。
+   */
+  it("短文はクエリを付けない", () => {
+    expect(playHref("theme", "福岡", "sentence")).toBe("/play/%E7%A6%8F%E5%B2%A1");
+    expect(playHref("theme", "福岡")).toBe("/play/%E7%A6%8F%E5%B2%A1");
+  });
+
+  it("単語だけ form=word を付ける", () => {
+    expect(playHref("theme", "福岡", "word")).toBe("/play/%E7%A6%8F%E5%B2%A1?form=word");
+  });
+
+  it("kind と form は両方載る", () => {
+    expect(playHref("constraint", "ざ", "word")).toBe("/play/%E3%81%96?kind=constraint&form=word");
+  });
+
+  // 存在しないプールを引かせない
+  it("未知の形式は短文に倒す", () => {
+    expect(parsePlayForm(undefined)).toBe("sentence");
+    expect(parsePlayForm("poem")).toBe("sentence");
+    expect(parsePlayForm("word")).toBe("word");
+  });
+
+  it("画面に出す呼び名", () => {
+    expect(formLabel("word")).toBe("単語");
+    expect(formLabel("sentence")).toBe("短文");
   });
 });

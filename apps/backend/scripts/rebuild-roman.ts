@@ -1,6 +1,5 @@
 #!/usr/bin/env bun
 import { unlink } from "node:fs/promises";
-import { KEYSTROKE_MAX, KEYSTROKE_MIN } from "@henge/shared";
 import { planRebuild, type StoredPrompt, updateStatement } from "./rebuild-roman-plan";
 
 /**
@@ -95,7 +94,7 @@ async function readAll(options: Options): Promise<StoredPrompt[]> {
     const take = Math.min(PAGE_SIZE, options.limit - all.length);
     if (take <= 0) break;
     const sql =
-      `SELECT id, reading_kana, reading_roman_json, keystroke_count FROM prompts ` +
+      `SELECT id, form, reading_kana, reading_roman_json, keystroke_count FROM prompts ` +
       `WHERE id > '${after.replaceAll("'", "''")}' ORDER BY id LIMIT ${take};`;
     // 次のページの開始位置が前のページの結果に依るので、並列にはできない
     // oxlint-disable-next-line no-await-in-loop
@@ -103,6 +102,7 @@ async function readAll(options: Options): Promise<StoredPrompt[]> {
     for (const row of rows) {
       all.push({
         id: String(row["id"]),
+        form: row["form"] === "word" ? "word" : "sentence",
         readingKana: String(row["reading_kana"]),
         readingRomanJson: String(row["reading_roman_json"]),
         keystrokeCount: Number(row["keystroke_count"]),
@@ -135,7 +135,7 @@ async function main() {
       `  ${row.readingKana}\n` +
         `    旧: ${before.map((u) => u[0]).join("|")} (${row.previousKeystrokeCount}打)\n` +
         `    新: ${after.map((u) => u[0]).join("|")} (${row.keystrokeCount}打)` +
-        (row.outOfRange ? `  ← ${KEYSTROKE_MIN}〜${KEYSTROKE_MAX}打の範囲外` : ""),
+        (row.outOfRange ? "  ← その形式の打鍵数の範囲外" : ""),
     );
   }
   if (plan.changed.length > LIST_LIMIT) {

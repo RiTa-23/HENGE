@@ -15,6 +15,13 @@
       "when": 1788853184538,
       "tag": "0001_melted_norrin_radd",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "6",
+      "when": 1789015058330,
+      "tag": "0002_cloudy_archangel",
+      "breakpoints": true
     }
   ]
 }

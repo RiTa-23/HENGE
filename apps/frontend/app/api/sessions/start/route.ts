@@ -18,7 +18,11 @@ export async function POST(request: Request) {
   if (userId === null) {
     return relay(
       await client.sessions.start.$post({
-        json: { themeId: parsed.data.themeId, offset: parsed.data.offset ?? 0 },
+        json: {
+          themeId: parsed.data.themeId,
+          form: parsed.data.form,
+          offset: parsed.data.offset ?? 0,
+        },
       }),
     );
   }
@@ -32,6 +36,7 @@ export async function POST(request: Request) {
   const res = await client.sessions.start.$post({
     json: {
       themeId: parsed.data.themeId,
+      form: parsed.data.form,
       userId,
       // 残数0でもプレイは許可する（ニューロンを消費しない行為のため）。
       // 補充のキックだけ許可しない。レート制限も同じ畳み方にしてあり、

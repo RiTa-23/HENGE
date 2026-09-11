@@ -1,4 +1,4 @@
-import type { ThemeKind } from "@henge/shared";
+import type { PromptForm, ThemeKind } from "@henge/shared";
 
 /**
  * テーマモードと最適化モードの**URL上の区別**をここだけに閉じ込める。
@@ -15,14 +15,36 @@ export function parseThemeKind(value: string | undefined): ThemeKind {
 }
 
 /**
+ * 既定は短文。未知の値も短文に倒す（kind と同じ理由）。
+ *
+ * **短文にクエリを付けない**ので、これまでに共有されたURLはそのまま短文で開く。
+ */
+export function parsePlayForm(value: string | undefined): PromptForm {
+  return value === "word" ? "word" : "sentence";
+}
+
+/** 画面に出す形式の呼び名 */
+export function formLabel(form: PromptForm): string {
+  return form === "word" ? "単語" : "短文";
+}
+
+/**
  * プレイ画面へのリンク。**テーマ名は必ずURLエンコードする。**
  *
- * `kind=theme` のときはクエリを付けない。既定値を明示しても意味が増えず、
- * 共有されたURLが読みにくくなるだけのため。
+ * `kind=theme` と `form=sentence` のときはクエリを付けない。既定値を明示しても
+ * 意味が増えず、共有されたURLが読みにくくなるだけのため。**これまでの共有URLは
+ * そのまま短文で開く。**
+ *
+ * 単語モードはテーマだけなので、`?kind=constraint&form=word` の組み合わせは
+ * 画面から作られない（URLを手で書けば作れるが、単語プールが無いので枯渇になる）。
  */
-export function playHref(kind: ThemeKind, name: string): string {
+export function playHref(kind: ThemeKind, name: string, form: PromptForm = "sentence"): string {
   const path = `/play/${encodeURIComponent(name)}`;
-  return kind === "constraint" ? `${path}?kind=constraint` : path;
+  const query = [
+    ...(kind === "constraint" ? ["kind=constraint"] : []),
+    ...(form === "word" ? ["form=word"] : []),
+  ];
+  return query.length === 0 ? path : `${path}?${query.join("&")}`;
 }
 
 /** 一覧・詳細ページへのリンク。テーマは `/themes/[name]`、最適化する音は `/practice/[char]` */

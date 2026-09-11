@@ -1,17 +1,19 @@
-import type { ThemeKind } from "@henge/shared";
+import type { PromptForm, ThemeKind } from "@henge/shared";
 import { backendClient } from "@/lib/api/backend";
 
 export interface ThemeDetail {
   id: string;
   kind: ThemeKind;
   name: string;
-  promptCount: number;
+  /** 形式ごとの在庫数。短文と単語で別のプールを持つ */
+  promptCounts: Record<PromptForm, number>;
   totalPlayCount: number;
   generationStatus: "ok" | "difficult";
+  wordGenerationStatus: "ok" | "difficult";
   createdAt: number;
 }
 
-export interface ThemeSummary extends Omit<ThemeDetail, "promptCount"> {}
+export interface ThemeSummary extends Omit<ThemeDetail, "promptCounts"> {}
 
 /**
  * 表示名からテーマを1件引く。サーバーコンポーネント用。

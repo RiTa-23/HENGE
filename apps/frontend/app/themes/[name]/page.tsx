@@ -1,9 +1,14 @@
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
+import { DetailScroll } from "@/components/DetailScroll";
+import { DifficultBadge } from "@/components/DifficultBadge";
+import { FormButton } from "@/components/FormButton";
+import { ThemeMark } from "@/components/ModeMark";
 import { SiteFooter } from "@/components/SiteFooter";
 import { SiteHeader } from "@/components/SiteHeader";
 import { ogFields, pageTitle } from "@/lib/og";
 import { decodePageParam, findTheme } from "@/lib/api/themes";
+import { playHref } from "@/lib/ui/kind";
 
 export const dynamic = "force-dynamic";
 
@@ -40,29 +45,52 @@ export default async function ThemeDetailPage({ params }: { params: Promise<{ na
   return (
     <>
       <SiteHeader />
-      <main className="mx-auto w-full max-w-3xl px-6 py-20">
-        <h1 className="font-mincho text-4xl tracking-wide text-kinari">{theme.name}</h1>
-        <p className="mt-6 leading-loose text-kinari/70">
-          「{theme.name}」をテーマにしたお題です。15問ひと組で、同じ文章は繰り返し出ません。
-        </p>
-
-        <dl className="mt-10 flex gap-10 text-sm">
-          <div>
-            <dt className="tracking-widest text-kinari/50">お題数</dt>
-            <dd className="mt-1 font-mono text-2xl text-kin">{theme.promptCount}</dd>
-          </div>
-          <div>
-            <dt className="tracking-widest text-kinari/50">プレイ回数</dt>
-            <dd className="mt-1 font-mono text-2xl text-kin">{theme.totalPlayCount}</dd>
-          </div>
-        </dl>
-
-        <a
-          href={`/play/${encodeURIComponent(theme.name)}`}
-          className="mt-14 inline-block rounded-md border border-shu bg-shu/15 px-10 py-4 font-gothic tracking-[0.2em] text-kinari transition-colors hover:bg-shu/25"
-        >
-          はじめる
-        </a>
+      <main className="mx-auto w-full max-w-4xl px-6 py-16">
+        <DetailScroll
+          mark={<ThemeMark className="h-5 w-5" />}
+          eyebrow="テーマ"
+          title={theme.name}
+          description={
+            <>
+              「{theme.name}」をテーマにしたお題です。短文と単語の2つの打ち方があり、
+              どちらも同じ文章・同じ語は繰り返し出ません。
+            </>
+          }
+          stats={[
+            {
+              label: "短文のお題",
+              value: theme.promptCounts.sentence,
+              badge:
+                theme.generationStatus === "difficult" ? (
+                  <DifficultBadge forms={["sentence"]} />
+                ) : undefined,
+            },
+            {
+              label: "単語のお題",
+              value: theme.promptCounts.word,
+              badge:
+                theme.wordGenerationStatus === "difficult" ? (
+                  <DifficultBadge forms={["word"]} />
+                ) : undefined,
+            },
+            { label: "プレイ", value: theme.totalPlayCount, unit: "回" },
+          ]}
+          actions={
+            /*
+              **形式の選択は行き止まりにしない。** 単語のお題がまだ無いテーマでも
+              ボタンは出す。押すとプレイ画面の枯渇と同じ導線（ログイン → 作る）に入る。
+              ここでボタンごと隠すと、「このテーマには単語が無い」ことすら伝わらない。
+            */
+            (["sentence", "word"] as const).map((form) => (
+              <FormButton
+                key={form}
+                form={form}
+                size="lg"
+                href={playHref("theme", theme.name, form)}
+              />
+            ))
+          }
+        />
 
         <p className="mt-10 text-sm text-kinari/50">
           <a href="/themes" className="hover:text-kinari">

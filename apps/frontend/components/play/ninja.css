@@ -15,6 +15,10 @@
  */
 .scroll {
   --roller-width: 44px;
+  /* キャップ（軸の端の留め具）の寸法。一覧のカード（.scroll--card）が上書きする */
+  --cap-height: 16px;
+  --cap-inset: 5px;
+  --cap-band: 3px;
   /**
    * 軸の地色。金（黄）と墨（青寄りの暗色）を **oklch で**混ぜると中間は
    * くすんだ緑になり、竹軸のような色になる（oklab だと黄褐色に寄る）。
@@ -66,9 +70,9 @@
 .scroll__roller::after {
   content: "";
   position: absolute;
-  left: 5px;
-  right: 5px;
-  height: 16px;
+  left: var(--cap-inset);
+  right: var(--cap-inset);
+  height: var(--cap-height);
   border-radius: 4px;
   background: linear-gradient(
     to right,
@@ -80,13 +84,13 @@
 }
 
 .scroll__roller::before {
-  top: -16px;
-  border-top: 3px solid var(--color-kin);
+  top: calc(-1 * var(--cap-height));
+  border-top: var(--cap-band) solid var(--color-kin);
 }
 
 .scroll__roller::after {
-  bottom: -16px;
-  border-bottom: 3px solid var(--color-kin);
+  bottom: calc(-1 * var(--cap-height));
+  border-bottom: var(--cap-band) solid var(--color-kin);
 }
 
 /* 広げられた紙の面。墨に生成りを混ぜた暗い紙。地より一段明るい独立した面にする */
@@ -144,6 +148,78 @@
   width: 20px;
   height: 20px;
   color: var(--color-makibishi);
+}
+
+/* ---- 詳細ページの巻物 -----------------------------------------------------
+ * プレイ画面と同じ大きさの巻物に、名前・説明・在庫・ボタンを載せる。
+ * 狭い画面では軸を細くする（44pxのままだと375px幅で紙が215pxしか残らない）。
+ * **ここで書くのは Tailwind の任意プロパティが効かないため。** ninja.css は
+ * レイヤーに入っていないので、`@layer utilities` のユーティリティより常に強い。
+ */
+.scroll--detail {
+  --roller-width: 26px;
+}
+
+@media (min-width: 640px) {
+  .scroll--detail {
+    --roller-width: 44px;
+  }
+}
+
+/* ---- 一覧のカード ------------------------------------------------------
+ * プレイ画面の巻物を**そのまま小さくしたもの**。軸の色・キャップ・紙の面は共有する。
+ * 別の作りにすると「一覧の巻物」と「プレイの巻物」が別の物体に見える。
+ * キャップが軸の外に張り出すぶん、並べるときは上下に余白（キャップ高さ以上）が要る。
+ *
+ * **閉じた巻物として置き、ホバーで横にほどける。** 縦幅は変えない（巻物は横に
+ * 巻くものなので、下に伸びると別の物になる）。閉じているときは軸2本と、名前が
+ * 読めるだけの狭い紙。カーソルを合わせる（またはフォーカスが入る）と紙が右へ広がり、
+ * 巻かれていた側に畳まれていたボタンが現れる。ボタンは紙の左端から固定の位置に
+ * 置いてあり、紙が狭い間は `overflow: hidden` で右の軸の下に隠れる。
+ *
+ * 幅は格子のセル（外側）に対して変わるだけで、セル自体は動かない。
+ * ホバーのたびに一覧が組み替わると、目当てのカードを見失う。
+ */
+.scroll--card {
+  --roller-width: 20px;
+  --cap-height: 9px;
+  --cap-inset: 3px;
+  --cap-band: 2px;
+  /* 閉じた巻物の幅。軸20×2 ＋ 紙の余白16×2 ＋ 名前の欄128 */
+  --scroll-closed: 200px;
+  width: min(100%, var(--scroll-closed));
+  transition: width 380ms cubic-bezier(0.2, 0.9, 0.3, 1);
+}
+
+.scroll--card .scroll__sheet {
+  overflow: hidden;
+  transition: background-color 200ms ease-out;
+}
+
+/* キーボードでボタンまで辿れるよう、フォーカスが中に入ったときも開く */
+.scroll--card:hover,
+.scroll--card:focus-within {
+  width: 100%;
+}
+
+/* 巻物のどこに乗っても「押せる」と分かるように、紙の面ごと少し明るくする */
+.scroll--card:hover .scroll__sheet,
+.scroll--card:focus-within .scroll__sheet {
+  background: color-mix(in oklab, var(--color-kinari) 32%, var(--color-sumi));
+}
+
+/* ホバーの無い端末（タッチ）では最初から開いておく。閉じたままだと打てない */
+@media (hover: none) {
+  .scroll--card {
+    width: 100%;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .scroll--card,
+  .scroll--card .scroll__sheet {
+    transition: none;
+  }
 }
 
 /* ---- 開始の合図 ---------------------------------------------------------

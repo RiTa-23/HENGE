@@ -2,7 +2,11 @@ import { describe, expect, test } from "bun:test";
 import {
   GENERATION_WAIT_LIMIT_MS,
   PLAY_SIZE,
+  PLAY_SIZE_WORD,
+  playSize,
   STOCK_TARGET,
+  STOCK_TARGET_WORD,
+  stockTarget,
   THEME_LOCK_TTL_SECONDS,
 } from "./session";
 
@@ -41,5 +45,33 @@ describe("在庫の目標水準", () => {
    */
   test("在庫の目標は1プレイ分より大きい", () => {
     expect(STOCK_TARGET).toBeGreaterThan(PLAY_SIZE);
+  });
+});
+
+describe("出題の形式ごとの値", () => {
+  test("単語の1プレイは短文より多い", () => {
+    // 単語は1語8打前後。短文と同じ15問だと20秒ほどで終わってしまう
+    expect(playSize("word")).toBe(PLAY_SIZE_WORD);
+    expect(playSize("word")).toBeGreaterThan(playSize("sentence"));
+  });
+
+  test("既定（短文）は今までの値のまま", () => {
+    expect(playSize("sentence")).toBe(PLAY_SIZE);
+    expect(stockTarget("sentence")).toBe(STOCK_TARGET);
+  });
+
+  /**
+   * **これが逆転すると、単語の補充は1回目から必ず失敗する。**
+   * 補充が1回で作れるのは最大40件（20件×2ラウンド）。在庫0からそれを超える
+   * 目標を掲げると、目標未達を理由に `generation_status='difficult'` が立ち、
+   * 普通のテーマの補充が以後止まる。
+   */
+  test("単語の在庫目標は、1回の補充で作れる上限（40件）を超えない", () => {
+    expect(stockTarget("word")).toBeLessThanOrEqual(40);
+  });
+
+  test("単語の在庫目標は2プレイ分にしない（上と同じ理由）", () => {
+    expect(stockTarget("word")).toBe(STOCK_TARGET_WORD);
+    expect(stockTarget("word")).toBeLessThan(playSize("word") * 2);
   });
 });

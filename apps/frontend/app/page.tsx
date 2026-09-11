@@ -92,7 +92,7 @@ export default async function HomePage() {
 
         <section className="mt-16">
           <h2 className="text-sm tracking-[0.25em] text-kinari/50">よく打たれているお題</h2>
-          <div className="mt-6 grid gap-3">
+          <div className="mt-6 grid gap-x-5 gap-y-8 sm:grid-cols-2 lg:grid-cols-3">
             {popular.map((theme) => (
               <ThemeCard key={theme.id} theme={theme} />
             ))}

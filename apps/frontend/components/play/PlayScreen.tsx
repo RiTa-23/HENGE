@@ -5,7 +5,8 @@ import {
   isApiError,
   isImeKey,
   normalizeTypedKey,
-  PLAY_SIZE,
+  playSize,
+  type PromptForm,
   pressKey,
   type RomanCandidates,
   romanDisplay,
@@ -15,6 +16,7 @@ import {
   type TypingProgress,
 } from "@henge/shared";
 import { useCallback, useEffect, useRef, useState } from "react";
+import { SentenceMark, WordMark } from "@/components/FormMark";
 import { Logo } from "@/components/Logo";
 import { authClient } from "@/lib/api/auth-client";
 import { Keyboard, type NextKey, toNextKey } from "./Keyboard";
@@ -23,10 +25,11 @@ import { ProgressDots } from "./ProgressDots";
 import { Result, type PlayStats } from "./Result";
 import { Scroll } from "./Scroll";
 import { SoundToggle } from "./SoundToggle";
+import { readJsonBody } from "@/lib/api/json";
 import { readOffset, writeOffset } from "@/lib/play/offset";
 import { mergeMissedKeys } from "@/lib/play/misses";
 import { playHit, playMiss, primeAudio, readMuted, writeMuted } from "@/lib/play/sound";
-import { kindLabel, listHref } from "@/lib/ui/kind";
+import { detailHref, formLabel, kindLabel, listHref } from "@/lib/ui/kind";
 
 interface Prompt {
   id: string;
@@ -107,12 +110,25 @@ export function PlayScreen({
   themeId,
   themeName,
   kind,
+  form,
+  poolEmpty,
   shareUrl,
   beta = false,
 }: {
   themeId: string;
   themeName: string;
   kind: ThemeKind;
+  /**
+   * 出題の形式。**プールもオフセットも1プレイの問題数もこれで変わる。**
+   * URLの `?form=word` から決まる（既定は短文）。
+   */
+  form: PromptForm;
+  /**
+   * このプールにお題が1件も無いか（画面を開いた時点のサーバー側の値）。
+   * **文言を分けるためだけに使う。** 「使い切りました」は、単語のように
+   * 最初から1件も無いプールでは嘘になる（一度も遊んでいない）。
+   */
+  poolEmpty: boolean;
   /** 結果のX投稿で共有するURL（着地ページの絶対URL）。サーバー側で組み立てて渡す */
   shareUrl: string;
   /** ベータ運用の間だけロゴの横に「ベータ版」を出す。判定はサーバー側（lib/beta/beta.ts） */
@@ -120,6 +136,14 @@ export function PlayScreen({
 }) {
   const { data: authSession } = authClient.useSession();
   const backToList = listHref(kind);
+  /**
+   * いま遊んでいたテーマの詳細。**プレイ画面からの離脱先はここにする。**
+   *
+   * トップへ返すと、遊んでいた文脈が消えて探し直しになる。詳細には短文と単語の
+   * 選択と在庫数があるので、**同じテーマの別の形式へそのまま移れる**。
+   * URLの組み立ては lib/ui/kind.ts に閉じる（手で /themes を書かない）。
+   */
+  const backToDetail = detailHref(kind, themeName);
   const [phase, setPhase] = useState<Phase>({ name: "ready" });
   const [promptIndex, setPromptIndex] = useState(0);
   const [progress, setProgress] = useState<TypingProgress>(() => startTyping([]));
@@ -179,9 +203,10 @@ export function PlayScreen({
       headers: { "Content-Type": "application/json" },
       // ログイン中はサーバーが進捗を持つので offset は無視される。
       // 匿名のときだけこの値が使われる
-      body: JSON.stringify({ themeId, offset: readOffset(themeId) }),
+      body: JSON.stringify({ themeId, form, offset: readOffset(themeId, form) }),
     });
-    const body: unknown = await response.json();
+    // **本文が空でも落とさない。** エラーを表示しようとして別の例外で画面が落ちる
+    const body: unknown = await readJsonBody(response);
 
     if (!response.ok) {
       const { code, message } = isApiError(body)
@@ -215,10 +240,10 @@ export function PlayScreen({
 
     const session = body as SessionResponse;
     // **返された時点で消費が確定する。** 中断しても巻き戻さない
-    writeOffset(themeId, session.nextOffset);
+    writeOffset(themeId, form, session.nextOffset);
     // お題はまだ出さない。合図を挟んでから1問目を見せる
     setPhase({ name: "starting", session });
-  }, [themeId]);
+  }, [themeId, form]);
 
   // **開始するまで sessions/start を呼ばない。** 呼んだ時点でオフセットの消費が
   // 確定し、条件次第では背景補充も走る（＝クォータを1消費する）。画面を開いた
@@ -317,7 +342,7 @@ export function PlayScreen({
     const response = await fetch("/api/prompts/regenerate", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ themeId }),
+      body: JSON.stringify({ themeId, form }),
     });
 
     if (response.ok) {
@@ -327,7 +352,7 @@ export function PlayScreen({
       return;
     }
 
-    const body: unknown = await response.json();
+    const body: unknown = await readJsonBody(response);
     const { code, message } = isApiError(body)
       ? body.error
       : { code: "UNKNOWN", message: "お題を作れませんでした" };
@@ -414,6 +439,17 @@ export function PlayScreen({
           <h1 className="font-mincho text-4xl leading-snug tracking-wider text-kinari">
             {themeName}
           </h1>
+          {/* **どちらの形式を開いているかを出す。** 同じテーマ名で中身が変わるので、
+              名前だけだと単語のつもりで短文を始めてしまう */}
+          <p className="mt-4 flex items-center justify-center gap-2 text-sm tracking-widest text-kinari/50">
+            {/* 紋は一覧・詳細の「打つ」札と同じ（FormMark）。どの画面でも同じ印で形式を示す */}
+            {form === "word" ? (
+              <WordMark className="size-4 text-kin" />
+            ) : (
+              <SentenceMark className="size-4 text-kin" />
+            )}
+            {formLabel(form)}・{playSize(form)}問
+          </p>
 
           <p className="mt-14 flex items-center justify-center gap-3 text-kinari">
             <span className="rounded-md border border-shu bg-shu/20 px-10 py-2 font-mono text-sm tracking-widest shadow-[0_0_10px_var(--color-shu)]">
@@ -467,6 +503,11 @@ export function PlayScreen({
   if (phase.name === "error") {
     // 枯渇はログインしていれば作り足して続けられる。匿名は別テーマかログインへ
     const exhausted = phase.code === "THEME_EXHAUSTED";
+    // 空のプールを「使い切った」と言わない
+    const message =
+      exhausted && poolEmpty
+        ? `${kindLabel(kind)}の${formLabel(form)}のお題はまだありません`
+        : phase.message;
     const canRegenerate = exhausted && authSession !== null;
     /**
      * **押しても直らないものに「もう一度」を出さない。** アカウント全体の枠切れは
@@ -477,11 +518,12 @@ export function PlayScreen({
     return (
       <div className="flex min-h-dvh items-center justify-center p-6">
         <div className="w-full max-w-lg rounded-lg border border-kin/60 bg-kinari/5 px-10 py-12 text-center">
-          <h1 className="font-mincho text-2xl tracking-widest text-kinari">{phase.message}</h1>
+          <h1 className="font-mincho text-2xl tracking-widest text-kinari">{message}</h1>
 
           {canRegenerate && (
             <p className="mt-5 text-sm leading-relaxed text-kinari/60">
-              {kindLabel(kind)}のお題を作り足せます。
+              {kindLabel(kind)}の{formLabel(form)}のお題を{poolEmpty ? "作れます" : "作り足せます"}
+              。
               {phase.neuronsRemaining !== undefined && (
                 <>
                   本日の残りは
@@ -496,7 +538,7 @@ export function PlayScreen({
           )}
           {exhausted && authSession === null && (
             <p className="mt-5 text-sm leading-relaxed text-kinari/60">
-              ログインすると、{kindLabel(kind)}のお題を作り足して続けられます。
+              ログインすると、{kindLabel(kind)}の{formLabel(form)}のお題を作って続けられます。
             </p>
           )}
 
@@ -507,7 +549,7 @@ export function PlayScreen({
                 onClick={() => void regenerate()}
                 className="rounded-md border border-shu bg-shu/15 px-6 py-2.5 tracking-widest text-kinari transition-colors hover:bg-shu/25"
               >
-                お題を作り足す
+                {formLabel(form)}のお題を作る
               </button>
             )}
             {exhausted && authSession === null && (
@@ -537,8 +579,8 @@ export function PlayScreen({
           </div>
 
           <p className="mt-8 text-sm">
-            <a href="/" className="tracking-widest text-kinari/50 hover:text-kinari">
-              トップへ戻る
+            <a href={backToDetail} className="tracking-widest text-kinari/50 hover:text-kinari">
+              「{themeName}」へ戻る
             </a>
           </p>
         </div>
@@ -549,12 +591,14 @@ export function PlayScreen({
   if (phase.name === "result") {
     return (
       <Result
+        detailHref={backToDetail}
         stats={stats}
         missedKeys={missedKeys}
         themeName={themeName}
         onRetry={start}
         listHref={backToList}
         kind={kind}
+        form={form}
         shareUrl={shareUrl}
       />
     );
@@ -579,6 +623,7 @@ export function PlayScreen({
         <div className="flex items-center gap-3">
           <span className="rounded-full border border-kinari/15 bg-kinari/5 px-4 py-1 text-xs tracking-widest text-kinari/70">
             {themeName}
+            <span className="ml-2 text-kinari/40">{formLabel(form)}</span>
           </span>
           {/* 音の入/切も、やめるボタンと同じ理由でこの中に置く */}
           <SoundToggle muted={muted} onToggle={toggleSound} />
@@ -609,7 +654,7 @@ export function PlayScreen({
         <div className="flex items-center justify-between">
           <ProgressDots current={promptIndex} total={phase.session.prompts.length} />
           <span className="font-mono text-sm text-kinari/50">
-            {promptIndex + 1}/{Math.min(phase.session.prompts.length, PLAY_SIZE)}
+            {promptIndex + 1}/{Math.min(phase.session.prompts.length, playSize(form))}
           </span>
         </div>
       </div>

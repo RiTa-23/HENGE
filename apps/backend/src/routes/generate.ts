@@ -1,13 +1,18 @@
-import { normalizeName, PLAY_SIZE, type ThemeKind } from "@henge/shared";
+import { normalizeName, playSize, type PromptForm, type ThemeKind } from "@henge/shared";
 import { type Context, Hono } from "hono";
 import { createDb } from "../db/client";
 import { appendPrompts, insertThemeWithPrompts, recentPromptTexts } from "../db/prompts";
-import { findThemeByName, getThemeDetail, setGenerationStatus } from "../db/themes";
+import {
+  findThemeByName,
+  generationStatusOf,
+  getThemeDetail,
+  setGenerationStatus,
+} from "../db/themes";
 import { recordUsage } from "../db/usage";
 import { generateBatch } from "../generation/batch";
 import { AiQuotaExceededError, AiUnavailableError } from "../generation/ai";
 import { resolveModel } from "../generation/model";
-import { EXISTING_CONTEXT_SIZE } from "../generation/prompt";
+import { existingContextSize } from "../generation/prompt";
 import { fail } from "../http/error";
 import { cacheThemeId, getCachedThemeId } from "../kv/themes";
 import { acquireThemeLock, releaseThemeLock } from "../kv/lock";
@@ -22,6 +27,8 @@ interface CreateBody {
 interface RegenerateBody {
   themeId: string;
   userId: string;
+  /** どちらのプールに作り足すか。省略時は短文 */
+  form?: PromptForm;
 }
 
 /**
@@ -66,10 +73,13 @@ export const generateRoutes = new Hono<{ Bindings: Env }>()
     try {
       result = await generateBatch(c.env, {
         kind: body.kind,
+        // 新規作成で作るのは短文だけ。単語は別リクエストで作る（不変条件4）
+        form: "sentence",
         name: body.name,
         themeId,
         path: "create",
-        target: PLAY_SIZE,
+        // 新規作成で作るのは短文のプールだけ（単語は別リクエストで作る）
+        target: playSize("sentence"),
         existing: [],
         model,
         getReading: createGetReading(c.env),
@@ -111,8 +121,10 @@ export const generateRoutes = new Hono<{ Bindings: Env }>()
     const theme = await getThemeDetail(db, body.themeId);
     if (theme === null) return fail(c, "NOT_FOUND", "テーマが見つかりません");
 
-    // 背景補充が走っている最中なら、二重に生成しない
-    if (!(await acquireThemeLock(c.env.KV, body.themeId))) {
+    const form: PromptForm = body.form ?? "sentence";
+
+    // 背景補充が走っている最中なら、二重に生成しない。**ロックは形式ごと**
+    if (!(await acquireThemeLock(c.env.KV, body.themeId, form))) {
       return fail(c, "GENERATION_IN_PROGRESS");
     }
 
@@ -123,11 +135,12 @@ export const generateRoutes = new Hono<{ Bindings: Env }>()
 
       const result = await generateBatch(c.env, {
         kind: theme.kind,
+        form,
         name: theme.name,
         themeId: theme.id,
         path: "regenerate",
-        target: PLAY_SIZE,
-        existing: await recentPromptTexts(db, theme.id, EXISTING_CONTEXT_SIZE),
+        target: playSize(form),
+        existing: await recentPromptTexts(db, theme.id, form, existingContextSize(form)),
         model,
         getReading: createGetReading(c.env),
         waitUntil: (promise) => c.executionCtx.waitUntil(promise),
@@ -138,11 +151,25 @@ export const generateRoutes = new Hono<{ Bindings: Env }>()
         },
       });
 
-      if (!result.reachedTarget) return fail(c, "GENERATION_FAILED");
+      /**
+       * **単語は取れた分を必ず保存する。** 短文は目標未達なら1件も保存せず
+       * `GENERATION_FAILED` を返すが、単語で同じにすると割に合わない。目標は
+       * 1プレイ分の30語なのに対し、1回で作れるのは最大40件（20件×2ラウンド）
+       * しかない。少し届かないことは普通に起きるので、**有効な20語と消費した
+       * ニューロンを捨てて何度も押させる**ことになる。
+       *
+       * 追加した先はテーマ既存のプールなので、途中まで積むこと自体に害はない
+       * （新規作成で「お題ゼロのテーマを作らない」のとは事情が違う）。
+       * 1件も作れなかったときだけ失敗として返す。
+       */
+      const failed = form === "word" ? result.valid.length === 0 : !result.reachedTarget;
+      if (failed) return fail(c, "GENERATION_FAILED");
 
-      await appendPrompts(db, theme.id, result.valid, model);
+      await appendPrompts(db, theme.id, form, result.valid, model);
       // 生成できることが実証されたので「生成困難」の印を外す
-      if (theme.generationStatus === "difficult") await setGenerationStatus(db, theme.id, "ok");
+      if (generationStatusOf(theme, form) === "difficult") {
+        await setGenerationStatus(db, theme.id, form, "ok");
+      }
 
       return c.json({
         theme: await getThemeDetail(db, theme.id),
@@ -153,6 +180,6 @@ export const generateRoutes = new Hono<{ Bindings: Env }>()
       return failFromAiError(c, error);
     } finally {
       // 記録は onNeurons で済んでいる。ここはロックを返すだけ
-      await releaseThemeLock(c.env.KV, body.themeId);
+      await releaseThemeLock(c.env.KV, body.themeId, form);
     }
   });

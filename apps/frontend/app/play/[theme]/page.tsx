@@ -6,7 +6,7 @@ import { betaLimitedPage } from "@/lib/api/admin-page";
 import { decodePageParam, findTheme } from "@/lib/api/themes";
 import { betaBadgeVisible } from "@/lib/beta/beta";
 import { siteUrl } from "@/lib/og";
-import { detailHref, parseThemeKind } from "@/lib/ui/kind";
+import { detailHref, parsePlayForm, parseThemeKind } from "@/lib/ui/kind";
 
 /** プレイ画面は検索結果に出さない（着地ページはテーマ詳細） */
 export const metadata: Metadata = { robots: { index: false, follow: false } };
@@ -26,15 +26,17 @@ export default async function PlayPage({
   searchParams,
 }: {
   params: Promise<{ theme: string }>;
-  searchParams: Promise<{ kind?: string }>;
+  searchParams: Promise<{ kind?: string; form?: string }>;
 }) {
-  const [{ theme }, { kind }] = await Promise.all([params, searchParams]);
+  const [{ theme }, { kind, form }] = await Promise.all([params, searchParams]);
   // **ページのパラメータはエンコードされたまま渡ってくる**（Route Handler とは違う）。
   // デコードしないと日本語のテーマ名が1件も引けない
   const name = decodePageParam(theme);
   if (name === null) notFound();
 
   const themeKind = parseThemeKind(kind);
+  // 未知の値は短文に倒す。**形式ごとにプールもオフセットも別**（docs/03-data-model.md）
+  const playForm = parsePlayForm(form);
   // **ベータ版では最適化練習ごと公開しない。** テーマモードのプレイは制限しない
   // （運営が生成したお題をそのまま遊べる）
   if (themeKind === "constraint" && (await betaLimitedPage())) {
@@ -56,6 +58,8 @@ export default async function PlayPage({
       themeId={found.id}
       themeName={found.name}
       kind={themeKind}
+      form={playForm}
+      poolEmpty={found.promptCounts[playForm] === 0}
       shareUrl={shareUrl}
       beta={beta}
     />

@@ -3,6 +3,7 @@
 import { isApiError, type PlayStats, type PromptForm, RANKING_SIZE } from "@henge/shared";
 import { useState } from "react";
 import { authClient } from "@/lib/api/auth-client";
+import { readJsonBody } from "@/lib/api/json";
 
 interface Registered {
   score: number;
@@ -85,7 +86,9 @@ export function RankingRegister({
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ themeId, form, ...stats }),
     });
-    const body: unknown = await response.json();
+    // 本文が空（サーバー側の例外など）でも落とさない。エラーを出そうとして別の例外で
+    // 結果画面ごと消えるのが最悪の壊れ方
+    const body = await readJsonBody(response);
     setBusy(false);
     if (!response.ok) {
       setError(isApiError(body) ? body.error.message : "登録できませんでした");

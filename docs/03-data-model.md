@@ -152,6 +152,20 @@ MVPでは日次上限のみ（**500ニューロン/日**）。月次上限は設
 
 D1のCASCADEはD1の中でしか効かない。KVを消し忘れると「削除したテーマがキャッシュ経由で復活したように見える」不具合になる。
 
+## user（Better Auth 管理）に足した列
+
+Better Auth の4テーブルは CLI の出力をそのまま使うが、**`user` にだけアプリの列を1つ足している**。
+定義は `apps/frontend/lib/auth.ts` の `additionalFields` で、スキーマは CLI で再生成する（下の「マイグレーション」）。
+
+| カラム | 型 | 制約 | 説明 |
+|---|---|---|---|
+| `display_name` | TEXT | NULL可 | **ユーザー名（表示名）。** ランキングなど公開の場に出す名前。NULLは「まだ決めていない」で、ログイン後に入力させる（`docs/07-ui.md`） |
+
+**Google の名前（`name`）をそのまま公開に使わない。** `name` は本名のことが多く、利用者が選んでいない。
+表示名は利用者が自分で決めた文字列だけを持ち、`name` は Better Auth が管理したまま触らない。
+一意制約は付けない（同じ名前の利用者がいてもよく、区別はIDで行う）。検証は `displayNameSchema`
+（1〜20文字、制御文字なし）で、Better Auth の `validator.input` にかけている（`docs/04-api.md`）。
+
 ## ユーザー削除時の連鎖
 
 | 対象 | 消え方 |
@@ -167,6 +181,8 @@ Drizzleのスキーマは `apps/backend/src/db/schema.ts`。Better Auth管理下
 
 **`better-auth` は `@better-auth/cli` と同じ系列に固定する**（現在はどちらも1.4系）。本体だけ上げると、CLIが未対応の列（1.7で追加された `account.issuer` など）をスキーマが持たないまま動き、**OAuthのコールバックで初めて500になる**。ブラウザで最後まで通さないと気付けないため、`apps/frontend/lib/auth-schema.test.ts` で「better-auth が要求する列が揃っているか」を検査している。本体を上げるときはCLIも同時に上げ、スキーマを再生成すること。
 両Workerから参照するため shared に置いている（アクセス権限の線引きは `docs/02-architecture.md`）。
+
+**再生成は `bun run auth:schema`（`apps/frontend`）。** CLI に渡す設定は `apps/frontend/lib/auth-cli.config.ts` で、本物の `createAuth` に中身の無い env を渡して同じ設定のインスタンスを作る（別の設定を書き写すと、列を足したときにそちらの更新を忘れて本番とずれる）。`additionalFields` を変えたのに再生成を忘れると `auth-schema.test.ts` が落ちる（照合にアプリと同じ設定を使っているため）。再生成のあとは通常どおり `bun run db:generate` でマイグレーションを作る。
 
 生成先は `apps/backend/migrations/`（wranglerの `migrations_dir` の既定値）。
 

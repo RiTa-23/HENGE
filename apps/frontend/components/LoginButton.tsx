@@ -3,8 +3,11 @@
 import { authClient } from "@/lib/api/auth-client";
 
 /**
- * ログイン・ログアウトの導線。Phase 5 時点での最小構成で、ヘッダー等の
- * 画面構成は Phase 6 で作り込む。Googleプロバイダのみ。
+ * ログイン・ログアウトの導線。Googleプロバイダのみ。
+ *
+ * ログイン中は**マイページへの導線もここに置く**。`NAV_LINKS` は未ログインにも
+ * 見せる固定の並びで、ログイン状態で増減する項目はセッションを知っているこの部品が持つ。
+ * 広い画面の横並び（`SiteHeader`）と狭い画面のメニュー（`MobileNav`）の両方から使われる。
  */
 export function LoginButton() {
   const { data: session, isPending } = authClient.useSession();
@@ -16,9 +19,14 @@ export function LoginButton() {
 
   if (session) {
     return (
-      <button type="button" onClick={() => authClient.signOut()} className={className}>
-        ログアウト
-      </button>
+      <span className="flex items-center gap-6">
+        <a href="/me" className="text-sm tracking-widest text-kinari/70 hover:text-kinari">
+          マイページ
+        </a>
+        <button type="button" onClick={() => authClient.signOut()} className={className}>
+          ログアウト
+        </button>
+      </span>
     );
   }
 

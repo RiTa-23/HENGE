@@ -1,3 +1,4 @@
+import { DisplayNameGate } from "@/components/DisplayNameGate";
 import { Logo } from "@/components/Logo";
 import { LoginButton } from "@/components/LoginButton";
 import { MobileNav } from "@/components/MobileNav";
@@ -13,6 +14,9 @@ import { betaBadgeVisible } from "@/lib/beta/beta";
  * **狭い画面では横並びをやめ、メニューに畳む**（`MobileNav`）。375px幅で使える幅は
  * 327pxしかないのに、横並びのナビは419px要るため、収まりようがない。
  * `relative` はメニューを下に重ねるための基準（`MobileNav` の `top-full`）。
+ *
+ * ユーザー名が未設定のログインユーザーには入力のモーダル（`DisplayNameGate`）を出す。
+ * ヘッダーに置くのは、ログインできる画面すべてに漏れなく効かせるため。
  */
 export async function SiteHeader() {
   const beta = await betaBadgeVisible();
@@ -30,6 +34,7 @@ export async function SiteHeader() {
         </nav>
         <MobileNav />
       </div>
+      <DisplayNameGate />
     </header>
   );
 }

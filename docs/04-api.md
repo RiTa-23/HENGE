@@ -32,6 +32,8 @@
 
 テーマと含む文字は同じエンドポイントで`kind`により分岐する。DB上も同じテーブルのため。
 
+**ユーザー名（表示名）の更新は Route Handler を持たない。** Better Auth の `POST /api/auth/update-user`（`authClient.updateUser({ displayName })`）で行う。このルートは Better Auth が `/api/auth/*` に生やしていて外から叩けるので、**入力検証はそこにかける**（`lib/auth.ts` の `additionalFields.displayName.validator.input` に `displayNameSchema` を渡している）。別に `PATCH /api/me` を作って検証しても、Better Auth のルートが検証なしで残るだけ。
+
 ### POST /api/sessions/start
 
 ```jsonc

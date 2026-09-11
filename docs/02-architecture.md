@@ -38,7 +38,7 @@ Better Auth は認証を持つ側がDBに直接接続することを前提にし
 **線引きのルール**:
 
 - `session` / `account` / `verification` へのアクセスは**Next.js Workerのみ**（Better Authの処理するテーブル）
-- `user` テーブルは**書き込みはNext.js Workerのみ**（ユーザーの作成・更新はBetter Authが行う）。**読み取りはHono側も可**（`themes.created_by` のFKの親として、また管理者向けユーザー一覧の表示のため、Phase 2からHonoのスキーマに存在する）
+- `user` テーブルは**書き込みはNext.js Workerのみ**（ユーザーの作成・更新はBetter Authが行う。アプリで足した `display_name` の更新も Better Auth の `/api/auth/update-user` を通す）。**読み取りはHono側も可**（`themes.created_by` のFKの親として、また管理者向けユーザー一覧の表示のため、Phase 2からHonoのスキーマに存在する）
 - ビジネスデータ（`themes` / `prompts` / `user_theme_progress` / `user_generation_usage`）への直接アクセスは引き続きNext.js側から行わない。**`lib/auth.ts` は認証スキーマのみをdrizzleに渡す**ため、間違ってビジネスデータへ接続しても型で弾けないが、スキーマに含めないことが実質の防御線
 - Better Auth のスキーマは `packages/shared/src/db/auth-schema.ts` に置き、両Workerから参照する
 

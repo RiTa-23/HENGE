@@ -2,6 +2,7 @@ import { describe, expect, it } from "bun:test";
 import * as authSchema from "@henge/shared/db/auth-schema";
 import { getAuthTables } from "better-auth/db";
 import { getTableColumns } from "drizzle-orm";
+import { auth } from "./auth-cli.config";
 
 /**
  * `packages/shared/src/db/auth-schema.ts` は `@better-auth/cli generate` の出力で、
@@ -14,9 +15,13 @@ import { getTableColumns } from "drizzle-orm";
  *
  * better-auth を上げるときにこのテストが落ちたら、CLI も同じ版に上げて
  * スキーマを再生成すること（CLIが未対応なら本体を上げない）。
+ *
+ * 照合に使うのは**アプリと同じ設定**（`auth-cli.config.ts` が `createAuth` で作る
+ * インスタンス）。`additionalFields` で足した列（`displayName`）も要求に含まれるので、
+ * `lib/auth.ts` に列を足して `bun run auth:schema` を忘れると、ここで落ちる。
  */
 describe("auth-schema は better-auth が要求する形を満たす", () => {
-  const tables = getAuthTables({});
+  const tables = getAuthTables(auth.options);
 
   it.each(Object.entries(tables))("%s テーブルの列がすべて揃っている", (model, definition) => {
     const table = (authSchema as Record<string, unknown>)[model];

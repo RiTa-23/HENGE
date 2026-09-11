@@ -22,6 +22,13 @@
       "when": 1789015058330,
       "tag": "0002_cloudy_archangel",
       "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "6",
+      "when": 1789125946928,
+      "tag": "0003_lazy_azazel",
+      "breakpoints": true
     }
   ]
 }

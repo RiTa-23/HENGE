@@ -81,3 +81,27 @@ export const promptIdParamSchema = z.object({ id: z.string().min(1) });
 export const promptTextSchema = z.object({
   text: z.string().trim().min(1).max(100),
 });
+
+/** 表示名の最大文字数。フォームの `maxLength` と検証で同じ値を使う */
+export const DISPLAY_NAME_MAX_LENGTH = 20;
+
+/**
+ * ユーザー名（表示名）。**ランキングなど公開の場に出す名前**なので、Google の
+ * 名前（`user.name`。本名のことが多い）とは別に、利用者が自分で決める。
+ *
+ * 前後の空白を除いて1〜20文字。改行や制御文字は一覧の1行に収まらないので弾く。
+ * 一意ではない（同じ名前の利用者がいてもよい。IDで区別する）。
+ *
+ * **Route Handler ではなく Better Auth の `validator.input` に渡す。** 更新は
+ * Better Auth の `/api/auth/update-user` で行い、そこが公開APIの入口になる
+ * （`lib/auth.ts`）。ここに置くのは、他の入力検証と同じ場所に規則を揃えるため。
+ */
+export const displayNameSchema = z
+  .string({ message: "ユーザー名は文字列で指定してください" })
+  .trim()
+  .min(1, "ユーザー名を入力してください")
+  .max(DISPLAY_NAME_MAX_LENGTH, "ユーザー名は20文字までです")
+  .refine(
+    (value) => !/[\p{Cc}\p{Zl}\p{Zp}]/u.test(value),
+    "ユーザー名に改行や制御文字は使えません",
+  );

@@ -188,9 +188,22 @@ describe("rankingRegisterSchema", () => {
     );
   });
 
-  test("整数以外・負数は弾く", () => {
+  test("elapsedMs は小数で来るので丸めて受ける（performance.now() の差）", () => {
+    const parsed = rankingRegisterSchema.safeParse({ ...ok, elapsedMs: 61234.567 });
+    expect(parsed.success).toBe(true);
+    if (parsed.success) expect(parsed.data.elapsedMs).toBe(61235);
+  });
+
+  test("範囲外の理由をそのまま返す", () => {
+    const parsed = rankingRegisterSchema.safeParse({ ...ok, hits: 10 });
+    expect(parsed.success).toBe(false);
+    if (!parsed.success) expect(parsed.error.issues[0]?.message).toBe("打鍵数が範囲外です");
+  });
+
+  test("打鍵数の小数・負数、時間の文字列は弾く", () => {
     expect(rankingRegisterSchema.safeParse({ ...ok, hits: 300.5 }).success).toBe(false);
     expect(rankingRegisterSchema.safeParse({ ...ok, misses: -1 }).success).toBe(false);
     expect(rankingRegisterSchema.safeParse({ ...ok, elapsedMs: "60000" }).success).toBe(false);
+    expect(rankingRegisterSchema.safeParse({ ...ok, elapsedMs: Number.NaN }).success).toBe(false);
   });
 });

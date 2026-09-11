@@ -26,7 +26,14 @@ export async function POST(request: Request) {
   if (limited !== null) return limited;
 
   const parsed = rankingRegisterSchema.safeParse(await request.json());
-  if (!parsed.success) return errorResponse("VALIDATION_ERROR", "記録が範囲外です");
+  if (!parsed.success) {
+    // 範囲検査（playStatsRejection）の理由はそのまま出す。形の誤りは既定の文言でよい
+    const issue = parsed.error.issues[0];
+    return errorResponse(
+      "VALIDATION_ERROR",
+      issue?.code === "custom" ? issue.message : "記録の形式が正しくありません",
+    );
+  }
 
   const { themeId, form, hits, misses, elapsedMs } = parsed.data;
   const client = await backendClient();

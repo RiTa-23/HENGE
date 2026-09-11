@@ -120,8 +120,18 @@ export const rankingRegisterSchema = z
     form: formSchema,
     hits: z.number().int().min(0),
     misses: z.number().int().min(0).max(100_000),
-    elapsedMs: z.number().int().min(1),
+    /**
+     * **小数で来る。** プレイ画面は `performance.now()` の差で計っていて、
+     * `61234.567` のような値になる。整数を要求すると正しい記録がすべて弾かれるので、
+     * ここで丸める（保存先は INTEGER）。上限・下限の検査は丸めた後に行う。
+     */
+    elapsedMs: z
+      .number()
+      .finite()
+      .transform((ms) => Math.round(ms)),
   })
-  .refine((value) => playStatsRejection(value, value.form) === null, {
-    message: "記録が範囲外です",
+  .superRefine((value, ctx) => {
+    // 弾く理由をそのまま利用者に返す（「範囲外」だけでは何が悪いか分からない）
+    const reason = playStatsRejection(value, value.form);
+    if (reason !== null) ctx.addIssue({ code: "custom", message: reason });
   });

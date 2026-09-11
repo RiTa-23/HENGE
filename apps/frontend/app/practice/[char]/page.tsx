@@ -4,11 +4,13 @@ import { AdjustingView } from "@/components/Adjusting";
 import { DetailScroll } from "@/components/DetailScroll";
 import { DifficultBadge } from "@/components/DifficultBadge";
 import { FormButton } from "@/components/FormButton";
+import { RankingBoard } from "@/components/RankingBoard";
 import { PracticeMark } from "@/components/ModeMark";
 import { SiteFooter } from "@/components/SiteFooter";
 import { SiteHeader } from "@/components/SiteHeader";
 import { betaLimitedPage } from "@/lib/api/admin-page";
 import { ogFields, pageTitle } from "@/lib/og";
+import { listRankings } from "@/lib/api/rankings";
 import { decodePageParam, findTheme } from "@/lib/api/themes";
 import { adjustingMetadata } from "@/lib/beta/beta";
 import { playHref } from "@/lib/ui/kind";
@@ -56,6 +58,9 @@ export default async function PracticeDetailPage({
   const theme = await findTheme("constraint", char);
   if (theme === null) notFound();
 
+  // 最適化する音は短文だけなので、ランキングも1つ
+  const entries = await listRankings(theme.id, "sentence");
+
   return (
     <>
       <SiteHeader />
@@ -90,6 +95,8 @@ export default async function PracticeDetailPage({
             />
           }
         />
+
+        <RankingBoard boards={[{ form: "sentence", entries }]} />
 
         <p className="mt-10 text-sm text-kinari/50">
           <a href="/practice" className="hover:text-kinari">

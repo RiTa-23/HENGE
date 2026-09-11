@@ -2,6 +2,7 @@ import { describe, expect, test } from "bun:test";
 import {
   adminPromptListQuerySchema,
   displayNameSchema,
+  rankingRegisterSchema,
   regenerateSchema,
   sessionStartSchema,
   themeListQuerySchema,
@@ -152,5 +153,57 @@ describe("displayNameSchema", () => {
   test("文字列以外は弾く", () => {
     expect(displayNameSchema.safeParse(123).success).toBe(false);
     expect(displayNameSchema.safeParse(null).success).toBe(false);
+  });
+});
+
+describe("rankingRegisterSchema", () => {
+  const ok = { themeId: "t1", form: "sentence", hits: 300, misses: 10, elapsedMs: 60_000 };
+
+  test("生の値だけを受け取る（スコアは送られてきても無視する）", () => {
+    const parsed = rankingRegisterSchema.safeParse({ ...ok, score: 9999 });
+    expect(parsed.success).toBe(true);
+    if (parsed.success) expect(parsed.data).not.toHaveProperty("score");
+  });
+
+  test("form を省略すると短文", () => {
+    const { form: _form, ...rest } = ok;
+    const parsed = rankingRegisterSchema.safeParse(rest);
+    expect(parsed.success).toBe(true);
+    if (parsed.success) expect(parsed.data.form).toBe("sentence");
+  });
+
+  test("範囲外の記録は弾く（規則は playStatsRejection）", () => {
+    // 短文の1プレイに満たない打鍵数
+    expect(rankingRegisterSchema.safeParse({ ...ok, hits: 10 }).success).toBe(false);
+    // 時間0
+    expect(rankingRegisterSchema.safeParse({ ...ok, elapsedMs: 0 }).success).toBe(false);
+    // 速すぎる
+    expect(rankingRegisterSchema.safeParse({ ...ok, elapsedMs: 1000 }).success).toBe(false);
+  });
+
+  test("形式で範囲が変わる（単語なら80打鍵で足りる）", () => {
+    expect(rankingRegisterSchema.safeParse({ ...ok, form: "word", hits: 80 }).success).toBe(true);
+    expect(rankingRegisterSchema.safeParse({ ...ok, form: "sentence", hits: 80 }).success).toBe(
+      false,
+    );
+  });
+
+  test("elapsedMs は小数で来るので丸めて受ける（performance.now() の差）", () => {
+    const parsed = rankingRegisterSchema.safeParse({ ...ok, elapsedMs: 61234.567 });
+    expect(parsed.success).toBe(true);
+    if (parsed.success) expect(parsed.data.elapsedMs).toBe(61235);
+  });
+
+  test("範囲外の理由をそのまま返す", () => {
+    const parsed = rankingRegisterSchema.safeParse({ ...ok, hits: 10 });
+    expect(parsed.success).toBe(false);
+    if (!parsed.success) expect(parsed.error.issues[0]?.message).toBe("打鍵数が範囲外です");
+  });
+
+  test("打鍵数の小数・負数、時間の文字列は弾く", () => {
+    expect(rankingRegisterSchema.safeParse({ ...ok, hits: 300.5 }).success).toBe(false);
+    expect(rankingRegisterSchema.safeParse({ ...ok, misses: -1 }).success).toBe(false);
+    expect(rankingRegisterSchema.safeParse({ ...ok, elapsedMs: "60000" }).success).toBe(false);
+    expect(rankingRegisterSchema.safeParse({ ...ok, elapsedMs: Number.NaN }).success).toBe(false);
   });
 });

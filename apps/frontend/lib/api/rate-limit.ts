@@ -40,3 +40,16 @@ export async function canKickRefill(userId: string): Promise<boolean> {
   const { success } = await env.REFILL_RATE_LIMIT.limit({ key: userId });
   return success;
 }
+
+/**
+ * ランキングの登録（POST /api/rankings）の連打を弾く。
+ *
+ * 1プレイに1回押すものなので、上限は補充のキックと同じくプレイの頻度で見積もる
+ * （10回/60秒）。生成系（limitGeneration）と枠を分けるのは、記録を送るだけで
+ * テーマ作成の予算が減らないようにするため。弾いたときは `RATE_LIMITED` を返す。
+ */
+export async function limitRankingRegister(userId: string): Promise<Response | null> {
+  const { env } = await getCloudflareContext({ async: true });
+  const { success } = await env.RANKING_RATE_LIMIT.limit({ key: userId });
+  return success ? null : errorResponse("RATE_LIMITED");
+}

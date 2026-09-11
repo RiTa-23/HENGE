@@ -57,6 +57,14 @@
       "namespace_id": "1002",
       "simple": { "limit": 10, "period": 60 },
     },
+    {
+      // ランキングの登録（POST /api/rankings）用。1プレイに1回押すものなので、
+      // 補充のキックと同じくプレイの頻度で見積もる。生成系の枠と分けるのは、
+      // 記録を送るだけでテーマ作成の予算が減らないようにするため
+      "name": "RANKING_RATE_LIMIT",
+      "namespace_id": "1003",
+      "simple": { "limit": 10, "period": 60 },
+    },
   ],
   "observability": { "enabled": true },
 }

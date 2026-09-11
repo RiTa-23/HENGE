@@ -23,6 +23,7 @@
 | POST | `/api/themes` | 必須 | 新規作成（初回15問を同期生成） |
 | POST | `/api/prompts/regenerate` | 必須 | 枯渇時の同期再生成 |
 | GET | `/api/me` | 必須 | ユーザー情報・本日の残ニューロン |
+| POST | `/api/rankings` | 必須 | ランキングへの登録（ベストのときだけ書き換え） |
 | GET | `/api/admin/themes` | 管理者 | 管理用一覧 |
 | DELETE | `/api/admin/themes/[id]` | 管理者 | 削除（prompts・KVも連鎖） |
 | GET | `/api/admin/themes/[id]/prompts` | 管理者 | テーマ1つ分のお題一覧（管理用） |
@@ -98,6 +99,29 @@
 表示名の正規化は Hono 側で行う。呼び出し側で正規化すると、規則が2か所に分かれて必ずずれる。
 
 **ベータモード（`BETA_MODE`）が有効な間、運営アカウント以外は `FORBIDDEN`（403）を返す。** ベータ版利用者は既存プールのプレイと補充生成だけができ、新しいお題の生成は「調整中」のため（`docs/07-ui.md`）。判定は認可なので**レート制限やクォータの照会より前に置く**。文言は「お題の生成は調整中です。既にあるお題は引き続き遊べます」を返す。運営アカウント（`ADMIN_EMAILS`）は制限しない。
+
+### POST /api/rankings
+
+```jsonc
+// リクエスト。**生の値を送る。スコアは送らない**（送っても無視する）
+{ "themeId": "01H...", "form": "word", "hits": 310, "misses": 12, "elapsedMs": 61234 }
+
+// レスポンス
+{ "score": 287,      // サーバーで計算したスコア（結果画面と同じ関数）
+  "best": true,      // 保存されている記録より良かったか。false なら何も書いていない
+  "rank": 3 }        // 記録の順位。100位以内でなければ null（その記録は保存されない）
+```
+
+**`best` は「保存されている記録の中でのベスト」。** 100位圏外の記録は書いた直後に刈り込まれて残らないので、圏外の後に低いスコアで登録しても `best: true` になる。結果画面は `rank: null` のとき「ベスト」と言わず「記録は残りません」と出す。
+
+- **1人につき1つのプールに1件（ベスト）。** 既存の記録以下のスコアでは書き換えず、`best: false` と既存の順位を返す
+- **スコアはサーバーで計算する**（`packages/shared` の `etypingScore`）。クライアントのスコアを受け取ると、画面とランキングの算出がずれる余地ができる
+- 記録は自己申告で改ざんは防げない（MVPでは対策しない）。Zod で弾くのは**打っていないと分かる値**だけ（`playStatsRejection`: 1プレイの打鍵数の範囲・時間が0以下または1時間超・30打鍵/秒超）。弾いた理由はそのまま `VALIDATION_ERROR` の文言で返す
+- **`elapsedMs` は小数で来る**（プレイ画面は `performance.now()` の差で計る）。整数を要求せず、サーバーで丸めてから検査・保存する
+- **ユーザー名（`display_name`）が未設定なら `FORBIDDEN`**（ランキングに出す名前が無い）。判定は Next.js
+- **そのプールを遊んだ記録（`user_theme_progress`）が無ければ `FORBIDDEN`。** 判定は Hono（ログインユーザーの再生オフセットは Hono にしか無い）
+- 登録のたびに101位以下を消す（`RANKING_SIZE`。`docs/03-data-model.md`）
+- 閲覧の公開APIは持たない。詳細ページが SSR で Hono の `GET /rankings` を直接引く
 
 ### GET /api/me
 
@@ -179,6 +203,8 @@
 | POST | `/themes` | 作成＋初回15問の同期生成 |
 | POST | `/prompts/regenerate` | 枯渇時の同期再生成 |
 | GET | `/usage/:userId` | 当日の `{ count, neurons }`（Next.js側の判定の材料）。**上限値はHono側に持たない** |
+| GET | `/rankings` | テーマ×形式の上位100件（`themeId` / `form` をクエリで受ける）。`displayName` を結合して返す |
+| POST | `/rankings` | 記録の登録。生の値からスコアを計算し、ベストのときだけ書き換え、101位以下を消す。**そのプールを遊んだ記録が無ければ `FORBIDDEN`** |
 | GET | `/users/themes` | ある利用者が作ったテーマ／含む文字の一覧（`userId` / `limit` / `cursor` をクエリで受ける）。`kind` で絞らず作成順。マイページ用 |
 | GET | `/admin/themes` | 管理用一覧 |
 | DELETE | `/admin/themes/:id` | 削除 |
@@ -233,7 +259,7 @@ MVPは**500ニューロン/日**（月次上限なし）。**リセットは 00:
 |---|---|---|---|
 | `VALIDATION_ERROR` | 400 | Zod検証に失敗 | 入力欄にエラー表示 |
 | `UNAUTHORIZED` | 401 | 未ログインで要認証を叩いた | ログインへ誘導 |
-| `FORBIDDEN` | 403 | 管理者以外が`/api/admin/*`。ベータ版の非運営がお題の新規生成（`POST /api/themes`）を叩いた | 404相当に見せる（後者は「調整中」を案内） |
+| `FORBIDDEN` | 403 | 管理者以外が`/api/admin/*`。ベータ版の非運営がお題の新規生成（`POST /api/themes`）を叩いた。ランキング登録でユーザー名が未設定／そのプールを遊んでいない | 404相当に見せる（後者2つは文言をそのまま出す） |
 | `NOT_FOUND` | 404 | 指定されたテーマが存在しない | 一覧へ戻す |
 | `THEME_EXHAUSTED` | 409 | 匿名がプール枯渇に到達 | 別テーマ／ログインを提示 |
 | `GENERATION_IN_PROGRESS` | 409 | 在庫不足だが生成ロックあり | 「準備中」を表示し数秒後に再試行 |
@@ -257,6 +283,7 @@ Cloudflare の Rate Limiting binding（`GENERATION_RATE_LIMIT`、Next.js Worker 
 |---|---|---|---|---|
 | `GENERATION_RATE_LIMIT` | `POST /api/themes` / `POST /api/prompts/regenerate` | ユーザーID | 5回 / 60秒 | `RATE_LIMITED`(429) |
 | `REFILL_RATE_LIMIT` | `POST /api/sessions/start`（ログイン時のみ） | ユーザーID | 10回 / 60秒 | **`allowRefill: false`。429は返さない** |
+| `RANKING_RATE_LIMIT` | `POST /api/rankings` | ユーザーID | 10回 / 60秒 | `RATE_LIMITED`(429) |
 
 - キーをIPにしないのは、共有回線の背後にいる別のユーザーを巻き添えにする理由が無いため。匿名の `sessions/start` は補充をキックしないので判定自体を行わない
 - 同期生成では**クォータ判定より先に判定する。** 弾かれたリクエストで `GET /usage/:userId` を引くのは無駄で、連打を弾く目的にも反する

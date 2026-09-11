@@ -1,28 +1,33 @@
-import type { PromptForm, ThemeKind } from "@henge/shared";
-import { SentenceMark, WordMark } from "@/components/FormMark";
-import { topMissedKeys } from "@/lib/play/misses";
 import {
   accuracyRatio,
   etypingScore,
   keysPerSecond,
   type PlayStats,
+  type PromptForm,
+  type ThemeKind,
   totalKeystrokes,
-} from "@/lib/play/score";
+} from "@henge/shared";
+import { SentenceMark, WordMark } from "@/components/FormMark";
+import { RankingRegister } from "@/components/play/RankingRegister";
+import { topMissedKeys } from "@/lib/play/misses";
+import { rankingHref } from "@/lib/ui/kind";
 import { buildShareText, buildTweetIntentUrl } from "@/lib/share/tweet";
 
 export type { PlayStats };
 
 /**
- * 結果。**スコアは保存しない**（MVPスコープ外）ので、この場で見せて終わり。
- * 画面遷移せずプレイ画面内の状態として出す。
+ * 結果。画面遷移せずプレイ画面内の状態として出す。**プレイごとの履歴は持たない。**
+ * 残るのはランキングに登録したベストスコアだけで、それも本人が押したときだけ
+ * （`RankingRegister`）。
  *
  * スコアは e-typing と同じ算出方法（WPM ×（正確率）^3 の切り捨て）。
- * 計算は lib/play/score.ts にあり、そちらでテストしている。
+ * 計算は packages/shared/src/score.ts にあり、そちらでテストしている。
  */
 /** 出す苦手キーの数。多すぎると「どれから直すか」が決められなくなる */
 const MISSED_KEY_LIMIT = 6;
 
 export function Result({
+  themeId,
   stats,
   missedKeys,
   onRetry,
@@ -33,6 +38,8 @@ export function Result({
   form,
   shareUrl,
 }: {
+  /** ランキングの登録に使う。名前ではなくIDで送る（`kind` を落とすと別のプールになる） */
+  themeId: string;
   stats: PlayStats;
   /** 打ち損ねた文字と回数。1プレイ（短文15問／単語20問）の通算 */
   missedKeys: ReadonlyMap<string, number>;
@@ -122,6 +129,13 @@ export function Result({
             </ul>
           </div>
         )}
+
+        <RankingRegister
+          themeId={themeId}
+          form={form}
+          stats={stats}
+          rankingHref={rankingHref(kind, themeName, form)}
+        />
 
         <div className="mt-12 flex flex-wrap items-center justify-center gap-4">
           <button

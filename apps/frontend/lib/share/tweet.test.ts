@@ -4,7 +4,7 @@ import { buildShareText, buildTweetIntentUrl } from "./tweet";
 /**
  * 投稿テキストの整形。**結果画面と同じ数値が乗ること**が要件。整形ルール
  * （小数1桁・切り捨て%）が結果画面とずれると「画面と投稿が違う」になるため、
- * 期待値は lib/play/score.ts の計算結果に手で追従させた固定値を置く。
+ * 期待値は packages/shared/src/score.ts の計算結果に手で追従させた固定値を置く。
  */
 describe("buildShareText", () => {
   // 550打中540打 正解、125秒。打鍵/秒 4.4、正確率 98%、スコア 249

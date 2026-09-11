@@ -7,6 +7,7 @@ import {
   parsePlayForm,
   parseThemeKind,
   playHref,
+  rankingHref,
 } from "./kind";
 
 /**
@@ -85,5 +86,23 @@ describe("出題の形式とURL", () => {
   it("画面に出す呼び名", () => {
     expect(formLabel("word")).toBe("単語");
     expect(formLabel("sentence")).toBe("短文");
+  });
+});
+
+describe("rankingHref", () => {
+  it("詳細ページの #ranking へ飛ぶ。短文はクエリを付けない", () => {
+    expect(rankingHref("theme", "忍びの心得")).toBe(
+      `/themes/${encodeURIComponent("忍びの心得")}#ranking`,
+    );
+  });
+
+  it("単語は ?ranking=word でそちらのタブを開く", () => {
+    expect(rankingHref("theme", "忍びの心得", "word")).toBe(
+      `/themes/${encodeURIComponent("忍びの心得")}?ranking=word#ranking`,
+    );
+  });
+
+  it("最適化する音は /practice の下", () => {
+    expect(rankingHref("constraint", "ざ")).toBe(`/practice/${encodeURIComponent("ざ")}#ranking`);
   });
 });

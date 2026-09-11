@@ -5,6 +5,7 @@ import { generateRoutes } from "./routes/generate";
 import { sessionRoutes } from "./routes/sessions";
 import { themeRoutes } from "./routes/themes";
 import { usageRoutes } from "./routes/usage";
+import { userRoutes } from "./routes/users";
 
 /**
  * Hono Worker。外部には公開しない。
@@ -24,6 +25,7 @@ const routes = app
   .route("/", sessionRoutes)
   .route("/", generateRoutes)
   .route("/", usageRoutes)
+  .route("/", userRoutes)
   .route("/", adminRoutes);
 
 export type AppType = typeof routes;

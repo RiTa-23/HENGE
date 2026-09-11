@@ -2,6 +2,7 @@ import { betterAuth } from "better-auth";
 import { drizzleAdapter } from "better-auth/adapters/drizzle";
 import { drizzle } from "drizzle-orm/d1";
 import * as authSchema from "@henge/shared/db/auth-schema";
+import { displayNameSchema } from "@/lib/api/schema";
 
 /**
  * Better Auth のインスタンスを作る。**認証は Next.js Worker 側にのみ置く。**
@@ -30,6 +31,32 @@ export function createAuth(env: CloudflareEnv) {
     },
     // Googleプロバイダのみ。パスワードログインは持たない
     emailAndPassword: { enabled: false },
+    user: {
+      additionalFields: {
+        /**
+         * ユーザー名（表示名）。**Google の名前（`name`）とは別に持つ。** `name` は
+         * 本名のことが多く、ランキングなど公開の場に勝手に出せない。利用者が自分で
+         * 決めた名前だけを公開に使う。
+         *
+         * 未設定（NULL）は「まだ決めていない」の意味で、ログイン後に入力させる
+         * （`components/DisplayNameGate.tsx`）。この列を足す前に登録した利用者も
+         * NULL のままなので、同じ導線に乗る。
+         *
+         * 更新は Better Auth の `/api/auth/update-user` で行う（`authClient.updateUser`）。
+         * そこが公開APIの入口なので、**検証はこの `validator.input` にかける**
+         * （Route Handler を別に足すと、Better Auth のルートが検証なしで残る）。
+         *
+         * **この定義を変えたら `bun run auth:schema` でスキーマを再生成する**
+         * （`packages/shared/src/db/auth-schema.ts` は手で書かない）。
+         */
+        displayName: {
+          type: "string",
+          required: false,
+          input: true,
+          validator: { input: displayNameSchema },
+        },
+      },
+    },
     baseURL: env.BETTER_AUTH_URL,
     // **明示的に渡す。** 省略すると Better Auth は process.env を見にいくが、
     // Workers のシークレットは env バインディングであって process.env ではない。

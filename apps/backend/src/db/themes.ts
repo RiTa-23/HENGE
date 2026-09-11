@@ -71,6 +71,45 @@ export async function listThemes(
   };
 }
 
+/**
+ * ある利用者が作ったテーマ／含む文字の一覧（マイページ用）。**`kind` で絞らない。**
+ *
+ * 作った本人が見る一覧なので、テーマと最適化する音を分けずに作成順（新しい順）で
+ * 並べる。公開一覧と同じ形（`ThemeSummary`）で返し、お題数は含めない
+ * （一覧に集計を持たせない方針は公開一覧と同じ。`docs/04-api.md`）。
+ *
+ * `userId` は Next.js 側で検証済みのものを信頼する。運営投入分（`created_by` が NULL）は
+ * 誰の一覧にも出ない。
+ */
+export async function listThemesByCreator(
+  db: Db,
+  params: { userId: string; limit: number; cursor: number },
+): Promise<{ themes: ThemeSummary[]; nextCursor: number | null }> {
+  const limit = Math.min(Math.max(params.limit, 1), LIST_LIMIT_MAX);
+  const rows = await db
+    .select({
+      id: themes.id,
+      kind: themes.kind,
+      name: themes.name,
+      totalPlayCount: themes.totalPlayCount,
+      createdAt: themes.createdAt,
+      generationStatus: themes.generationStatus,
+      wordGenerationStatus: themes.wordGenerationStatus,
+    })
+    .from(themes)
+    .where(eq(themes.createdBy, params.userId))
+    .orderBy(desc(themes.createdAt))
+    // 次ページの有無を知るために1件多く取る
+    .limit(limit + 1)
+    .offset(params.cursor);
+
+  const hasMore = rows.length > limit;
+  return {
+    themes: rows.slice(0, limit),
+    nextCursor: hasMore ? params.cursor + limit : null,
+  };
+}
+
 /** 表示名から引く。正規化はここで行い、呼び出し側に正規化の責任を持たせない */
 export async function findThemeByName(
   db: Db,

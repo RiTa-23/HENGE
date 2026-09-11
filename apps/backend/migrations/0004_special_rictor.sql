@@ -1,0 +1,1 @@
+CREATE INDEX `themes_created_by` ON `themes` (`created_by`,"created_at" desc);

@@ -1,6 +1,7 @@
 import { describe, expect, test } from "bun:test";
 import {
   adminPromptListQuerySchema,
+  displayNameSchema,
   regenerateSchema,
   sessionStartSchema,
   themeListQuerySchema,
@@ -118,5 +119,38 @@ describe("管理用のお題一覧（形式で絞る）", () => {
 
   test("知らない形式は弾く", () => {
     expect(adminPromptListQuerySchema.safeParse({ form: "poem" }).success).toBe(false);
+  });
+});
+
+describe("displayNameSchema", () => {
+  test("前後の空白を除いて1〜20文字", () => {
+    expect(displayNameSchema.safeParse("影丸").success).toBe(true);
+    expect(displayNameSchema.safeParse("あ".repeat(20)).success).toBe(true);
+    expect(displayNameSchema.safeParse("あ".repeat(21)).success).toBe(false);
+    expect(displayNameSchema.safeParse("").success).toBe(false);
+    expect(displayNameSchema.safeParse("   ").success).toBe(false);
+  });
+
+  test("前後の空白は落として返す（保存する値は trim 後）", () => {
+    const parsed = displayNameSchema.safeParse("  影丸  ");
+    expect(parsed.success).toBe(true);
+    if (parsed.success) expect(parsed.data).toBe("影丸");
+  });
+
+  test("改行・制御文字は弾く（一覧の1行に収まらない）", () => {
+    for (const name of ["影\n丸", "影\t丸", "影\u0000丸", "影\u2028丸"]) {
+      expect(displayNameSchema.safeParse(name).success).toBe(false);
+    }
+  });
+
+  test("途中の空白や記号・絵文字は許す（一意でもない）", () => {
+    for (const name of ["影 丸", "kage-maru_23", "🥷", "Ｋａｇｅ"]) {
+      expect(displayNameSchema.safeParse(name).success).toBe(true);
+    }
+  });
+
+  test("文字列以外は弾く", () => {
+    expect(displayNameSchema.safeParse(123).success).toBe(false);
+    expect(displayNameSchema.safeParse(null).success).toBe(false);
   });
 });

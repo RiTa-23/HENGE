@@ -149,10 +149,33 @@ MVPでは日次上限のみ（**500ニューロン/日**）。月次上限は設
 | 対象 | 消え方 |
 |---|---|
 | `prompts` | FKのCASCADEで自動削除 |
-| `user_theme_progress` | 同上 |
+| `user_theme_progress` / `rankings` | 同上 |
 | **KVのキャッシュ・ロック** | **自動では消えない。削除処理で明示的に削除する**（ロックは**形式ぶんすべて**） |
 
 D1のCASCADEはD1の中でしか効かない。KVを消し忘れると「削除したテーマがキャッシュ経由で復活したように見える」不具合になる。
+
+## rankings
+
+テーマ×形式ごとのランキング。**1人につき1件（ベストスコア）。**
+
+| カラム | 型 | 説明 |
+|---|---|---|
+| `theme_id` | TEXT | FK→`themes.id` ON DELETE CASCADE |
+| `form` | TEXT | `'sentence'` / `'word'`。**短文と単語は別のランキング** |
+| `user_id` | TEXT | FK→`user.id` ON DELETE CASCADE |
+| `score` | INTEGER | e-typing 方式のスコア（`packages/shared` の `etypingScore`）。**サーバーで計算する** |
+| `hits` / `misses` / `elapsed_ms` | INTEGER | 生の値。一覧に打鍵/秒と正確率を出すためと、算出方法を変えたときに計算し直すため |
+| `created_at` | INTEGER | この記録を出した時刻。**同点は先に出した方が上** |
+
+```sql
+PRIMARY KEY (theme_id, form, user_id)
+CREATE INDEX rankings_theme_form_score ON rankings (theme_id, form, score DESC);
+```
+
+- **主キーに `user_id` を含める。** プレイごとに積むと1人で100枠を埋められる。既存の記録より高いスコアのときだけ書き換える
+- **名前は持たない。** 表示時に `user.display_name` を結合する。名前を変えれば過去の記録の名前も変わり、ユーザー削除は CASCADE で記録ごと消える
+- **保持するのは上位 `RANKING_SIZE`（100）件だけ。** 登録のたびに101位以下を消す（`pruneRanking`）。一覧・刈り込み・順位の計算は同じ並び（スコア降順、`created_at` 昇順）で数える。ずれると一覧に無い人が「N位」と言われる
+- 記録は自己申告で改ざんは防げない（MVPでは対策しない）。範囲外の値（`playStatsRejection`）と、**そのプールを遊んだ記録（`user_theme_progress`）が無いユーザー**は弾く
 
 ## user（Better Auth 管理）に足した列
 
@@ -172,7 +195,7 @@ Better Auth の4テーブルは CLI の出力をそのまま使うが、**`user`
 
 | 対象 | 消え方 |
 |---|---|
-| `user_theme_progress` / `user_generation_usage` | FKのCASCADEで自動削除 |
+| `user_theme_progress` / `user_generation_usage` / `rankings` | FKのCASCADEで自動削除 |
 | Better Auth の `session` / `account` | 同上 |
 | `themes` | **消さない。** `created_by` がNULLになるだけ（公開コンテンツのため） |
 

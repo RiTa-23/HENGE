@@ -1,5 +1,11 @@
-import type { PromptForm, ThemeKind } from "@henge/shared";
-import { accuracyRatio, etypingScore, keysPerSecond, type PlayStats } from "@/lib/play/score";
+import {
+  accuracyRatio,
+  etypingScore,
+  keysPerSecond,
+  type PlayStats,
+  type PromptForm,
+  type ThemeKind,
+} from "@henge/shared";
 
 /**
  * 結果のX投稿。**スコアは保存しない**ので、投稿テキストは結果画面のメモリ上の

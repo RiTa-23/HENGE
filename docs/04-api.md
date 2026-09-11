@@ -179,6 +179,8 @@
 | POST | `/themes` | 作成＋初回15問の同期生成 |
 | POST | `/prompts/regenerate` | 枯渇時の同期再生成 |
 | GET | `/usage/:userId` | 当日の `{ count, neurons }`（Next.js側の判定の材料）。**上限値はHono側に持たない** |
+| GET | `/rankings` | テーマ×形式の上位100件（`themeId` / `form` をクエリで受ける）。`displayName` を結合して返す |
+| POST | `/rankings` | 記録の登録。生の値からスコアを計算し、ベストのときだけ書き換え、101位以下を消す。**そのプールを遊んだ記録が無ければ `FORBIDDEN`** |
 | GET | `/users/themes` | ある利用者が作ったテーマ／含む文字の一覧（`userId` / `limit` / `cursor` をクエリで受ける）。`kind` で絞らず作成順。マイページ用 |
 | GET | `/admin/themes` | 管理用一覧 |
 | DELETE | `/admin/themes/:id` | 削除 |

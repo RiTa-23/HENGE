@@ -157,6 +157,45 @@ export const userGenerationUsage = sqliteTable(
 );
 
 /**
+ * ランキング。**テーマ×形式ごとに、1人1件（ベストスコア）。**
+ *
+ * プレイごとに積むと1人で100枠を埋められるので、主キーに user_id を含めて
+ * ベストだけを持つ。生の値（打鍵数・ミス・時間）も持つのは、一覧に打鍵/秒と
+ * 正確率を出すためと、スコアの算出方法を変えたときに計算し直せるようにするため。
+ *
+ * 名前は持たない。表示時に `user.display_name` を結合する（名前を変えれば過去の
+ * 記録の名前も変わる。ユーザー削除は CASCADE で記録ごと消える）。
+ * 101位以下は登録のたびに消す（`RANKING_SIZE`。`docs/03-data-model.md`）。
+ */
+export const rankings = sqliteTable(
+  "rankings",
+  {
+    themeId: text("theme_id")
+      .notNull()
+      .references(() => themes.id, { onDelete: "cascade" }),
+    /** 出題の形式。短文と単語は別のランキング */
+    form: text("form", { enum: ["sentence", "word"] }).notNull(),
+    userId: text("user_id")
+      .notNull()
+      .references(() => user.id, { onDelete: "cascade" }),
+    /** e-typing 方式のスコア（`packages/shared` の `etypingScore`）。サーバーで計算する */
+    score: integer("score").notNull(),
+    hits: integer("hits").notNull(),
+    misses: integer("misses").notNull(),
+    elapsedMs: integer("elapsed_ms").notNull(),
+    /** この記録を出した時刻。同点は先に出した方が上 */
+    createdAt: integer("created_at")
+      .notNull()
+      .default(sql`(unixepoch())`),
+  },
+  (t) => [
+    primaryKey({ columns: [t.themeId, t.form, t.userId] }),
+    // 一覧（上位100件）と刈り込みの両方で使う
+    index("rankings_theme_form_score").on(t.themeId, t.form, desc(t.score)),
+  ],
+);
+
+/**
  * Better Auth 管理下のテーブル。@better-auth/cli generate が生成したものを
  * packages/shared に置き、両Workerから参照する。
  *

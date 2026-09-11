@@ -1,13 +1,14 @@
-import type { PromptForm, ThemeKind } from "@henge/shared";
-import { SentenceMark, WordMark } from "@/components/FormMark";
-import { topMissedKeys } from "@/lib/play/misses";
 import {
   accuracyRatio,
   etypingScore,
   keysPerSecond,
   type PlayStats,
+  type PromptForm,
+  type ThemeKind,
   totalKeystrokes,
-} from "@/lib/play/score";
+} from "@henge/shared";
+import { SentenceMark, WordMark } from "@/components/FormMark";
+import { topMissedKeys } from "@/lib/play/misses";
 import { buildShareText, buildTweetIntentUrl } from "@/lib/share/tweet";
 
 export type { PlayStats };
@@ -17,7 +18,7 @@ export type { PlayStats };
  * 画面遷移せずプレイ画面内の状態として出す。
  *
  * スコアは e-typing と同じ算出方法（WPM ×（正確率）^3 の切り捨て）。
- * 計算は lib/play/score.ts にあり、そちらでテストしている。
+ * 計算は packages/shared/src/score.ts にあり、そちらでテストしている。
  */
 /** 出す苦手キーの数。多すぎると「どれから直すか」が決められなくなる */
 const MISSED_KEY_LIMIT = 6;

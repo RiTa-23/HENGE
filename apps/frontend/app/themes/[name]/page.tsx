@@ -3,12 +3,14 @@ import { notFound } from "next/navigation";
 import { DetailScroll } from "@/components/DetailScroll";
 import { DifficultBadge } from "@/components/DifficultBadge";
 import { FormButton } from "@/components/FormButton";
+import { RankingBoard } from "@/components/RankingBoard";
 import { ThemeMark } from "@/components/ModeMark";
 import { SiteFooter } from "@/components/SiteFooter";
 import { SiteHeader } from "@/components/SiteHeader";
 import { ogFields, pageTitle } from "@/lib/og";
+import { listRankings } from "@/lib/api/rankings";
 import { decodePageParam, findTheme } from "@/lib/api/themes";
-import { playHref } from "@/lib/ui/kind";
+import { parsePlayForm, playHref } from "@/lib/ui/kind";
 
 export const dynamic = "force-dynamic";
 
@@ -34,13 +36,26 @@ export async function generateMetadata({
 /**
  * テーマ詳細。**SEOの主戦場**なので行き止まりにせず、「はじめる」を主役に置く。
  */
-export default async function ThemeDetailPage({ params }: { params: Promise<{ name: string }> }) {
+export default async function ThemeDetailPage({
+  params,
+  searchParams,
+}: {
+  params: Promise<{ name: string }>;
+  searchParams: Promise<{ ranking?: string }>;
+}) {
   // ページのルートパラメータはエンコードされたまま渡ってくる
-  const name = decodePageParam((await params).name);
+  const [{ name: raw }, { ranking }] = await Promise.all([params, searchParams]);
+  const name = decodePageParam(raw);
   if (name === null) notFound();
 
   const theme = await findTheme("theme", name);
   if (theme === null) notFound();
+
+  // ランキングは短文と単語で別。両方引いてタブで切り替える（`RankingBoard`）
+  const [sentence, word] = await Promise.all([
+    listRankings(theme.id, "sentence"),
+    listRankings(theme.id, "word"),
+  ]);
 
   return (
     <>
@@ -90,6 +105,14 @@ export default async function ThemeDetailPage({ params }: { params: Promise<{ na
               />
             ))
           }
+        />
+
+        <RankingBoard
+          boards={[
+            { form: "sentence", entries: sentence },
+            { form: "word", entries: word },
+          ]}
+          initialForm={parsePlayForm(ranking)}
         />
 
         <p className="mt-10 text-sm text-kinari/50">

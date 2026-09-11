@@ -78,7 +78,7 @@ docs/            実装ドキュメント
 
 **以下に関するコードを先回りで書かない。** 準備のためのカラム追加やインターフェース定義も不要。
 
-課金（Stripe）、有料/無料プランの区別、対戦機能、ブラウザLLM（Gemini Nano）、お気に入り、スコアの保存・履歴、OGP画像の動的生成、Cron Triggers、Cache API、Cloudflare Workflows。
+課金（Stripe）、有料/無料プランの区別、対戦機能、ブラウザLLM（Gemini Nano）、お気に入り、プレイごとのスコア履歴（ランキングに残るのはベスト1件だけ）、OGP画像の動的生成、Cron Triggers、Cache API、Cloudflare Workflows。
 
 ## コーディング規約
 

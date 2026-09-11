@@ -54,16 +54,14 @@ async function fillBoard() {
         displayName: id,
       })),
     );
-    await db
-      .insert(userThemeProgress)
-      .values(
-        chunk.map((userId) => ({
-          userId,
-          themeId: "t1",
-          form: "sentence" as const,
-          playCount: 15,
-        })),
-      );
+    await db.insert(userThemeProgress).values(
+      chunk.map((userId) => ({
+        userId,
+        themeId: "t1",
+        form: "sentence" as const,
+        playCount: 15,
+      })),
+    );
   }
   const all = ["u1", ...ids];
   for (let i = 0; i < all.length; i += 10) {

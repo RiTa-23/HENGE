@@ -591,6 +591,7 @@ export function PlayScreen({
   if (phase.name === "result") {
     return (
       <Result
+        themeId={themeId}
         detailHref={backToDetail}
         stats={stats}
         missedKeys={missedKeys}

@@ -1,4 +1,4 @@
-import { isHiraganaOnly } from "@henge/shared";
+import { isHiraganaOnly, playStatsRejection } from "@henge/shared";
 import { z } from "zod";
 
 /**
@@ -105,3 +105,23 @@ export const displayNameSchema = z
     (value) => !/[\p{Cc}\p{Zl}\p{Zp}]/u.test(value),
     "ユーザー名に改行や制御文字は使えません",
   );
+
+/**
+ * ランキングの登録。クライアントは**生の値**（打鍵数・ミス・時間）を送り、
+ * スコアはサーバー（Hono）で計算する。クライアントのスコアを受け取らない。
+ *
+ * 記録は自己申告で改ざんは防げない。ここで弾くのは「打っていないと分かる値」だけで、
+ * 規則は `packages/shared` の `playStatsRejection`（1プレイの打鍵数の範囲・時間・
+ * 1秒あたりの打鍵数）に1つだけ置く。形式で範囲が変わるので `form` と一緒に検査する。
+ */
+export const rankingRegisterSchema = z
+  .object({
+    themeId: z.string().min(1),
+    form: formSchema,
+    hits: z.number().int().min(0),
+    misses: z.number().int().min(0).max(100_000),
+    elapsedMs: z.number().int().min(1),
+  })
+  .refine((value) => playStatsRejection(value, value.form) === null, {
+    message: "記録が範囲外です",
+  });

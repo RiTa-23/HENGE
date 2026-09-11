@@ -53,6 +53,16 @@ export function detailHref(kind: ThemeKind, name: string): string {
   return kind === "constraint" ? `/practice/${segment}` : `/themes/${segment}`;
 }
 
+/**
+ * 詳細ページのランキング。`#ranking` で巻物の下の一覧へ飛び、単語のときは
+ * `?ranking=word` でそちらのタブを開いた状態にする（短文は既定なので付けない）。
+ * クエリ名を `form` にしないのは、詳細ページの他の用途と混ざらないようにするため。
+ */
+export function rankingHref(kind: ThemeKind, name: string, form: PromptForm = "sentence"): string {
+  const base = detailHref(kind, name);
+  return `${base}${form === "word" ? "?ranking=word" : ""}#ranking`;
+}
+
 /** そのモードの一覧ページ。プレイ画面の「一覧に戻る」が使う */
 export function listHref(kind: ThemeKind): string {
   return kind === "constraint" ? "/practice" : "/themes";

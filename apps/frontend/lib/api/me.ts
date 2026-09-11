@@ -1,4 +1,4 @@
-import { quotaResetAt, remainingNeurons } from "@henge/shared";
+import { remainingNeurons } from "@henge/shared";
 import { backendClient } from "@/lib/api/backend";
 import type { ThemeSummary } from "@/lib/api/themes";
 
@@ -9,8 +9,6 @@ export interface DailyNeurons {
   used: number;
   /** 当日AIを呼んだ回数（1回あたりの重さを読む分母。上限ではない） */
   count: number;
-  /** 次のリセット。`+09:00` 表記なので、そのまま日本時間として見せられる */
-  resetAt: string;
 }
 
 /**
@@ -19,13 +17,14 @@ export interface DailyNeurons {
  * 直接使う（`lib/api/themes.ts` と同じ理由）。
  *
  * 上限との比較（`remainingNeurons`）は `packages/shared` の関数で行い、
- * ここに 500 を書かない。
+ * ここに 500 を書かない。リセット時刻は返さない。窓は 00:00 UTC で固定で、
+ * 画面は「朝9時（日本時間）」と決め打ちで出す（`docs/03-data-model.md`）。
  */
 export async function dailyNeurons(userId: string): Promise<DailyNeurons> {
   const client = await backendClient();
   const response = await client.usage[":userId"].$get({ param: { userId } });
   const { count, neurons } = (await response.json()) as { count: number; neurons: number };
-  return { remaining: remainingNeurons(neurons), used: neurons, count, resetAt: quotaResetAt() };
+  return { remaining: remainingNeurons(neurons), used: neurons, count };
 }
 
 /**

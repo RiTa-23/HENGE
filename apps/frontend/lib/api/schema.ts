@@ -100,7 +100,7 @@ export const displayNameSchema = z
   .string({ message: "ユーザー名は文字列で指定してください" })
   .trim()
   .min(1, "ユーザー名を入力してください")
-  .max(DISPLAY_NAME_MAX_LENGTH, "ユーザー名は20文字までです")
+  .max(DISPLAY_NAME_MAX_LENGTH, `ユーザー名は${DISPLAY_NAME_MAX_LENGTH}文字までです`)
   .refine(
     (value) => !/[\p{Cc}\p{Zl}\p{Zp}]/u.test(value),
     "ユーザー名に改行や制御文字は使えません",

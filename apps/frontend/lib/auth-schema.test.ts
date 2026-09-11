@@ -1,6 +1,6 @@
 import { describe, expect, it } from "bun:test";
 import * as authSchema from "@henge/shared/db/auth-schema";
-import { getAuthTables } from "better-auth/db";
+import { getAuthTables, parseUserInput } from "better-auth/db";
 import { getTableColumns } from "drizzle-orm";
 import { auth } from "./auth-cli.config";
 
@@ -32,5 +32,32 @@ describe("auth-schema は better-auth が要求する形を満たす", () => {
     const expected = ["id", ...Object.keys(definition.fields)];
 
     expect(expected.filter((field) => !actual.has(field))).toEqual([]);
+  });
+});
+
+/**
+ * 表示名の更新は Route Handler を持たず、Better Auth の `/update-user` に
+ * `additionalFields.displayName.validator.input`（`displayNameSchema`）で検証を委ねている
+ * （`docs/04-api.md`）。その前提は better-auth の内部（`parseUserInput` が
+ * `validator.input` を実行すること）に乗っているので、ここで固定する。
+ * 外れると 21 文字超や改行入りの名前がそのまま保存され、ランキングの1行が崩れる。
+ */
+describe("update-user の入口で displayName の検証が走る", () => {
+  it("前後の空白を落として通す", () => {
+    expect(parseUserInput(auth.options, { displayName: "  影丸 " }, "update")).toEqual({
+      displayName: "影丸",
+    });
+  });
+
+  it("長さ・空・制御文字は弾く", () => {
+    for (const displayName of ["あ".repeat(21), "", "   ", "影\n丸"]) {
+      expect(() => parseUserInput(auth.options, { displayName }, "update")).toThrow();
+    }
+  });
+
+  it("サインアップ（create）では未指定でも通り、NULL のまま作られる", () => {
+    expect(
+      parseUserInput(auth.options, { name: "忍", email: "u@example.com" }, "create"),
+    ).not.toHaveProperty("displayName");
   });
 });

@@ -16,6 +16,7 @@ import {
   type TypingProgress,
 } from "@henge/shared";
 import { useCallback, useEffect, useRef, useState } from "react";
+import { SentenceMark, WordMark } from "@/components/FormMark";
 import { Logo } from "@/components/Logo";
 import { authClient } from "@/lib/api/auth-client";
 import { Keyboard, type NextKey, toNextKey } from "./Keyboard";
@@ -440,7 +441,13 @@ export function PlayScreen({
           </h1>
           {/* **どちらの形式を開いているかを出す。** 同じテーマ名で中身が変わるので、
               名前だけだと単語のつもりで短文を始めてしまう */}
-          <p className="mt-4 text-sm tracking-widest text-kinari/50">
+          <p className="mt-4 flex items-center justify-center gap-2 text-sm tracking-widest text-kinari/50">
+            {/* 紋は一覧・詳細の「打つ」札と同じ（FormMark）。どの画面でも同じ印で形式を示す */}
+            {form === "word" ? (
+              <WordMark className="size-4 text-kin" />
+            ) : (
+              <SentenceMark className="size-4 text-kin" />
+            )}
             {formLabel(form)}・{playSize(form)}問
           </p>
 

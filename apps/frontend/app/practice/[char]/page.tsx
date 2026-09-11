@@ -2,6 +2,8 @@ import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import { AdjustingView } from "@/components/Adjusting";
 import { DetailScroll } from "@/components/DetailScroll";
+import { DifficultBadge } from "@/components/DifficultBadge";
+import { FormButton } from "@/components/FormButton";
 import { PracticeMark } from "@/components/ModeMark";
 import { SiteFooter } from "@/components/SiteFooter";
 import { SiteHeader } from "@/components/SiteHeader";
@@ -69,19 +71,23 @@ export default async function PracticeDetailPage({
             </>
           }
           stats={[
-            { label: "お題", value: theme.promptCounts.sentence },
+            {
+              label: "お題",
+              value: theme.promptCounts.sentence,
+              badge:
+                theme.generationStatus === "difficult" ? (
+                  <DifficultBadge forms={["sentence"]} />
+                ) : undefined,
+            },
             { label: "プレイ", value: theme.totalPlayCount, unit: "回" },
           ]}
           actions={
-            <a
+            <FormButton
+              form="sentence"
+              size="lg"
+              label="打つ"
               href={playHref("constraint", theme.name)}
-              className="min-w-48 rounded-md border border-shu bg-shu/15 px-8 py-4 font-gothic tracking-[0.2em] text-kinari transition-colors hover:bg-shu/25"
-            >
-              <span className="block text-lg">打つ</span>
-              <span className="mt-1 block font-mono text-xs tracking-normal text-kinari/60">
-                15問ひと組
-              </span>
-            </a>
+            />
           }
         />
 

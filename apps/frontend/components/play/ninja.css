@@ -185,8 +185,8 @@
   --cap-height: 9px;
   --cap-inset: 3px;
   --cap-band: 2px;
-  /* 閉じた巻物の幅。軸20×2 ＋ 紙の余白16×2 ＋ 名前の欄144 */
-  --scroll-closed: 216px;
+  /* 閉じた巻物の幅。軸20×2 ＋ 紙の余白16×2 ＋ 名前の欄128 */
+  --scroll-closed: 200px;
   width: min(100%, var(--scroll-closed));
   transition: width 380ms cubic-bezier(0.2, 0.9, 0.3, 1);
 }

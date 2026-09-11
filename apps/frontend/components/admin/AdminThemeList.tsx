@@ -2,6 +2,7 @@
 
 import { isApiError } from "@henge/shared";
 import Link from "next/link";
+import { DifficultBadge, difficultForms } from "@/components/DifficultBadge";
 import { useCallback, useEffect, useState } from "react";
 
 interface AdminTheme {
@@ -90,13 +91,10 @@ export function AdminThemeList() {
               >
                 {theme.name}
               </Link>
-              {/* 印は形式ごとに立つ。どちらが困難なのかを書き分ける */}
-              {theme.generationStatus === "difficult" && (
-                <span className="ml-3 text-xs tracking-widest text-kinari/40">短文が生成困難</span>
-              )}
-              {theme.wordGenerationStatus === "difficult" && (
-                <span className="ml-3 text-xs tracking-widest text-kinari/40">単語が生成困難</span>
-              )}
+              {/* 印は形式ごとに立つ。公開側と同じ部品で、どちらが困難かを紋で示す */}
+              <span className="ml-3">
+                <DifficultBadge forms={difficultForms(theme)} />
+              </span>
             </td>
             <td className="py-3 text-kinari/60">{theme.kind === "theme" ? "テーマ" : "最適化"}</td>
             <td className="py-3 text-right font-mono text-kinari/70">

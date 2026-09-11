@@ -1,4 +1,4 @@
-import { playSize, type PromptForm, type ThemeKind } from "@henge/shared";
+import type { PromptForm, ThemeKind } from "@henge/shared";
 import { accuracyRatio, etypingScore, keysPerSecond, type PlayStats } from "@/lib/play/score";
 
 /**
@@ -12,6 +12,7 @@ import { accuracyRatio, etypingScore, keysPerSecond, type PlayStats } from "@/li
 
 /**
  * 投稿テキスト。テーマ（または最適化の文字）・出題の形式・スコア・打鍵/秒・正確率を含む。
+ * **問題数は含めない。** 形式ごとに固定なので、形式が書いてあれば足りる。
  *
  * **形式は短文も単語も明記する。** 同じテーマ名で中身も問題数も違うので、書かないと
  * 「どちらの記録なのか」が投稿から分からない。単語のときだけ書く形にすると、
@@ -35,8 +36,8 @@ export function buildShareText({
       ? `HENGEで「${themeName}」の最適化練習を打った。`
       : `HENGEで「${themeName}」の${form === "word" ? "単語" : "短文"}を打った。`;
 
-  // 問題数は形式で変わる（短文15／単語20）。同じスコアでも重みが違うので添える
-  const line = `${playSize(form)}問 スコア ${etypingScore(stats)}／打鍵/秒 ${keysPerSecond(stats).toFixed(1)}／正確率 ${Math.floor(accuracyRatio(stats) * 100)}%`;
+  // 問題数は書かない。形式ごとに固定（短文15／単語20）なので、形式が書いてあれば足りる
+  const line = `スコア ${etypingScore(stats)}／打鍵/秒 ${keysPerSecond(stats).toFixed(1)}／正確率 ${Math.floor(accuracyRatio(stats) * 100)}%`;
 
   // ハッシュタグは投稿の集計・検索のため。それ以上は280字を圧迫する
   return [lead, line, "#HENGE"].join("\n");

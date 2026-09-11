@@ -85,8 +85,9 @@ export function RankingBoard({
               {current.entries.map((entry) => (
                 <tr key={entry.userId} className="border-b border-kinari/5">
                   <td className="py-3 pr-4 font-mono text-kinari/70">{entry.rank}</td>
-                  <td className="max-w-48 truncate py-3 pr-4 text-kinari">
-                    {entry.displayName ?? "名無し"}
+                  <td className="py-3 pr-4 text-kinari">
+                    {/* td の max-width は自動レイアウトの表では効かないので、中の要素で切る */}
+                    <span className="block max-w-48 truncate">{entry.displayName ?? "名無し"}</span>
                   </td>
                   <td className="py-3 pr-4 text-right font-mono text-kin">{entry.score}</td>
                   <td className="py-3 pr-4 text-right font-mono text-kinari/70">

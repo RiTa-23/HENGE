@@ -10,7 +10,7 @@ import { SiteHeader } from "@/components/SiteHeader";
 import { ogFields, pageTitle } from "@/lib/og";
 import { listRankings } from "@/lib/api/rankings";
 import { decodePageParam, findTheme } from "@/lib/api/themes";
-import { parsePlayForm, playHref } from "@/lib/ui/kind";
+import { detailHref, parsePlayForm, playHref } from "@/lib/ui/kind";
 
 export const dynamic = "force-dynamic";
 
@@ -27,6 +27,9 @@ export async function generateMetadata({
   return {
     title,
     description,
+    // **ランキングのタブ指定（`?ranking=word`）でURLが2つに割れる。** 着地ページの
+    // 評価を1つに寄せるため、クエリ無しの詳細を正規URLとして明示する
+    alternates: { canonical: detailHref("theme", name) },
     // **シェアの着地ページ。** 結果のX投稿からここに来るため、カードが確実に
     // 出るようにする（docs/09-share.md）
     ...ogFields(title, description),

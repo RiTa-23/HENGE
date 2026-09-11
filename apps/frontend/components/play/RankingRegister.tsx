@@ -99,11 +99,13 @@ export function RankingRegister({
 
   if (registered !== null) {
     const { best, rank } = registered;
+    // **圏外の記録は保存されない**（上位100件だけを保持し、書いた直後に刈り込まれる）。
+    // 「ベストを更新した」と言うと、次に低いスコアでも同じ文言が出て嘘になる
     const message =
       best && rank !== null
         ? `${rank}位に入りました`
         : best
-          ? `ベストを更新しましたが、${RANKING_SIZE}位以内には届きませんでした`
+          ? `${RANKING_SIZE}位以内に入らなかったため、記録は残りません`
           : rank !== null
             ? `これまでのベスト（${rank}位）を超えませんでした`
             : "これまでのベストを超えませんでした";

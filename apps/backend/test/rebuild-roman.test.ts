@@ -18,6 +18,7 @@ function current(id: string, kana: string): StoredPrompt {
   const roman = buildRomanCandidates(kana);
   return {
     id,
+    form: "sentence",
     readingKana: kana,
     readingRomanJson: JSON.stringify(roman),
     keystrokeCount: countKeystrokes(roman),
@@ -42,6 +43,7 @@ describe("planRebuild", () => {
   it("古いテーブルで作られた行を拾い、新しい候補と打鍵数を返す", () => {
     const stale: StoredPrompt = {
       id: "p1",
+      form: "sentence",
       readingKana: "ちぇっく",
       readingRomanJson: JSON.stringify([["chi", "ti"], ["xe", "le"], ["k"], ["ku"]]),
       keystrokeCount: 8,
@@ -75,7 +77,13 @@ describe("planRebuild", () => {
    */
   it("テーブルに無いかなを含む行は、書き換えずに報告する", () => {
     const plan = planRebuild([
-      { id: "p1", readingKana: "しのびA", readingRomanJson: "[]", keystrokeCount: 6 },
+      {
+        id: "p1",
+        form: "sentence",
+        readingKana: "しのびA",
+        readingRomanJson: "[]",
+        keystrokeCount: 6,
+      },
       current("p2", "しのび"),
     ]);
 
@@ -121,5 +129,21 @@ describe("SQLの組み立て", () => {
     expect(sql).toContain("WHERE id = 'p1'");
     // 読みは触らない。読みは正しく、そこから作り直している
     expect(sql).not.toContain("reading_kana");
+  });
+});
+
+/**
+ * **範囲外の判定は形式ごと。** 短文の範囲（10〜35）で判定すると、単語の行は
+ * ほぼ全部が「範囲外」として並び、人が消すかどうかを決める一覧の意味が無くなる。
+ */
+describe("打鍵数の範囲は形式で変わる", () => {
+  it("6打の単語は範囲内、6打の短文は範囲外", () => {
+    const word = { ...current("w1", "しのび"), form: "word" as const, keystrokeCount: 99 };
+    const sentence = { ...current("p1", "しのび"), keystrokeCount: 99 };
+
+    const plan = planRebuild([word, sentence]);
+
+    expect(plan.changed.find((r) => r.id === "w1")?.outOfRange).toBe(false);
+    expect(plan.changed.find((r) => r.id === "p1")?.outOfRange).toBe(true);
   });
 });

@@ -1,5 +1,7 @@
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
+import { DetailScroll } from "@/components/DetailScroll";
+import { ThemeMark } from "@/components/ModeMark";
 import { SiteFooter } from "@/components/SiteFooter";
 import { SiteHeader } from "@/components/SiteHeader";
 import { ogFields, pageTitle } from "@/lib/og";
@@ -42,39 +44,42 @@ export default async function ThemeDetailPage({ params }: { params: Promise<{ na
   return (
     <>
       <SiteHeader />
-      <main className="mx-auto w-full max-w-3xl px-6 py-20">
-        <h1 className="font-mincho text-4xl tracking-wide text-kinari">{theme.name}</h1>
-        <p className="mt-6 leading-loose text-kinari/70">
-          「{theme.name}」をテーマにしたお題です。短文と単語の2つの打ち方があり、どちらも同じ文章・
-          同じ語は繰り返し出ません。
-        </p>
-
-        <dl className="mt-10 flex gap-10 text-sm">
-          <div>
-            <dt className="tracking-widest text-kinari/50">プレイ回数</dt>
-            <dd className="mt-1 font-mono text-2xl text-kin">{theme.totalPlayCount}</dd>
-          </div>
-        </dl>
-
-        {/*
-          **形式の選択は行き止まりにしない。** 単語のお題がまだ無いテーマでも
-          ボタンは出す。押すとプレイ画面の枯渇と同じ導線（ログイン → 作る）に入る。
-          ここでボタンごと隠すと、「このテーマには単語が無い」ことすら伝わらない。
-        */}
-        <div className="mt-14 flex flex-wrap gap-4">
-          {(["sentence", "word"] as const).map((form) => (
-            <a
-              key={form}
-              href={playHref("theme", theme.name, form)}
-              className="min-w-56 rounded-md border border-shu bg-shu/15 px-8 py-4 font-gothic tracking-[0.2em] text-kinari transition-colors hover:bg-shu/25"
-            >
-              <span className="block text-lg">{form === "word" ? "単語" : "短文"}で打つ</span>
-              <span className="mt-1 block font-mono text-xs tracking-normal text-kinari/60">
-                {playSize(form)}問ひと組 ／ お題 {theme.promptCounts[form]}
-              </span>
-            </a>
-          ))}
-        </div>
+      <main className="mx-auto w-full max-w-4xl px-6 py-16">
+        <DetailScroll
+          mark={<ThemeMark className="h-5 w-5" />}
+          eyebrow="テーマ"
+          title={theme.name}
+          description={
+            <>
+              「{theme.name}」をテーマにしたお題です。短文と単語の2つの打ち方があり、
+              どちらも同じ文章・同じ語は繰り返し出ません。
+            </>
+          }
+          stats={[
+            { label: "短文のお題", value: theme.promptCounts.sentence },
+            { label: "単語のお題", value: theme.promptCounts.word },
+            { label: "プレイ", value: theme.totalPlayCount, unit: "回" },
+          ]}
+          actions={
+            /*
+              **形式の選択は行き止まりにしない。** 単語のお題がまだ無いテーマでも
+              ボタンは出す。押すとプレイ画面の枯渇と同じ導線（ログイン → 作る）に入る。
+              ここでボタンごと隠すと、「このテーマには単語が無い」ことすら伝わらない。
+            */
+            (["sentence", "word"] as const).map((form) => (
+              <a
+                key={form}
+                href={playHref("theme", theme.name, form)}
+                className="min-w-48 rounded-md border border-shu bg-shu/15 px-8 py-4 font-gothic tracking-[0.2em] text-kinari transition-colors hover:bg-shu/25"
+              >
+                <span className="block text-lg">{form === "word" ? "単語" : "短文"}で打つ</span>
+                <span className="mt-1 block font-mono text-xs tracking-normal text-kinari/60">
+                  {playSize(form)}問ひと組
+                </span>
+              </a>
+            ))
+          }
+        />
 
         <p className="mt-10 text-sm text-kinari/50">
           <a href="/themes" className="hover:text-kinari">

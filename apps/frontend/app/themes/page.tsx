@@ -61,7 +61,7 @@ export default async function ThemesPage({
           ))}
         </div>
 
-        <div className="mt-8 grid gap-3">
+        <div className="mt-8 grid gap-x-5 gap-y-8 sm:grid-cols-2 lg:grid-cols-3">
           {themes.map((theme) => (
             <ThemeCard key={theme.id} theme={theme} />
           ))}

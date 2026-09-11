@@ -1,6 +1,8 @@
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import { AdjustingView } from "@/components/Adjusting";
+import { DetailScroll } from "@/components/DetailScroll";
+import { PracticeMark } from "@/components/ModeMark";
 import { SiteFooter } from "@/components/SiteFooter";
 import { SiteHeader } from "@/components/SiteHeader";
 import { betaLimitedPage } from "@/lib/api/admin-page";
@@ -55,31 +57,33 @@ export default async function PracticeDetailPage({
   return (
     <>
       <SiteHeader />
-      <main className="mx-auto w-full max-w-3xl px-6 py-20">
-        <p className="text-sm tracking-[0.25em] text-kinari/50">最適化する音</p>
-        <h1 className="mt-2 font-mincho text-4xl tracking-wide text-kinari">{theme.name}</h1>
-        <p className="mt-6 leading-loose text-kinari/70">
-          読み仮名に「{theme.name}」を含む文章だけが出ます。表記に現れていなくても構いません。
-          15問ひと組で、同じ文章は繰り返し出ません。
-        </p>
-
-        <dl className="mt-10 flex gap-10 text-sm">
-          <div>
-            <dt className="tracking-widest text-kinari/50">お題数</dt>
-            <dd className="mt-1 font-mono text-2xl text-kin">{theme.promptCounts.sentence}</dd>
-          </div>
-          <div>
-            <dt className="tracking-widest text-kinari/50">プレイ回数</dt>
-            <dd className="mt-1 font-mono text-2xl text-kin">{theme.totalPlayCount}</dd>
-          </div>
-        </dl>
-
-        <a
-          href={playHref("constraint", theme.name)}
-          className="mt-14 inline-block rounded-md border border-shu bg-shu/15 px-10 py-4 font-gothic tracking-[0.2em] text-kinari transition-colors hover:bg-shu/25"
-        >
-          はじめる
-        </a>
+      <main className="mx-auto w-full max-w-4xl px-6 py-16">
+        <DetailScroll
+          mark={<PracticeMark className="h-5 w-5" />}
+          eyebrow="最適化する音"
+          title={theme.name}
+          description={
+            <>
+              読み仮名に「{theme.name}」を含む文章だけが出ます。表記に現れていなくても構いません。
+              15問ひと組で、同じ文章は繰り返し出ません。
+            </>
+          }
+          stats={[
+            { label: "お題", value: theme.promptCounts.sentence },
+            { label: "プレイ", value: theme.totalPlayCount, unit: "回" },
+          ]}
+          actions={
+            <a
+              href={playHref("constraint", theme.name)}
+              className="min-w-48 rounded-md border border-shu bg-shu/15 px-8 py-4 font-gothic tracking-[0.2em] text-kinari transition-colors hover:bg-shu/25"
+            >
+              <span className="block text-lg">打つ</span>
+              <span className="mt-1 block font-mono text-xs tracking-normal text-kinari/60">
+                15問ひと組
+              </span>
+            </a>
+          }
+        />
 
         <p className="mt-10 text-sm text-kinari/50">
           <a href="/practice" className="hover:text-kinari">

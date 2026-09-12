@@ -1,6 +1,6 @@
 import { playSize, type PromptForm } from "@henge/shared";
 import { FormMark } from "@/components/FormMark";
-import { formLabel } from "@/lib/ui/kind";
+import { formColor, formLabel } from "@/lib/ui/kind";
 
 /**
  * 「打つ」ボタン。**木札（きふだ）の形。**
@@ -8,8 +8,8 @@ import { formLabel } from "@/lib/ui/kind";
  * 一覧の巻物と詳細の巻物の両方で使う。角を1つ落として紐穴を空けた札で、
  * 巻物に結わえた札を引くとその形式で打ち始まる、という見立て。
  *
- * **朱は両方とも同じ。** 朱は「今すぐ打つべきもの」の色で、形式で色を変えると
- * その意味が薄まる。見分けは紋（`FormMark`）と文字で付ける。
+ * **色は形式ごと**（`formColor`。単語＝青竹、短文＝朱、長文＝桔梗）。長いほど難しい、が
+ * 色で伝わる並びで、4色の唯一の例外。以前は全部朱だったが、3枚並ぶと見分けがつかなかった。
  *
  * 角の落としは `clip-path`。枠線は clip で切れてしまうので、内側の影
  * （`shadow-[inset_…]`）で描く。落とした角に枠が無いのは、削った木の断面として
@@ -30,12 +30,13 @@ export function FormButton({
 }) {
   const text = label ?? formLabel(form);
   const large = size === "lg";
+  const color = formColor(form);
 
   return (
     <a
       href={href}
       className={
-        "group relative flex items-center gap-1.5 bg-shu/15 text-kinari shadow-[inset_0_0_0_1px_var(--color-shu)] transition-colors hover:bg-shu/30 " +
+        `group relative flex items-center gap-1.5 text-kinari transition-colors ${color.tag} ` +
         "[clip-path:polygon(12px_0,100%_0,100%_100%,0_100%,0_12px)] " +
         // 紐穴は大きい札だけ。小さい札では落とした角と穴が近すぎて、穴が
         // 黒い点にしか見えない（一覧の巻物で実際に気になった）。角の落としだけで
@@ -45,10 +46,7 @@ export function FormButton({
           : "py-1.5 pr-2.5 pl-4")
       }
     >
-      <FormMark
-        form={form}
-        className={large ? "size-6 shrink-0 text-shu" : "size-3.5 shrink-0 text-shu"}
-      />
+      <FormMark form={form} className={`${large ? "size-6" : "size-3.5"} shrink-0 ${color.text}`} />
       <span className="min-w-0">
         <span
           className={

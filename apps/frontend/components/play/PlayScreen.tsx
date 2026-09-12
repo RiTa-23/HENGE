@@ -30,7 +30,7 @@ import { readJsonBody } from "@/lib/api/json";
 import { readOffset, writeOffset } from "@/lib/play/offset";
 import { mergeMissedKeys } from "@/lib/play/misses";
 import { playHit, playMiss, primeAudio, readMuted, writeMuted } from "@/lib/play/sound";
-import { detailHref, formLabel, kindLabel, listHref } from "@/lib/ui/kind";
+import { detailHref, formColor, formLabel, kindLabel, listHref } from "@/lib/ui/kind";
 
 interface Prompt {
   id: string;
@@ -466,7 +466,7 @@ export function PlayScreen({
               名前だけだと単語のつもりで短文を始めてしまう */}
           <p className="mt-4 flex items-center justify-center gap-2 text-sm tracking-widest text-kinari/50">
             {/* 紋は一覧・詳細の「打つ」札と同じ（FormMark）。どの画面でも同じ印で形式を示す */}
-            <FormMark form={form} className="size-4 text-kin" />
+            <FormMark form={form} className={`size-4 ${formColor(form).text}`} />
             {formLabel(form)}・{form === "long" ? "1本" : `${playSize(form)}問`}
           </p>
 

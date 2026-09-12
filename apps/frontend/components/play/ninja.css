@@ -222,10 +222,25 @@
   background: color-mix(in oklab, var(--color-kinari) 32%, var(--color-sumi));
 }
 
+/* 札は紙が開くまで透明にする。閉じた紙では名前の欄の右に札の端が覗くため */
+.scroll--card .scroll__tags {
+  opacity: 0;
+  transition: opacity 200ms ease-out;
+}
+
+.scroll--card:hover .scroll__tags,
+.scroll--card:focus-within .scroll__tags {
+  opacity: 1;
+}
+
 /* ホバーの無い端末（タッチ）では最初から開いておく。閉じたままだと打てない */
 @media (hover: none) {
   .scroll--card {
     width: 100%;
+  }
+
+  .scroll--card .scroll__tags {
+    opacity: 1;
   }
 }
 

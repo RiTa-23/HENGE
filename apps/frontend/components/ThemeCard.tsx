@@ -14,10 +14,12 @@ import "@/components/play/ninja.css";
  * **最初は閉じている。** 名前が読めるだけの狭い紙に、テーマ名とプレイ回数。
  * カーソルを合わせる（またはフォーカスが入る）と紙が横にほどけて、巻かれていた側に
  * 畳まれていた「短文」「単語」の札が現れる。縦幅は変わらない。
- * 木札は紙の左端から固定の位置（`left-40`＝閉じたときの紙の幅160）から右端までの領域に
- * **上下左右の余白が揃うように中央揃え**で並べる。`justify-center-safe` なのは、紙が狭い間
- * （領域の幅が札より小さい間）は中央揃えが左にはみ出して名前に重なるため。その間は
- * 左端（＝右の軸の下）に留まって隠れる（幅の遷移は `ninja.css`）。
+ * 木札は名前の欄の右端（`left-36`＝余白込みの名前の幅144）から紙の右端の手前（`right-4`）
+ * までの領域に、**上下左右の余白が揃うように中央揃え**で並べる。`justify-center-safe` なのは、
+ * 紙が狭い間（領域の幅が札より小さい間）は中央揃えが左にはみ出して名前に重なるため。
+ * 閉じた紙（幅160）では名前の欄の右に16pxだけ札が覗くので、**開くまでは透明にする**
+ * （`.scroll__tags`。`ninja.css`）。以前は札の起点を160にして軸の下に隠していたが、
+ * そのぶん右の余白が取れず、3列の幅では札が右の軸に張り付いて見えた。
  * ホバーの無い端末では最初から開いている。
  *
  * 押せる場所は2種類ある。
@@ -61,7 +63,7 @@ export function ThemeCard({ theme }: { theme: ThemeSummary }) {
         </div>
 
         {/* ほどけた側に現れる部分。巻物全体を覆うリンクより上に置き、ここだけプレイへ直行する */}
-        <div className="absolute inset-y-0 left-40 right-0 z-10 flex items-center justify-center-safe gap-2">
+        <div className="scroll__tags absolute inset-y-0 left-36 right-4 z-10 flex items-center justify-center-safe gap-2">
           {isTheme ? (
             PROMPT_FORMS.map((form) => (
               <FormButton

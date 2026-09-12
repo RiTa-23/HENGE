@@ -3,23 +3,20 @@ import { FormMark } from "@/components/FormMark";
 import { formLabel } from "@/lib/ui/kind";
 
 /**
- * 「生成困難」の印。**どの形式のプールが困難なのかを紋で示す。**
+ * 「生成困難」の印。**どの形式のプールが困難なのかを紋で示す。管理画面用。**
  *
  * 印は形式ごとに立つ（`generation_status` / `word_generation_status` /
- * `long_generation_status`）。文字だけの「生成困難」では、どの形式が作れないのか分からない。形式の紋
- * （`FormMark`。「打つ」札と同じ）を並べて、どちらの話かを見せる。
+ * `long_generation_status`）。文字だけの「生成困難」では、どの形式が作れないのか分からない。
+ * 形式の紋（`FormMark`。「打つ」札と同じ）を並べて、どの形式の話かを見せる。
  *
- * 一覧・詳細・管理画面で同じ部品を使う。場所ごとに違う描き方をすると、同じ状態が
- * 別のものに見える。
+ * 公開側（一覧・詳細）ではこの印を使わず、**その形式の木札を暗くして示す**
+ * （`FormButton` の `difficult`）。管理画面だけ札が無いので、ここに残している。
  */
 export function DifficultBadge({
   forms,
-  compact = false,
 }: {
   /** 困難な形式。複数なら並べる */
   forms: PromptForm[];
-  /** 一覧の閉じた巻物のように幅が無い場所では「困難」に詰める */
-  compact?: boolean;
 }) {
   if (forms.length === 0) return null;
   const names = forms.map(formLabel).join("と");
@@ -32,7 +29,7 @@ export function DifficultBadge({
       {forms.map((form) => (
         <FormMark key={form} form={form} className="size-3.5" />
       ))}
-      {compact ? "困難" : "生成困難"}
+      生成困難
     </span>
   );
 }

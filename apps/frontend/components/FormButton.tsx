@@ -44,7 +44,10 @@ export function FormButton({
     <a
       href={href}
       className={`kifuda ${large ? "kifuda--lg" : "kifuda--sm"}${difficult ? " kifuda--difficult" : ""}`}
-      title={difficult ? `${text}のお題の生成が難しい（在庫があれば遊べます）` : undefined}
+      // 文言は札の文字（最適化練習は「打つ」）ではなく形式の呼び名から組む
+      title={
+        difficult ? `${formLabel(form)}のお題の生成が難しい（在庫があれば遊べます）` : undefined
+      }
       // 紐の色は形式ごと。CSS 変数で渡し、クラスは書き切る（Tailwind が拾うのは紋の側）
       style={{ "--kifuda-cord": `var(--color-${color.token})` } as React.CSSProperties}
     >

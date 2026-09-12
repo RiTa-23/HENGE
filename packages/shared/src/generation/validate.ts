@@ -109,6 +109,21 @@ export const WORD_KEYSTROKE_MAX = 20;
 export const LONG_KEYSTROKE_MIN = 250;
 export const LONG_KEYSTROKE_MAX = 450;
 
+/**
+ * 長文に最低限要る文の数（「。」「！」「？」で数える）。
+ *
+ * 長文は3〜5文の文章として書かせるが、モデルは**句読点を落として1文ごとに改行する**
+ * ことがある（実測）。区切りの無い文章は読みながら打てないので、文の終わりが
+ * 足りないものは却下する。2にしてあるのは、句点を省いた「〜だ〜である」の
+ * 一続きを落としつつ、3文のうち1つが「！」で終わるような揺れを通すため。
+ */
+export const LONG_SENTENCE_MIN = 2;
+
+/** 文の終わり（。！？）の数。長文の区切りの検査に使う */
+export function countSentenceEnds(text: string): number {
+  return (text.match(/[。！？]/gu) ?? []).length;
+}
+
 /** その形式の打鍵数の範囲 `[下限, 上限]`。生成の検証とランキングの範囲検査が使う */
 export function keystrokeRange(form: PromptForm): [number, number] {
   if (form === "word") return [WORD_KEYSTROKE_MIN, WORD_KEYSTROKE_MAX];

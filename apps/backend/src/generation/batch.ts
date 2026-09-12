@@ -6,11 +6,13 @@ import {
   containsKanji,
   countConstraint,
   countKeystrokes,
+  countSentenceEnds,
   includesConstraint,
   isHiraganaOnlyWord,
   isKeystrokeCountInRange,
   isTypableText,
   isTypableWord,
+  LONG_SENTENCE_MIN,
   type PromptForm,
   type ThemeKind,
   UnsupportedKanaError,
@@ -99,6 +101,12 @@ export interface RejectionCounts {
   /** 「含む」モードで、指定文字が読み仮名に無かった */
   constraint: number;
   /**
+   * 長文で、文の終わり（。！？）が足りなかった。句読点を落として返す癖があり
+   * （`parseGeneratedBlocks` で行末には補うが、改行も句点も無い一続きは補えない）、
+   * 区切りの無い文章は読みながら打てないので落とす。短文・単語では常に0
+   */
+  punct: number;
+  /**
    * 既にプールにある（または同じ生成の中で重複した）ため落としたもの。
    *
    * **これが見えないと診断できない。** 重複は読み取得の前に無言で捨てていたので、
@@ -164,6 +172,7 @@ export async function generateBatch(env: Env, input: GenerateBatchInput): Promis
     opening: 0,
     keystroke: 0,
     constraint: 0,
+    punct: 0,
     dup: 0,
   };
   const seen = new Set(input.existing);
@@ -254,6 +263,7 @@ function subtract(after: RejectionCounts, before: RejectionCounts): RejectionCou
     opening: after.opening - before.opening,
     keystroke: after.keystroke - before.keystroke,
     constraint: after.constraint - before.constraint,
+    punct: after.punct - before.punct,
     dup: after.dup - before.dup,
   };
 }
@@ -292,6 +302,11 @@ async function validateInto(
     // 単語ではひらがな限定の側から判定する
     if (isWord ? isHiraganaOnlyWord(text) : !containsKanji(text)) {
       rejected.kanji++;
+      return false;
+    }
+    // **長文は文の区切りが要る。** 句点の無い一続きは読みながら打てない
+    if (input.form === "long" && countSentenceEnds(text) < LONG_SENTENCE_MIN) {
+      rejected.punct++;
       return false;
     }
     // **同じ書き出しを並べない。** 完全一致ではないので seen では拾えない

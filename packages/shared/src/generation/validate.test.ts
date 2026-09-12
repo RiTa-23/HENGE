@@ -4,10 +4,12 @@ import {
   countConstraint,
   includesConstraint,
   isHiraganaOnlyWord,
+  countSentenceEnds,
   isKeystrokeCountInRange,
   keystrokeRange,
   LONG_KEYSTROKE_MAX,
   LONG_KEYSTROKE_MIN,
+  LONG_SENTENCE_MIN,
   isTypableText,
   isTypableWord,
   KEYSTROKE_MAX,
@@ -72,6 +74,12 @@ describe("isKeystrokeCountInRange", () => {
     expect(isKeystrokeCountInRange(LONG_KEYSTROKE_MIN - 1, "long")).toBe(false);
     // 短文の範囲は長文では通らない
     expect(isKeystrokeCountInRange(KEYSTROKE_MAX, "long")).toBe(false);
+  });
+
+  test("文の終わりは 。！？ を数える（長文の区切りの検査）", () => {
+    expect(countSentenceEnds("走る。揺れた！消えた？")).toBe(3);
+    expect(countSentenceEnds("走る、揺れた、消えた")).toBe(0);
+    expect(LONG_SENTENCE_MIN).toBe(2);
   });
 
   test("形式ごとの範囲は既定（短文）と一致する", () => {

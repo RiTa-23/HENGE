@@ -157,6 +157,7 @@ function longRules(count: number): string[] {
   return [
     `- ちょうど${count}本の文章を書く`,
     "- 1本は3〜5文からなる、ひとつながりの文章にする。箇条書きや見出しにしない",
+    "- **各文の終わりに必ず「。」を付ける。** 文の途中には読みやすいところに「、」を入れる。句読点の無い文章は拒否される",
     `- 1本はひらがなに直して150〜220文字程度。**これより短いと拒否される**（打鍵数${LONG_KEYSTROKE_MIN}〜${LONG_KEYSTROKE_MAX}に相当）`,
     "- 1本の中では改行しない。本と本の間だけを空行で区切る",
     "- 番号や記号、見出しを付けない",
@@ -297,16 +298,35 @@ export function parseGeneratedLines(output: string): string[] {
 }
 
 /**
+ * 行末に文の終わりが無ければ「。」を補う。
+ *
+ * モデルは指示に反して**1文ごとに改行し、そのとき「。」を落とす**（実測。
+ * 「〜イベントだ／参加者は〜」のように返ってきた）。改行をそのまま繋ぐと
+ * 「〜イベントだ参加者は〜」という区切りの無い文章になる。行の切れ目は文の切れ目と
+ * 見なして補う。「、」で終わる行（文の途中で折り返した）には足さない。
+ */
+function closeSentence(line: string): string {
+  return /[。！？、]$/u.test(line) ? line : `${line}。`;
+}
+
+/**
  * 長文の出力を1本ずつに切る。**本の切れ目は空行**で、1本の中の改行は繋ぐ。
  *
- * 指示では改行しないことになっているが、モデルは文の途中で折り返すことがある。
- * 行で切ると1本が数件のお題に割れ、どれも打鍵数不足で落ちる。空行が1つも無ければ
- * 出力全体を1本と見なす。
+ * 指示では改行しないことになっているが、モデルは1文ごとに改行することがある。
+ * 行で切ると1本が数件のお題に割れ、どれも打鍵数不足で落ちる。繋ぐときは行末に
+ * 「。」を補う（`closeSentence`）。空行が1つも無ければ出力全体を1本と見なす。
  */
 export function parseGeneratedBlocks(output: string): string[] {
   return output
     .split(/\n\s*\n/u)
-    .map((block) => block.split("\n").map(cleanLine).join(""))
+    .map((block) =>
+      block
+        .split("\n")
+        .map(cleanLine)
+        .filter((line) => line.length > 0)
+        .map(closeSentence)
+        .join(""),
+    )
     .filter((block) => block.length > 0);
 }
 

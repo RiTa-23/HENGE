@@ -27,6 +27,7 @@ export {
 export {
   containsKanji,
   countConstraint,
+  countSentenceEnds,
   includesConstraint,
   isHiraganaOnlyWord,
   isKeystrokeCountInRange,
@@ -37,6 +38,7 @@ export {
   keystrokeRange,
   LONG_KEYSTROKE_MAX,
   LONG_KEYSTROKE_MIN,
+  LONG_SENTENCE_MIN,
   WORD_KEYSTROKE_MAX,
   WORD_KEYSTROKE_MIN,
 } from "./generation/validate";

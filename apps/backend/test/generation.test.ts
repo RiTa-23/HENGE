@@ -52,6 +52,16 @@ describe("parseGeneratedBlocks（長文）", () => {
     ]);
   });
 
+  /**
+   * モデルは1文ごとに改行して「。」を落とすことがある（実測: 「〜イベントだ／参加者は〜」）。
+   * そのまま繋ぐと区切りの無い文章になるので、行末に「。」を補う
+   */
+  it("「。」の無い行末には「。」を補い、「、」で終わる行（文の途中）には足さない", () => {
+    expect(parseGeneratedBlocks("忍びは走る\n影が揺れた！\n闇に、\n消えた")).toEqual([
+      "忍びは走る。影が揺れた！闇に、消えた。",
+    ]);
+  });
+
   it("番号や箇条書き記号、空白だけの行を落とす", () => {
     expect(parseGeneratedBlocks("1. 忍びは走る。\n  \n\n- 影が揺れた。")).toEqual([
       "忍びは走る。",
@@ -350,11 +360,11 @@ describe("generateBatch", () => {
 
     expect(logs).toHaveLength(2);
     expect(logs[0]?.metadata?.counts).toBe(
-      "charset:1,kanji:0,opening:0,keystroke:0,constraint:0,dup:0",
+      "charset:1,kanji:0,opening:0,keystroke:0,constraint:0,punct:0,dup:0",
     );
     // 累積を渡していれば charset:2 になる
     expect(logs[1]?.metadata?.counts).toBe(
-      "charset:1,kanji:0,opening:0,keystroke:0,constraint:0,dup:0",
+      "charset:1,kanji:0,opening:0,keystroke:0,constraint:0,punct:0,dup:0",
     );
   });
 
@@ -442,6 +452,29 @@ describe("長文の検証", () => {
     });
 
     expect(result.valid.map((p) => p.text)).toEqual([body]);
+  });
+
+  it("文の終わり（。！？）が足りない本は punct で却下する", async () => {
+    // 句点を落とした一続き（改行も無いので parseGeneratedBlocks では補えない）
+    const noPunct = sentence.repeat(6).replaceAll("。", "");
+    const result = await generateBatch(envWithAiResponses([[noPunct]]), {
+      ...input({ form: "long", target: 1 }),
+      getReading: longReading,
+    });
+    expect(result.valid).toEqual([]);
+    expect(result.rejected.punct).toBe(1);
+  });
+
+  it("短文では文の終わりを検査しない（punct は常に0）", async () => {
+    const result = await generateBatch(envWithAiResponses([["影が揺れた"]]), {
+      ...input({ target: 1 }),
+      getReading: async () => {
+        const kana = "かげがゆれた";
+        return { kana, roman: buildRomanCandidates(kana) };
+      },
+    });
+    expect(result.valid.map((p) => p.text)).toEqual(["影が揺れた"]);
+    expect(result.rejected.punct).toBe(0);
   });
 
   it("ひらがなだけの本は kanji で却下する", async () => {

@@ -67,7 +67,7 @@ export function ThemeCard({ theme }: { theme: ThemeSummary }) {
         </div>
 
         {/* ほどけた側に現れる部分。巻物全体を覆うリンクより上に置き、ここだけプレイへ直行する */}
-        <div className="absolute top-3 left-40 z-10 flex gap-2">
+        <div className="absolute top-0 left-40 z-10 flex gap-2.5">
           {isTheme ? (
             PROMPT_FORMS.map((form) => (
               <FormButton key={form} form={form} href={playHref(theme.kind, theme.name, form)} />

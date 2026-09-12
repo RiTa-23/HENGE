@@ -32,7 +32,7 @@ export function DetailScroll({
   description: ReactNode;
   /** 在庫・プレイ回数など。値は等幅・金で出す。`badge` は値の下に添える印（生成困難など） */
   stats: { label: string; value: number; unit?: string; badge?: ReactNode }[];
-  /** 「打つ」ボタン。朱で描かれる前提 */
+  /** 「打つ」札（木札）。横に並べて折り目の線に吊るす */
   actions: ReactNode;
 }) {
   return (
@@ -50,25 +50,29 @@ export function DetailScroll({
         </h1>
         <p className="mt-5 max-w-2xl leading-loose text-kinari/70">{description}</p>
 
-        {/* 金は細い線まで。紙の折り目のような1本で、説明と数字を分ける */}
-        <hr className="my-8 border-0 border-t border-kin/50" />
+        {/* 金は細い線まで。紙の折り目のような1本で、説明と数字を分ける。
+            **木札はこの線に結わえる**（紐の上端が線に触れる）。線の下の右側に吊るし、
+            左の在庫と向かい合わせにする。狭い画面では折り返して在庫の下に来る */}
+        <hr className="mt-8 border-0 border-t border-kin/50" />
 
-        <dl className="flex flex-wrap gap-x-10 gap-y-4">
-          {stats.map((stat) => (
-            <div key={stat.label}>
-              <dt className="text-xs tracking-widest text-kinari/50">{stat.label}</dt>
-              <dd className="mt-1 font-mono text-2xl text-kin">
-                {stat.value}
-                {stat.unit !== undefined && (
-                  <span className="ml-1 text-xs text-kinari/50">{stat.unit}</span>
-                )}
-              </dd>
-              {stat.badge !== undefined && <div className="mt-1.5">{stat.badge}</div>}
-            </div>
-          ))}
-        </dl>
+        <div className="flex flex-wrap items-start justify-between gap-x-12 gap-y-10">
+          <dl className="mt-8 flex flex-wrap gap-x-10 gap-y-4">
+            {stats.map((stat) => (
+              <div key={stat.label}>
+                <dt className="text-xs tracking-widest text-kinari/50">{stat.label}</dt>
+                <dd className="mt-1 font-mono text-2xl text-kin">
+                  {stat.value}
+                  {stat.unit !== undefined && (
+                    <span className="ml-1 text-xs text-kinari/50">{stat.unit}</span>
+                  )}
+                </dd>
+                {stat.badge !== undefined && <div className="mt-1.5">{stat.badge}</div>}
+              </div>
+            ))}
+          </dl>
 
-        <div className="mt-10 flex flex-wrap gap-4">{actions}</div>
+          <div className="-mt-px flex gap-6 pr-2">{actions}</div>
+        </div>
       </div>
       <div className="scroll__roller" />
     </div>

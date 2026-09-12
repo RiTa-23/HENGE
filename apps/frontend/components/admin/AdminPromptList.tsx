@@ -2,6 +2,7 @@
 
 import { isApiError, PROMPT_FORMS, type PromptForm } from "@henge/shared";
 import { useCallback, useEffect, useState } from "react";
+import { PROMPT_TEXT_MAX_LENGTH } from "@/lib/api/schema";
 import { formLabel } from "@/lib/ui/kind";
 
 interface AdminPrompt {
@@ -178,13 +179,28 @@ export function AdminPromptList({ themeId }: { themeId: string }) {
               <td className="py-3 pr-4 font-mincho text-base text-kinari">
                 {editingId === prompt.id ? (
                   <div>
-                    <input
-                      type="text"
-                      value={draft}
-                      maxLength={100}
-                      onChange={(event) => setDraft(event.target.value)}
-                      className="w-full rounded border border-kinari/20 bg-sumi px-2 py-1 font-mincho text-base text-kinari outline-none focus:border-kin/60"
-                    />
+                    {/*
+                      上限は検証（promptTextSchema）と同じ値。画面だけ小さいと、
+                      超えている本文への追加入力が黙って捨てられ、削除しかできなくなる。
+                      長文は1行に収まらないので折り返して読める textarea にする
+                    */}
+                    {form === "long" ? (
+                      <textarea
+                        value={draft}
+                        maxLength={PROMPT_TEXT_MAX_LENGTH}
+                        rows={5}
+                        onChange={(event) => setDraft(event.target.value)}
+                        className="w-full rounded border border-kinari/20 bg-sumi px-2 py-1 font-mincho text-base leading-relaxed text-kinari outline-none focus:border-kin/60"
+                      />
+                    ) : (
+                      <input
+                        type="text"
+                        value={draft}
+                        maxLength={PROMPT_TEXT_MAX_LENGTH}
+                        onChange={(event) => setDraft(event.target.value)}
+                        className="w-full rounded border border-kinari/20 bg-sumi px-2 py-1 font-mincho text-base text-kinari outline-none focus:border-kin/60"
+                      />
+                    )}
                     {editError !== null && <p className="mt-1 text-xs text-shu">{editError}</p>}
                   </div>
                 ) : (

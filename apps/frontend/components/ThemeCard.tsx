@@ -14,8 +14,10 @@ import "@/components/play/ninja.css";
  * **最初は閉じている。** 名前が読めるだけの狭い紙に、テーマ名とプレイ回数。
  * カーソルを合わせる（またはフォーカスが入る）と紙が横にほどけて、巻かれていた側に
  * 畳まれていた「短文」「単語」の札が現れる。縦幅は変わらない。
- * 木札は紙の左端から固定の位置（`left-40`＝閉じたときの紙の幅160）に**横に並べて吊るす**
- * （紙の上端から紐が出る）。紙が狭い間は右の軸の下に完全に隠れる（幅の遷移は `ninja.css`）。
+ * 木札は紙の左端から固定の位置（`left-40`＝閉じたときの紙の幅160）から右端までの領域に
+ * **上下左右の余白が揃うように中央揃え**で並べる。`justify-center-safe` なのは、紙が狭い間
+ * （領域の幅が札より小さい間）は中央揃えが左にはみ出して名前に重なるため。その間は
+ * 左端（＝右の軸の下）に留まって隠れる（幅の遷移は `ninja.css`）。
  * ホバーの無い端末では最初から開いている。
  *
  * 押せる場所は2種類ある。
@@ -67,7 +69,7 @@ export function ThemeCard({ theme }: { theme: ThemeSummary }) {
         </div>
 
         {/* ほどけた側に現れる部分。巻物全体を覆うリンクより上に置き、ここだけプレイへ直行する */}
-        <div className="absolute top-0 left-40 z-10 flex gap-2.5">
+        <div className="absolute inset-y-0 left-40 right-0 z-10 flex items-center justify-center-safe gap-2">
           {isTheme ? (
             PROMPT_FORMS.map((form) => (
               <FormButton key={form} form={form} href={playHref(theme.kind, theme.name, form)} />

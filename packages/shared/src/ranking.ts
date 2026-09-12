@@ -1,9 +1,4 @@
-import {
-  KEYSTROKE_MAX,
-  KEYSTROKE_MIN,
-  WORD_KEYSTROKE_MAX,
-  WORD_KEYSTROKE_MIN,
-} from "./generation/validate";
+import { keystrokeRange } from "./generation/validate";
 import { keysPerSecond, type PlayStats } from "./score";
 import { playSize, type PromptForm } from "./session";
 
@@ -24,7 +19,7 @@ export const MAX_ELAPSED_MS = 60 * 60 * 1000;
  * 問題数 × 下限を下回る申告はあり得ない。
  */
 export function minHits(form: PromptForm): number {
-  return playSize(form) * (form === "word" ? WORD_KEYSTROKE_MIN : KEYSTROKE_MIN);
+  return playSize(form) * keystrokeRange(form)[0];
 }
 
 /**
@@ -32,7 +27,7 @@ export function minHits(form: PromptForm): number {
  * （`し` を `shi` と打てば `si` より1打多い）ので、上限そのものではなく2倍を取る。
  */
 export function maxHits(form: PromptForm): number {
-  return playSize(form) * (form === "word" ? WORD_KEYSTROKE_MAX : KEYSTROKE_MAX) * 2;
+  return playSize(form) * keystrokeRange(form)[1] * 2;
 }
 
 /**

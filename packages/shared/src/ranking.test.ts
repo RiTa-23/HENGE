@@ -12,6 +12,11 @@ describe("打鍵数の範囲", () => {
     expect(minHits("word")).toBe(PLAY_SIZE_WORD * 4);
     expect(maxHits("word")).toBe(PLAY_SIZE_WORD * 20 * 2);
   });
+
+  it("長文は 1本 × 250〜450打鍵", () => {
+    expect(minHits("long")).toBe(250);
+    expect(maxHits("long")).toBe(450 * 2);
+  });
 });
 
 describe("playStatsRejection", () => {

@@ -1,5 +1,5 @@
 /* oxlint-disable no-await-in-loop -- D1のバインド変数上限に合わせて分割投入するため、順に入れる */
-import { PLAY_SIZE, PLAY_SIZE_WORD, STOCK_TARGET } from "@henge/shared";
+import { PLAY_SIZE, PLAY_SIZE_LONG, PLAY_SIZE_WORD, STOCK_TARGET } from "@henge/shared";
 import { env, SELF } from "cloudflare:test";
 import { eq } from "drizzle-orm";
 import { beforeEach, describe, expect, it, vi } from "vitest";
@@ -57,6 +57,22 @@ async function seedWords(count: number) {
   for (let i = 0; i < rows.length; i += 10) {
     await db.insert(prompts).values(rows.slice(i, i + 10));
   }
+}
+
+async function seedLongs(count: number) {
+  await db.insert(prompts).values(
+    Array.from({ length: count }, (_, i) => ({
+      id: `l${i + 1}`,
+      themeId: "t1",
+      form: "long" as const,
+      text: `長文${i + 1}`,
+      readingKana: "ちょうぶん",
+      readingRomanJson: '[["cho","tyo","cyo"],["u"],["bu"],["n","nn","xn"]]',
+      keystrokeCount: 300,
+      source: "workers_ai" as const,
+      sequenceNumber: i + 1,
+    })),
+  );
 }
 
 async function start(body: Record<string, unknown>) {
@@ -319,6 +335,27 @@ describe("形式ごとに別のプール・別の進捗", () => {
     const { body } = await start({ themeId: "t1", form: "sentence", userId: "u1" });
     expect(body.nextOffset).toBe(PLAY_SIZE);
     expect((body.prompts as { text: string }[]).some((p) => p.text === "お題1")).toBe(true);
+  });
+
+  it("長文を指定すると、長文が1本（1プレイ分）返り、オフセットは1進む", async () => {
+    await seed(PLAY_SIZE);
+    await seedLongs(3);
+
+    const { status, body } = await start({ themeId: "t1", form: "long", offset: 0 });
+
+    expect(status).toBe(200);
+    expect(body.prompts).toHaveLength(PLAY_SIZE_LONG);
+    expect((body.prompts as { text: string }[])[0]?.text.startsWith("長文")).toBe(true);
+    expect(body.nextOffset).toBe(PLAY_SIZE_LONG);
+    expect(body.remainingInPool).toBe(2);
+  });
+
+  it("長文の在庫が1本も無ければ枯渇", async () => {
+    await seed(PLAY_SIZE);
+
+    const { body } = await start({ themeId: "t1", form: "long", offset: 0 });
+
+    expect((body.error as { code: string }).code).toBe("THEME_EXHAUSTED");
   });
 
   it("形式を省略すると短文になる（既存のクライアントを壊さない）", async () => {

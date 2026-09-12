@@ -5,6 +5,9 @@ import {
   includesConstraint,
   isHiraganaOnlyWord,
   isKeystrokeCountInRange,
+  keystrokeRange,
+  LONG_KEYSTROKE_MAX,
+  LONG_KEYSTROKE_MIN,
   isTypableText,
   isTypableWord,
   KEYSTROKE_MAX,
@@ -60,6 +63,19 @@ describe("isKeystrokeCountInRange", () => {
   test("範囲外を弾く", () => {
     expect(isKeystrokeCountInRange(KEYSTROKE_MIN - 1)).toBe(false);
     expect(isKeystrokeCountInRange(KEYSTROKE_MAX + 1)).toBe(false);
+  });
+
+  test("長文は1本で短文1プレイ分の範囲（250〜450）", () => {
+    expect(keystrokeRange("long")).toEqual([LONG_KEYSTROKE_MIN, LONG_KEYSTROKE_MAX]);
+    expect(isKeystrokeCountInRange(LONG_KEYSTROKE_MIN, "long")).toBe(true);
+    expect(isKeystrokeCountInRange(LONG_KEYSTROKE_MAX, "long")).toBe(true);
+    expect(isKeystrokeCountInRange(LONG_KEYSTROKE_MIN - 1, "long")).toBe(false);
+    // 短文の範囲は長文では通らない
+    expect(isKeystrokeCountInRange(KEYSTROKE_MAX, "long")).toBe(false);
+  });
+
+  test("形式ごとの範囲は既定（短文）と一致する", () => {
+    expect(keystrokeRange("sentence")).toEqual([KEYSTROKE_MIN, KEYSTROKE_MAX]);
   });
 });
 

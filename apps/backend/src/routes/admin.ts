@@ -8,6 +8,7 @@ import {
   isTypableWord,
   KEYSTROKE_MAX,
   KEYSTROKE_MIN,
+  parsePromptForm,
   UnsupportedKanaError,
   WORD_KEYSTROKE_MAX,
   WORD_KEYSTROKE_MIN,
@@ -92,7 +93,7 @@ export const adminRoutes = new Hono<{ Bindings: Env }>()
         db,
         c.req.query("themeId") ?? "",
         // 検証は公開API側（Next.js）で済んでいる。ここは既定に倒すだけ
-        c.req.query("form") === "word" ? "word" : "sentence",
+        parsePromptForm(c.req.query("form")),
         pagination(c.req.query.bind(c.req), PROMPT_LIST_LIMIT_DEFAULT),
       ),
     );

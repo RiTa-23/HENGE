@@ -4,7 +4,22 @@
  * `kind` に値を足す形にすると、テーマ「福岡」が一覧に2つ並ぶことになる。
  * 同じテーマを2つの形式で遊びたいので、プールの側（`prompts.form`）で分ける。
  */
-export type PromptForm = "sentence" | "word";
+export type PromptForm = "sentence" | "word" | "long";
+
+/** すべての形式。画面の札やタブ、ロックの掃除など「形式ぶん並べる」ところで使う */
+export const PROMPT_FORMS: readonly PromptForm[] = ["sentence", "word", "long"];
+
+/**
+ * 文字列を形式として読む。**既定は短文。未知の値も短文に倒す。**
+ *
+ * 形式を持たない古いURL・古いクライアントがそのまま短文で動くようにするため。
+ * 知らない値を通すと、存在しないプールを引くことになる。
+ * `form === "word" ? "word" : "sentence"` を各所に書かせない（形式が増えるたびに
+ * 書き漏れる）。
+ */
+export function parsePromptForm(value: string | null | undefined): PromptForm {
+  return value === "word" || value === "long" ? value : "sentence";
+}
 
 /** 1プレイ = 15問。進捗ドットの数もこれに合わせる */
 export const PLAY_SIZE = 15;
@@ -28,9 +43,20 @@ export const PLAY_SIZE = 15;
  */
 export const PLAY_SIZE_WORD = 20;
 
+/**
+ * 長文の1プレイ = **1本**。
+ *
+ * 1本が読み仮名150〜220文字（打鍵250〜450）のまとまった文章で、短文1プレイ
+ * （約330打）と同じ程度の手応えになる。複数本にすると1本ごとに巻物を切り替える
+ * ことになり、「文章を通しで打つ」という形式の意味が薄れる。
+ */
+export const PLAY_SIZE_LONG = 1;
+
 /** その形式の1プレイの問題数。**画面もAPIもこれを通す**（15を直接書かない） */
 export function playSize(form: PromptForm): number {
-  return form === "word" ? PLAY_SIZE_WORD : PLAY_SIZE;
+  if (form === "word") return PLAY_SIZE_WORD;
+  if (form === "long") return PLAY_SIZE_LONG;
+  return PLAY_SIZE;
 }
 
 /**
@@ -54,9 +80,19 @@ export const STOCK_TARGET = 30;
  */
 export const STOCK_TARGET_WORD = 30;
 
+/**
+ * 長文の在庫目標。**3本（3プレイ分）。**
+ *
+ * 1回の補充で作れるのは最大10本（5本×2ラウンド）なので、在庫0からでも埋まる。
+ * 単語と同じく、目標が1回の補充の上限を超えると「生成困難」の印が誤って立つ。
+ */
+export const STOCK_TARGET_LONG = 3;
+
 /** その形式の在庫目標。下回ったら補充をキックする */
 export function stockTarget(form: PromptForm): number {
-  return form === "word" ? STOCK_TARGET_WORD : STOCK_TARGET;
+  if (form === "word") return STOCK_TARGET_WORD;
+  if (form === "long") return STOCK_TARGET_LONG;
+  return STOCK_TARGET;
 }
 
 /**

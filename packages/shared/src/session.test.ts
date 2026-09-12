@@ -2,9 +2,13 @@ import { describe, expect, test } from "bun:test";
 import {
   GENERATION_WAIT_LIMIT_MS,
   PLAY_SIZE,
+  PLAY_SIZE_LONG,
   PLAY_SIZE_WORD,
+  parsePromptForm,
   playSize,
+  PROMPT_FORMS,
   STOCK_TARGET,
+  STOCK_TARGET_LONG,
   STOCK_TARGET_WORD,
   stockTarget,
   THEME_LOCK_TTL_SECONDS,
@@ -73,5 +77,36 @@ describe("出題の形式ごとの値", () => {
   test("単語の在庫目標は2プレイ分にしない（上と同じ理由）", () => {
     expect(stockTarget("word")).toBe(STOCK_TARGET_WORD);
     expect(stockTarget("word")).toBeLessThan(playSize("word") * 2);
+  });
+});
+
+describe("長文", () => {
+  test("1プレイは1本", () => {
+    expect(playSize("long")).toBe(PLAY_SIZE_LONG);
+    expect(PLAY_SIZE_LONG).toBe(1);
+  });
+
+  /**
+   * 1回の補充で作れるのは最大10本（5本×2ラウンド）。目標がこれを超えると、
+   * 単語と同じ理由で「生成困難」の印が誤って立つ
+   */
+  test("在庫目標は1回の補充で作れる上限（10本）を超えず、1プレイ分より大きい", () => {
+    expect(stockTarget("long")).toBe(STOCK_TARGET_LONG);
+    expect(stockTarget("long")).toBeLessThanOrEqual(10);
+    expect(stockTarget("long")).toBeGreaterThan(playSize("long"));
+  });
+
+  test("PROMPT_FORMS は3形式すべてを含む", () => {
+    expect(PROMPT_FORMS.toSorted()).toEqual(["long", "sentence", "word"]);
+  });
+});
+
+describe("parsePromptForm", () => {
+  test("word / long はそのまま、それ以外は短文に倒す", () => {
+    expect(parsePromptForm("word")).toBe("word");
+    expect(parsePromptForm("long")).toBe("long");
+    for (const value of [undefined, null, "", "sentence", "Long", "poem"]) {
+      expect(parsePromptForm(value)).toBe("sentence");
+    }
   });
 });

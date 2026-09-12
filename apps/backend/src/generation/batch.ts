@@ -31,6 +31,33 @@ export const N_REQUEST = 20;
 export const MAX_ROUNDS = 2;
 
 /**
+ * 長文の1ラウンドの件数。**1本が長いので少なく頼む。**
+ *
+ * 1本≒短文15問ぶんの出力で、20本頼むと応答が長すぎる（時間も `max_tokens` も）。
+ * 1プレイ1本・在庫目標3本なので、5本×2ラウンド＝最大10本で十分埋まる。
+ * 読み取得も1本1回なので `2 × 5 = 10 ≤ 50` に余裕で収まる。
+ */
+export const N_REQUEST_LONG = 5;
+
+/** その形式の1ラウンドの件数。**`MAX_ROUNDS × これ ≤ 50` を満たすこと** */
+export function requestCount(form: PromptForm): number {
+  return form === "long" ? N_REQUEST_LONG : N_REQUEST;
+}
+
+/**
+ * 目標に届かなくても、取れた分を保存してよい形式か。
+ *
+ * 短文は目標（1プレイ分＝15問）未達なら1件も保存せず失敗にするが、単語と長文は
+ * **目標と1回で作れる上限が近い**（単語: 目標20に対し最大40件、長文: 目標3に対し
+ * 最大10本で、却下や重複でここから減る）。同じ扱いにすると、少し届かないだけで
+ * 有効なお題と消費したニューロンを捨てて何度も押させ、普通に作れているテーマにまで
+ * 「生成困難」の印が付く。**1件も作れなかったときだけ**失敗・困難とする。
+ */
+export function acceptsPartialBatch(form: PromptForm): boolean {
+  return form !== "sentence";
+}
+
+/**
  * 書き出しの重なりを見る文字数と、同じ書き出しを何本まで採るか。
  *
  * **プロンプトの言うことを聞かなかったときの歯止め。** 「し」を含む文を作れと
@@ -148,6 +175,8 @@ export async function generateBatch(env: Env, input: GenerateBatchInput): Promis
   let rounds = 0;
   let neurons = 0;
 
+  const requested = requestCount(input.form);
+
   for (let round = 1; round <= MAX_ROUNDS; round++) {
     rounds = round;
 
@@ -160,17 +189,17 @@ export async function generateBatch(env: Env, input: GenerateBatchInput): Promis
       kind: input.kind,
       form: input.form,
       name: input.name,
-      count: N_REQUEST,
+      count: requested,
       existing: input.existing,
       metadata: {
         themeId: input.themeId,
         kind: input.kind,
         round,
         // 形式はメタデータの枠が無いので経路の値に畳む（ai.ts の GenerationPath）。
-        // 新規作成は短文しか作らないので `create:word` は存在しない
+        // 新規作成は短文しか作らないので `create:word` / `create:long` は存在しない
         path:
-          input.form === "word" && input.path !== "create"
-            ? (`${input.path}:word` as const)
+          input.form !== "sentence" && input.path !== "create"
+            ? (`${input.path}:${input.form}` as const)
             : input.path,
       },
     });
@@ -188,7 +217,7 @@ export async function generateBatch(env: Env, input: GenerateBatchInput): Promis
       // ログは1リクエスト（＝1ラウンド）に紐づくため、採用数も却下数も
       // **そのラウンド分だけ**を渡す。累積を渡すと2ラウンド目で1ラウンド目が二重計上される
       const record = recordGenerationResult(env, logId, {
-        requested: N_REQUEST,
+        requested,
         valid: valid.length - validBefore,
         rejected: { ...subtract(rejected, rejectedBefore) },
         constraintTwice: countTwice(valid.slice(validBefore), input),

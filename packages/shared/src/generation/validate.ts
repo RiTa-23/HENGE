@@ -102,14 +102,28 @@ export const WORD_KEYSTROKE_MIN = 4;
 export const WORD_KEYSTROKE_MAX = 20;
 
 /**
+ * 長文の打鍵数。1本で1プレイなので、短文1プレイ（15問 × 約22打 ≒ 330打）と
+ * 同じ程度の手応えになる範囲にする。読み仮名でおよそ150〜220文字。
+ * 上限を切るのは、長すぎると1本を打ち切る前に集中が切れるため。
+ */
+export const LONG_KEYSTROKE_MIN = 250;
+export const LONG_KEYSTROKE_MAX = 450;
+
+/** その形式の打鍵数の範囲 `[下限, 上限]`。生成の検証とランキングの範囲検査が使う */
+export function keystrokeRange(form: PromptForm): [number, number] {
+  if (form === "word") return [WORD_KEYSTROKE_MIN, WORD_KEYSTROKE_MAX];
+  if (form === "long") return [LONG_KEYSTROKE_MIN, LONG_KEYSTROKE_MAX];
+  return [KEYSTROKE_MIN, KEYSTROKE_MAX];
+}
+
+/**
  * 打鍵数が範囲内か。**形式で範囲が変わる。**
  *
  * 既定を短文にしてあるのは、呼び出し側（`rebuild-roman` など形式を持たない経路）が
  * これまでどおり動くようにするため。
  */
 export function isKeystrokeCountInRange(count: number, form: PromptForm = "sentence"): boolean {
-  const [min, max] =
-    form === "word" ? [WORD_KEYSTROKE_MIN, WORD_KEYSTROKE_MAX] : [KEYSTROKE_MIN, KEYSTROKE_MAX];
+  const [min, max] = keystrokeRange(form);
   return count >= min && count <= max;
 }
 

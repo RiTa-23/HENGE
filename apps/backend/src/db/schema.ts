@@ -37,9 +37,17 @@ export const themes = sqliteTable(
      *
      * まとめると、単語が作れないテーマで印が立った瞬間に**短文の補充まで止まる**。
      * 形式ごとに作りやすさは違う（短文は作れるが単語が出てこないテーマがある）ので、
-     * 印も形式ごとに持つ。3つ目の形式が来たら theme_pools テーブルへ寄せる。
+     * 印も形式ごとに持つ。
+     *
+     * **形式ごとの列で持つのはこの印だけ。** 形式ごとに持ちたい属性が2つ以上になったら
+     * `theme_pools (theme_id, form, ...)` へ寄せる（列が形式×属性で増えるため）。
+     * 長文（3つ目）を足した時点では印1つだけなので列のまま。
      */
     wordGenerationStatus: text("word_generation_status", { enum: ["ok", "difficult"] })
+      .notNull()
+      .default("ok"),
+    /** 長文のプールの「生成困難」の印。上と同じ理由で形式ごとに持つ */
+    longGenerationStatus: text("long_generation_status", { enum: ["ok", "difficult"] })
       .notNull()
       .default("ok"),
     /** 人気順ソート用。プレイ開始のたび+1 */
@@ -85,7 +93,7 @@ export const prompts = sqliteTable(
      * 既存の行はすべて 'sentence'。`kind`（テーマ／最適化）とは直交する軸で、
      * `kind` に値を足す形にすると同じテーマが一覧に2つ並ぶことになる。
      */
-    form: text("form", { enum: ["sentence", "word"] })
+    form: text("form", { enum: ["sentence", "word", "long"] })
       .notNull()
       .default("sentence"),
     /** テーマ内・形式内で1始まりの連番。ページネーションの基準 */
@@ -120,7 +128,7 @@ export const userThemeProgress = sqliteTable(
      * 1つにまとめると、単語を遊んだぶんだけ短文のオフセットも進み、
      * **遊んでいない短文のお題が飛ばされる**。
      */
-    form: text("form", { enum: ["sentence", "word"] })
+    form: text("form", { enum: ["sentence", "word", "long"] })
       .notNull()
       .default("sentence"),
     /** その形式の1プレイ分の倍数。次に配信する範囲のオフセット */
@@ -174,7 +182,7 @@ export const rankings = sqliteTable(
       .notNull()
       .references(() => themes.id, { onDelete: "cascade" }),
     /** 出題の形式。短文と単語は別のランキング */
-    form: text("form", { enum: ["sentence", "word"] }).notNull(),
+    form: text("form", { enum: ["sentence", "word", "long"] }).notNull(),
     userId: text("user_id")
       .notNull()
       .references(() => user.id, { onDelete: "cascade" }),

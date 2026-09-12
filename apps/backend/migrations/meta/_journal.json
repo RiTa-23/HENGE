@@ -43,6 +43,13 @@
       "when": 1789128566551,
       "tag": "0005_flawless_beyonder",
       "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "6",
+      "when": 1789171057287,
+      "tag": "0006_military_gargoyle",
+      "breakpoints": true
     }
   ]
 }

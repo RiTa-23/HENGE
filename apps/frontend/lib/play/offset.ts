@@ -17,11 +17,11 @@ const PREFIX = "henge:offset:";
  * 形式ごとのキー。**短文はこれまでのキーのまま。**
  *
  * 短文にも接尾辞を付けると、既に遊んでいる人の進捗が全部0に戻り、**一度見た
- * お題がもう一度配られる**（「毎回違うお題」が崩れる）。単語は新しいプールなので
- * 接尾辞を付けて分ける。
+ * お題がもう一度配られる**（「毎回違うお題」が崩れる）。単語・長文は新しいプールなので
+ * 接尾辞（形式名）を付けて分ける。
  */
 function keyOf(themeId: string, form: PromptForm): string {
-  return form === "word" ? `${PREFIX}${themeId}:word` : PREFIX + themeId;
+  return form === "sentence" ? PREFIX + themeId : `${PREFIX}${themeId}:${form}`;
 }
 
 /** localStorage が使えない環境（プライベートウィンドウ等）でも落とさない */

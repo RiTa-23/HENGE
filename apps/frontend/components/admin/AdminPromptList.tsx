@@ -1,7 +1,8 @@
 "use client";
 
-import { isApiError, type PromptForm } from "@henge/shared";
+import { isApiError, PROMPT_FORMS, type PromptForm } from "@henge/shared";
 import { useCallback, useEffect, useState } from "react";
+import { formLabel } from "@/lib/ui/kind";
 
 interface AdminPrompt {
   id: string;
@@ -118,7 +119,7 @@ export function AdminPromptList({ themeId }: { themeId: string }) {
    */
   const tabs = (
     <div className="mt-8 flex gap-2">
-      {(["sentence", "word"] as const).map((option) => (
+      {PROMPT_FORMS.map((option) => (
         <button
           key={option}
           type="button"
@@ -134,7 +135,7 @@ export function AdminPromptList({ themeId }: { themeId: string }) {
               : "rounded border border-kinari/15 px-4 py-1.5 text-xs tracking-widest text-kinari/50 hover:border-kin/60 hover:text-kinari/80"
           }
         >
-          {option === "word" ? "単語" : "短文"}
+          {formLabel(option)}
         </button>
       ))}
     </div>

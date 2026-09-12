@@ -6,6 +6,7 @@ import {
   type PromptForm,
   type ThemeKind,
 } from "@henge/shared";
+import { formLabel } from "@/lib/ui/kind";
 
 /**
  * 結果のX投稿。**サーバーを通さない。** 投稿テキストは結果画面のメモリ上の
@@ -40,9 +41,9 @@ export function buildShareText({
   const lead =
     kind === "constraint"
       ? `HENGEで「${themeName}」の最適化練習を打った。`
-      : `HENGEで「${themeName}」の${form === "word" ? "単語" : "短文"}を打った。`;
+      : `HENGEで「${themeName}」の${formLabel(form)}を打った。`;
 
-  // 問題数は書かない。形式ごとに固定（短文15／単語20）なので、形式が書いてあれば足りる
+  // 問題数は書かない。形式ごとに固定（短文15／単語20／長文1本）なので、形式が書いてあれば足りる
   const line = `スコア ${etypingScore(stats)}／打鍵/秒 ${keysPerSecond(stats).toFixed(1)}／正確率 ${Math.floor(accuracyRatio(stats) * 100)}%`;
 
   // ハッシュタグは投稿の集計・検索のため。それ以上は280字を圧迫する

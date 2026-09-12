@@ -1,3 +1,4 @@
+import { PROMPT_FORMS } from "@henge/shared";
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import { DetailScroll } from "@/components/DetailScroll";
@@ -54,11 +55,10 @@ export default async function ThemeDetailPage({
   const theme = await findTheme("theme", name);
   if (theme === null) notFound();
 
-  // ランキングは短文と単語で別。両方引いてタブで切り替える（`RankingBoard`）
-  const [sentence, word] = await Promise.all([
-    listRankings(theme.id, "sentence"),
-    listRankings(theme.id, "word"),
-  ]);
+  // ランキングは形式ごとに別。全部引いてタブで切り替える（`RankingBoard`）
+  const boards = await Promise.all(
+    PROMPT_FORMS.map(async (form) => ({ form, entries: await listRankings(theme.id, form) })),
+  );
 
   return (
     <>
@@ -70,8 +70,8 @@ export default async function ThemeDetailPage({
           title={theme.name}
           description={
             <>
-              「{theme.name}」をテーマにしたお題です。短文と単語の2つの打ち方があり、
-              どちらも同じ文章・同じ語は繰り返し出ません。
+              「{theme.name}」をテーマにしたお題です。短文・単語・長文の3つの打ち方があり、
+              どれも同じ文章・同じ語は繰り返し出ません。
             </>
           }
           stats={[
@@ -91,6 +91,14 @@ export default async function ThemeDetailPage({
                   <DifficultBadge forms={["word"]} />
                 ) : undefined,
             },
+            {
+              label: "長文のお題",
+              value: theme.promptCounts.long,
+              badge:
+                theme.longGenerationStatus === "difficult" ? (
+                  <DifficultBadge forms={["long"]} />
+                ) : undefined,
+            },
             { label: "プレイ", value: theme.totalPlayCount, unit: "回" },
           ]}
           actions={
@@ -99,7 +107,7 @@ export default async function ThemeDetailPage({
               ボタンは出す。押すとプレイ画面の枯渇と同じ導線（ログイン → 作る）に入る。
               ここでボタンごと隠すと、「このテーマには単語が無い」ことすら伝わらない。
             */
-            (["sentence", "word"] as const).map((form) => (
+            PROMPT_FORMS.map((form) => (
               <FormButton
                 key={form}
                 form={form}
@@ -110,13 +118,7 @@ export default async function ThemeDetailPage({
           }
         />
 
-        <RankingBoard
-          boards={[
-            { form: "sentence", entries: sentence },
-            { form: "word", entries: word },
-          ]}
-          initialForm={parsePlayForm(ranking)}
-        />
+        <RankingBoard boards={boards} initialForm={parsePlayForm(ranking)} />
 
         <p className="mt-10 text-sm text-kinari/50">
           <a href="/themes" className="hover:text-kinari">

@@ -1,3 +1,4 @@
+import { PROMPT_FORMS } from "@henge/shared";
 import type { ThemeSummary } from "@/lib/api/themes";
 import { DifficultBadge, difficultForms } from "@/components/DifficultBadge";
 import { FormButton } from "@/components/FormButton";
@@ -26,7 +27,9 @@ import "@/components/play/ninja.css";
  * 「カード全体をリンクにする」ときの常套手段で、読み上げでもテーマ名のリンクと
  * ボタンが別々に辿れる。
  *
- * 最適化する音は形式が1つ（単語モードを付けない）なので、ボタンは「打つ」1つ。
+ * テーマは短文・単語・長文の3枚。札3枚ぶんの高さを紙に持たせる（`min-h-32`。
+ * 紙は `overflow: hidden` なので、足りないと上下の札が切れる）。
+ * 最適化する音は形式が1つ（単語・長文を付けない）なので、ボタンは「打つ」1つ。
  * リンク先の組み立ては `lib/ui/kind.ts` に任せる（`?kind=` `?form=` を手で書かない）。
  */
 export function ThemeCard({ theme }: { theme: ThemeSummary }) {
@@ -35,7 +38,12 @@ export function ThemeCard({ theme }: { theme: ThemeSummary }) {
   return (
     <article className="scroll scroll--card relative">
       <div className="scroll__roller" />
-      <div className="scroll__sheet relative flex min-h-24 items-center px-4 py-3">
+      <div
+        className={
+          "scroll__sheet relative flex items-center px-4 py-3 " +
+          (isTheme ? "min-h-32" : "min-h-24")
+        }
+      >
         {/* 閉じた巻物に見えている部分。幅は固定（--scroll-closed と合わせてある） */}
         <div className="w-32 shrink-0">
           <a
@@ -61,7 +69,7 @@ export function ThemeCard({ theme }: { theme: ThemeSummary }) {
         {/* ほどけた側に現れる部分。巻物全体を覆うリンクより上に置き、ここだけプレイへ直行する */}
         <div className="absolute top-1/2 left-40 z-10 flex -translate-y-1/2 flex-col gap-1.5">
           {isTheme ? (
-            (["sentence", "word"] as const).map((form) => (
+            PROMPT_FORMS.map((form) => (
               <FormButton key={form} form={form} href={playHref(theme.kind, theme.name, form)} />
             ))
           ) : (

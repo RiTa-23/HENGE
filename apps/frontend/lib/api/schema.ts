@@ -28,7 +28,7 @@ const offsetSchema = z.number().int().min(0).max(100_000);
  * そのまま短文で動くようにするため。未知の値は弾く（存在しないプールをHonoに
  * 引かせない）。
  */
-const formSchema = z.enum(["sentence", "word"]).default("sentence");
+const formSchema = z.enum(["sentence", "word", "long"]).default("sentence");
 
 export const sessionStartSchema = z.object({
   themeId: z.string().min(1),

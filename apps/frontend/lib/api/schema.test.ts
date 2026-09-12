@@ -94,6 +94,8 @@ describe("出題の形式（form）", () => {
   test("単語を指定できる", () => {
     expect(sessionStartSchema.safeParse({ themeId: "t1", form: "word" }).data?.form).toBe("word");
     expect(regenerateSchema.safeParse({ themeId: "t1", form: "word" }).data?.form).toBe("word");
+    expect(sessionStartSchema.safeParse({ themeId: "t1", form: "long" }).data?.form).toBe("long");
+    expect(regenerateSchema.safeParse({ themeId: "t1", form: "long" }).data?.form).toBe("long");
   });
 
   // 存在しないプールをHonoに引かせない

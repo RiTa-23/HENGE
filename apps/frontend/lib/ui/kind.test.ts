@@ -81,11 +81,20 @@ describe("出題の形式とURL", () => {
     expect(parsePlayForm(undefined)).toBe("sentence");
     expect(parsePlayForm("poem")).toBe("sentence");
     expect(parsePlayForm("word")).toBe("word");
+    expect(parsePlayForm("long")).toBe("long");
   });
 
   it("画面に出す呼び名", () => {
     expect(formLabel("word")).toBe("単語");
     expect(formLabel("sentence")).toBe("短文");
+    expect(formLabel("long")).toBe("長文");
+  });
+
+  it("長文は form=long を付ける", () => {
+    expect(playHref("theme", "福岡", "long")).toBe("/play/%E7%A6%8F%E5%B2%A1?form=long");
+    expect(rankingHref("theme", "福岡", "long")).toBe(
+      "/themes/%E7%A6%8F%E5%B2%A1?ranking=long#ranking",
+    );
   });
 });
 

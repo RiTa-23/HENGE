@@ -97,4 +97,14 @@ describe("形式ごとのオフセット", () => {
 
     expect(readOffset("t1", "word")).toBe(0);
   });
+
+  it("長文も別のキーで持つ", () => {
+    writeOffset("t1", "sentence", 30);
+    writeOffset("t1", "word", 60);
+    writeOffset("t1", "long", 2);
+
+    expect(readOffset("t1", "sentence")).toBe(30);
+    expect(readOffset("t1", "word")).toBe(60);
+    expect(readOffset("t1", "long")).toBe(2);
+  });
 });

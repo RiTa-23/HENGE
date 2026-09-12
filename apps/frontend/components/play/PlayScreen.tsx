@@ -16,11 +16,12 @@ import {
   type TypingProgress,
 } from "@henge/shared";
 import { useCallback, useEffect, useRef, useState } from "react";
-import { SentenceMark, WordMark } from "@/components/FormMark";
+import { FormMark } from "@/components/FormMark";
 import { Logo } from "@/components/Logo";
 import { authClient } from "@/lib/api/auth-client";
 import { Keyboard, type NextKey, toNextKey } from "./Keyboard";
 import { Loading } from "./Loading";
+import { LongScroll } from "./LongScroll";
 import { ProgressDots } from "./ProgressDots";
 import { Result, type PlayStats } from "./Result";
 import { Scroll } from "./Scroll";
@@ -100,6 +101,28 @@ function nextKeysOf(progress: TypingProgress): NextKey[] {
  */
 function isTypingKey(event: KeyboardEvent): boolean {
   return !(event.ctrlKey || event.metaKey || event.altKey);
+}
+
+/**
+ * 長文の進み。**1本の中の打鍵の位置**を細い線で出す（金＝進行中）。
+ * 問題数のドットは1本では意味を持たないので、代わりに置く。
+ */
+function LongProgress({ progress }: { progress: TypingProgress }) {
+  const { text, cursor } = romanDisplay(progress);
+  const total = Math.max(1, text.length);
+  return (
+    <div className="mx-auto flex w-full max-w-4xl items-center gap-4">
+      <div className="h-px flex-1 bg-kinari/15">
+        <div
+          className="h-px bg-kin transition-[width] duration-150 ease-out"
+          style={{ width: `${(cursor / total) * 100}%` }}
+        />
+      </div>
+      <span className="font-mono text-sm text-kinari/50">
+        {cursor}/{text.length}
+      </span>
+    </div>
+  );
 }
 
 /**
@@ -443,12 +466,8 @@ export function PlayScreen({
               名前だけだと単語のつもりで短文を始めてしまう */}
           <p className="mt-4 flex items-center justify-center gap-2 text-sm tracking-widest text-kinari/50">
             {/* 紋は一覧・詳細の「打つ」札と同じ（FormMark）。どの画面でも同じ印で形式を示す */}
-            {form === "word" ? (
-              <WordMark className="size-4 text-kin" />
-            ) : (
-              <SentenceMark className="size-4 text-kin" />
-            )}
-            {formLabel(form)}・{playSize(form)}問
+            <FormMark form={form} className="size-4 text-kin" />
+            {formLabel(form)}・{form === "long" ? "1本" : `${playSize(form)}問`}
           </p>
 
           <p className="mt-14 flex items-center justify-center gap-3 text-kinari">
@@ -645,24 +664,42 @@ export function PlayScreen({
         </div>
       </header>
 
-      <div className="flex flex-1 flex-col justify-center gap-8 py-8">
-        <Scroll
-          text={prompt.text}
-          kanaUnits={splitKanaUnits(prompt.readingKana)}
-          progress={progress}
-        />
-
-        <div className="flex items-center justify-between">
-          <ProgressDots current={promptIndex} total={phase.session.prompts.length} />
-          <span className="font-mono text-sm text-kinari/50">
-            {promptIndex + 1}/{Math.min(phase.session.prompts.length, playSize(form))}
-          </span>
+      {form === "long" ? (
+        /*
+          **長文はキーボードを出さない。** そのぶん巻物を縦に大きくし、紙の大半を本文で
+          埋める（docs/07-ui.md）。進捗は問題数ではなく1本の中の打鍵の進みで示す
+          （1プレイ1本なので進捗ドットは意味を持たない）
+        */
+        <div className="flex flex-1 flex-col justify-center gap-6 py-6">
+          <LongScroll
+            text={prompt.text}
+            kanaUnits={splitKanaUnits(prompt.readingKana)}
+            progress={progress}
+          />
+          <LongProgress progress={progress} />
         </div>
-      </div>
+      ) : (
+        <>
+          <div className="flex flex-1 flex-col justify-center gap-8 py-8">
+            <Scroll
+              text={prompt.text}
+              kanaUnits={splitKanaUnits(prompt.readingKana)}
+              progress={progress}
+            />
 
-      <div className="border-t border-kin/40 pt-6">
-        <Keyboard nextKeys={nextKeysOf(progress)} missKey={missKey} />
-      </div>
+            <div className="flex items-center justify-between">
+              <ProgressDots current={promptIndex} total={phase.session.prompts.length} />
+              <span className="font-mono text-sm text-kinari/50">
+                {promptIndex + 1}/{Math.min(phase.session.prompts.length, playSize(form))}
+              </span>
+            </div>
+          </div>
+
+          <div className="border-t border-kin/40 pt-6">
+            <Keyboard nextKeys={nextKeysOf(progress)} missKey={missKey} />
+          </div>
+        </>
+      )}
 
       {imeDetected && (
         <p className="mt-4 rounded-md border border-shu/50 bg-shu/10 px-4 py-3 text-center text-sm text-kinari">

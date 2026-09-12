@@ -14,11 +14,12 @@ interface AdminTheme {
    * 短文と単語はプールも補充も生成困難の印も別に動くので、合計では
    * 「どちらが足りていないか」が分からない。
    */
-  promptCounts: { sentence: number; word: number };
+  promptCounts: { sentence: number; word: number; long: number };
   totalPlayCount: number;
   generationStatus: "ok" | "difficult";
   /** 単語プールの生成困難の印。短文とは別に立つ */
   wordGenerationStatus: "ok" | "difficult";
+  longGenerationStatus: "ok" | "difficult";
   createdBy: string | null;
 }
 
@@ -77,6 +78,7 @@ export function AdminThemeList() {
           <th className="py-3 font-normal">種別</th>
           <th className="py-3 text-right font-normal">短文</th>
           <th className="py-3 text-right font-normal">単語</th>
+          <th className="py-3 text-right font-normal">長文</th>
           <th className="py-3 text-right font-normal">プレイ</th>
           <th className="py-3 text-right font-normal" />
         </tr>
@@ -101,6 +103,7 @@ export function AdminThemeList() {
               {theme.promptCounts.sentence}
             </td>
             <td className="py-3 text-right font-mono text-kinari/70">{theme.promptCounts.word}</td>
+            <td className="py-3 text-right font-mono text-kinari/70">{theme.promptCounts.long}</td>
             <td className="py-3 text-right font-mono text-kinari/70">{theme.totalPlayCount}</td>
             <td className="py-3 text-right">
               <button
@@ -116,7 +119,7 @@ export function AdminThemeList() {
         ))}
         {themes.length === 0 && (
           <tr>
-            <td colSpan={6} className="py-10 text-center text-kinari/50">
+            <td colSpan={7} className="py-10 text-center text-kinari/50">
               テーマがありません
             </td>
           </tr>

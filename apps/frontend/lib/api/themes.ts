@@ -10,6 +10,7 @@ export interface ThemeDetail {
   totalPlayCount: number;
   generationStatus: "ok" | "difficult";
   wordGenerationStatus: "ok" | "difficult";
+  longGenerationStatus: "ok" | "difficult";
   createdAt: number;
 }
 

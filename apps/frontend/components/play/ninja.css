@@ -222,10 +222,25 @@
   background: color-mix(in oklab, var(--color-kinari) 32%, var(--color-sumi));
 }
 
+/* 札は紙が開くまで透明にする。閉じた紙では名前の欄の右に札の端が覗くため */
+.scroll--card .scroll__tags {
+  opacity: 0;
+  transition: opacity 200ms ease-out;
+}
+
+.scroll--card:hover .scroll__tags,
+.scroll--card:focus-within .scroll__tags {
+  opacity: 1;
+}
+
 /* ホバーの無い端末（タッチ）では最初から開いておく。閉じたままだと打てない */
 @media (hover: none) {
   .scroll--card {
     width: 100%;
+  }
+
+  .scroll--card .scroll__tags {
+    opacity: 1;
   }
 }
 
@@ -290,5 +305,125 @@
   }
   100% {
     translate: 300% 0;
+  }
+}
+
+/* ---- 木札（形式の「打つ」札） ------------------------------------------
+ * 巻物に結わえた木の札。**縦長で縦書き**、上に紐穴と紐。
+ * 地は木（金と墨を混ぜた木肌に、生成りで淡く上げる。軸の竹色より赤みのある茶）。
+ * 木目は同じ木肌色を濃くした細い縞。文字は墨（木に墨で書いた札）。
+ * 形式の識別色（docs/07-ui.md）は**紐と紋**にだけ乗せる。札そのものを染めると
+ * 木ではなく色紙に見える。
+ *
+ * 以前は角を1つ落とした横長の札に半透明の色を敷いていたが、チップ（現代のUI）に
+ * 見えたのでやめた。
+ */
+.kifuda {
+  --kifuda-wood: color-mix(
+    in oklab,
+    color-mix(in oklch, var(--color-kin) 62%, var(--color-sumi)) 55%,
+    var(--color-kinari)
+  );
+  --kifuda-grain: color-mix(in oklab, var(--color-sumi) 10%, transparent);
+  --kifuda-ink: color-mix(in oklab, var(--color-sumi) 88%, var(--color-kin));
+  position: relative;
+  display: flex;
+  /* 縦書きでは inline 軸が縦。row で紋 → 文字 → 副題が上から下に並ぶ */
+  flex-direction: row;
+  align-items: center;
+  writing-mode: vertical-rl;
+  color: var(--kifuda-ink);
+  background:
+    /* 木目。斜めではなく縦（木を縦に挽いた札）に流す */
+    repeating-linear-gradient(
+      90deg,
+      transparent 0 3px,
+      var(--kifuda-grain) 3px 4px,
+      transparent 4px 9px,
+      var(--kifuda-grain) 9px 10px,
+      transparent 10px 17px
+    ),
+    /* 中央をわずかに明るく。板の面の丸み */
+    linear-gradient(
+      90deg,
+      color-mix(in oklab, var(--kifuda-wood) 84%, var(--color-sumi)),
+      var(--kifuda-wood) 35%,
+      var(--kifuda-wood) 65%,
+      color-mix(in oklab, var(--kifuda-wood) 84%, var(--color-sumi))
+    );
+  /* 上の両角を落とした荷札の形。下は切りっぱなし */
+  clip-path: polygon(22% 0, 78% 0, 100% 9%, 100% 100%, 0 100%, 0 9%);
+  box-shadow: inset 0 0 0 1px color-mix(in oklab, var(--color-sumi) 35%, transparent);
+  transition:
+    translate 160ms ease-out,
+    filter 160ms ease-out;
+}
+
+/* 紐穴。板に開いた穴なので地の色（墨）で抜き、穴を通した紐を色の輪で見せる */
+.kifuda::before {
+  content: "";
+  position: absolute;
+  top: var(--kifuda-hole-top);
+  left: 50%;
+  translate: -50% 0;
+  width: var(--kifuda-hole);
+  height: var(--kifuda-hole);
+  border-radius: 50%;
+  background: var(--color-sumi);
+  box-shadow: 0 0 0 2px var(--kifuda-cord);
+}
+
+/* 紐。穴から上へ、札の上端まで。色は形式の識別色（--kifuda-cord）。
+   clip-path は疑似要素にも効くので、札の外までは伸ばせない */
+.kifuda::after {
+  content: "";
+  position: absolute;
+  top: 0;
+  left: 50%;
+  translate: -50% 0;
+  width: 2px;
+  height: calc(var(--kifuda-hole-top) + var(--kifuda-hole) / 2);
+  background: var(--kifuda-cord);
+}
+
+.kifuda:hover,
+.kifuda:focus-visible {
+  translate: 0 -2px;
+  filter: brightness(1.06);
+}
+
+/* 「生成困難」の形式の札。**色を抜いて暗くし、くすんだ古い札に見せる。**
+   押せることは変えない（在庫があれば遊べる。補充が止まっているだけ）。
+   紐の色も一緒に沈むので、どの形式が困難かは札の暗さで分かる */
+.kifuda--difficult {
+  filter: grayscale(0.85) brightness(0.62);
+}
+
+.kifuda--difficult:hover,
+.kifuda--difficult:focus-visible {
+  filter: grayscale(0.85) brightness(0.72);
+}
+
+/* 一覧のカード用（小）。縦書き2文字が読める最小の幅 */
+.kifuda--sm {
+  --kifuda-hole: 5px;
+  --kifuda-hole-top: 8px;
+  width: 32px;
+  padding: 20px 0 8px;
+  gap: 6px;
+}
+
+/* 詳細用（大）。問題数の副題を添える */
+.kifuda--lg {
+  --kifuda-hole: 8px;
+  --kifuda-hole-top: 11px;
+  width: 56px;
+  padding: 28px 0 14px;
+  gap: 10px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .kifuda {
+    transition: none;
   }
 }

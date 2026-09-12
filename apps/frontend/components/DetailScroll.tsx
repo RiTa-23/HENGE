@@ -30,9 +30,9 @@ export function DetailScroll({
   eyebrow: string;
   title: string;
   description: ReactNode;
-  /** 在庫・プレイ回数など。値は等幅・金で出す。`badge` は値の下に添える印（生成困難など） */
-  stats: { label: string; value: number; unit?: string; badge?: ReactNode }[];
-  /** 「打つ」ボタン。朱で描かれる前提 */
+  /** 在庫・プレイ回数など。値は等幅・金で出す（「生成困難」は数字ではなく札の側に出す） */
+  stats: { label: string; value: number; unit?: string }[];
+  /** 「打つ」札（木札）。横に並べて折り目の線に吊るす */
   actions: ReactNode;
 }) {
   return (
@@ -63,12 +63,13 @@ export function DetailScroll({
                   <span className="ml-1 text-xs text-kinari/50">{stat.unit}</span>
                 )}
               </dd>
-              {stat.badge !== undefined && <div className="mt-1.5">{stat.badge}</div>}
             </div>
           ))}
         </dl>
 
-        <div className="mt-10 flex flex-wrap gap-4">{actions}</div>
+        {/* 木札は在庫の下に**中央揃えで**並べる。上下左右の余白を揃える
+            （右上に寄せて線に結わえる形も試したが、隅に固まって見えた） */}
+        <div className="mt-12 flex flex-wrap justify-center gap-8">{actions}</div>
       </div>
       <div className="scroll__roller" />
     </div>

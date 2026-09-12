@@ -23,6 +23,20 @@ export function parsePlayForm(value: string | undefined): PromptForm {
   return parsePromptForm(value);
 }
 
+/**
+ * 形式の識別色。**札（`FormButton`）の紐と紋（`FormMark`）だけに使う。**
+ *
+ * 単語＝青竹（易しい）→ 短文＝朱 → 長文＝桔梗（紫）。長いほど難しい、が色で伝わる並び。
+ * 4色の唯一の例外で、トークンは `globals.css` の `@theme`（`docs/07-ui.md`）。
+ * `text` は Tailwind が静的に拾うクラスなので書き切る。`token` は CSS 変数名の末尾
+ * （`var(--color-<token>)`）で、木札の紐の色に使う。
+ */
+export function formColor(form: PromptForm): { token: string; text: string } {
+  if (form === "word") return { token: "aotake", text: "text-aotake" };
+  if (form === "long") return { token: "kikyo", text: "text-kikyo" };
+  return { token: "shu", text: "text-shu" };
+}
+
 /** 画面に出す形式の呼び名 */
 export function formLabel(form: PromptForm): string {
   if (form === "word") return "単語";

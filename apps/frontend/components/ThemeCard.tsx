@@ -1,6 +1,6 @@
 import { PROMPT_FORMS } from "@henge/shared";
 import type { ThemeSummary } from "@/lib/api/themes";
-import { DifficultBadge, difficultForms } from "@/components/DifficultBadge";
+import { difficultForms } from "@/components/DifficultBadge";
 import { FormButton } from "@/components/FormButton";
 import { detailHref, playHref } from "@/lib/ui/kind";
 import "@/components/play/ninja.css";
@@ -14,8 +14,12 @@ import "@/components/play/ninja.css";
  * **最初は閉じている。** 名前が読めるだけの狭い紙に、テーマ名とプレイ回数。
  * カーソルを合わせる（またはフォーカスが入る）と紙が横にほどけて、巻かれていた側に
  * 畳まれていた「短文」「単語」の札が現れる。縦幅は変わらない。
- * ボタンは紙の左端から固定の位置（`left-40`＝閉じたときの紙の幅160）に置き、
- * 紙が狭い間は右の軸の下に完全に隠れる（幅の遷移は `ninja.css`）。
+ * 木札は名前の欄の右端（`left-36`＝余白込みの名前の幅144）から紙の右端の手前（`right-4`）
+ * までの領域に、**上下左右の余白が揃うように中央揃え**で並べる。`justify-center-safe` なのは、
+ * 紙が狭い間（領域の幅が札より小さい間）は中央揃えが左にはみ出して名前に重なるため。
+ * 閉じた紙（幅160）では名前の欄の右に16pxだけ札が覗くので、**開くまでは透明にする**
+ * （`.scroll__tags`。`ninja.css`）。以前は札の起点を160にして軸の下に隠していたが、
+ * そのぶん右の余白が取れず、3列の幅では札が右の軸に張り付いて見えた。
  * ホバーの無い端末では最初から開いている。
  *
  * 押せる場所は2種類ある。
@@ -27,8 +31,8 @@ import "@/components/play/ninja.css";
  * 「カード全体をリンクにする」ときの常套手段で、読み上げでもテーマ名のリンクと
  * ボタンが別々に辿れる。
  *
- * テーマは単語・短文・長文の3枚（短いものから）。札3枚ぶんの高さを紙に持たせる（`min-h-32`。
- * 紙は `overflow: hidden` なので、足りないと上下の札が切れる）。
+ * テーマは単語・短文・長文の3枚（短いものから）。縦長の札が収まる高さを紙に持たせる
+ * （`min-h-32`。紙は `overflow: hidden` なので、足りないと札の下が切れる）。
  * 最適化する音は形式が1つ（単語・長文を付けない）なので、ボタンは「打つ」1つ。
  * リンク先の組み立ては `lib/ui/kind.ts` に任せる（`?kind=` `?form=` を手で書かない）。
  */
@@ -52,28 +56,30 @@ export function ThemeCard({ theme }: { theme: ThemeSummary }) {
           >
             {theme.name}
           </a>
-          {/*
-            **行を増やさない。** 印を別の行にすると、そのカードだけ中身の位置がずれて
-            格子の中で浮く。プレイ回数と同じ行にバッジで並べる。名前の真横に置かないのは、
-            閉じた紙の幅（128px）だと名前が3文字ほどで切れてしまうため。
-            どの形式が困難かは紋で示す（文字で書くと閉じた紙に収まらない）
-          */}
-          <p className="mt-1 flex items-center gap-1.5 text-xs tracking-widest whitespace-nowrap text-kinari/50">
-            <span>
-              プレイ <span className="font-mono text-kinari/70">{theme.totalPlayCount}</span> 回
-            </span>
-            <DifficultBadge forms={difficult} compact />
+          {/* 「生成困難」はここに出さない。その形式の札を暗くして示す（FormButton の difficult） */}
+          <p className="mt-1 text-xs tracking-widest whitespace-nowrap text-kinari/50">
+            プレイ <span className="font-mono text-kinari/70">{theme.totalPlayCount}</span> 回
           </p>
         </div>
 
         {/* ほどけた側に現れる部分。巻物全体を覆うリンクより上に置き、ここだけプレイへ直行する */}
-        <div className="absolute top-1/2 left-40 z-10 flex -translate-y-1/2 flex-col gap-1.5">
+        <div className="scroll__tags absolute inset-y-0 left-36 right-4 z-10 flex items-center justify-center-safe gap-2">
           {isTheme ? (
             PROMPT_FORMS.map((form) => (
-              <FormButton key={form} form={form} href={playHref(theme.kind, theme.name, form)} />
+              <FormButton
+                key={form}
+                form={form}
+                href={playHref(theme.kind, theme.name, form)}
+                difficult={difficult.includes(form)}
+              />
             ))
           ) : (
-            <FormButton form="sentence" href={playHref(theme.kind, theme.name)} label="打つ" />
+            <FormButton
+              form="sentence"
+              href={playHref(theme.kind, theme.name)}
+              label="打つ"
+              difficult={difficult.includes("sentence")}
+            />
           )}
         </div>
       </div>

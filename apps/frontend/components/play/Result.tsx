@@ -10,7 +10,7 @@ import {
 import { FormMark } from "@/components/FormMark";
 import { RankingRegister } from "@/components/play/RankingRegister";
 import { topMissedKeys } from "@/lib/play/misses";
-import { formLabel, rankingHref } from "@/lib/ui/kind";
+import { formColor, formLabel, rankingHref } from "@/lib/ui/kind";
 import { buildShareText, buildTweetIntentUrl } from "@/lib/share/tweet";
 
 export type { PlayStats };
@@ -83,7 +83,7 @@ export function Result({
         <h1 className="flex items-center justify-center gap-4 font-mincho text-2xl tracking-widest text-kinari">
           {themeName}
           <span className="flex items-center gap-1.5 rounded-full border border-kinari/20 px-3 py-0.5 font-gothic text-xs tracking-widest text-kinari/70">
-            <FormMark form={form} className="size-3.5 text-kin" />
+            <FormMark form={form} className={`size-3.5 ${formColor(form).text}`} />
             {formLabel(form)}
           </span>
         </h1>

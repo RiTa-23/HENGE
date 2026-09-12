@@ -1,71 +1,76 @@
 import { playSize, type PromptForm } from "@henge/shared";
 import { FormMark } from "@/components/FormMark";
-import { formLabel } from "@/lib/ui/kind";
+import { formColor, formLabel } from "@/lib/ui/kind";
+import "@/components/play/ninja.css";
 
 /**
- * 「打つ」ボタン。**木札（きふだ）の形。**
+ * 「打つ」ボタン。**木札（きふだ）。**
  *
- * 一覧の巻物と詳細の巻物の両方で使う。角を1つ落として紐穴を空けた札で、
- * 巻物に結わえた札を引くとその形式で打ち始まる、という見立て。
+ * 一覧の巻物と詳細の巻物の両方で使う。巻物に結わえた木の札を引くとその形式で
+ * 打ち始まる、という見立て。**縦長で縦書き**、上に紐穴と紐（`ninja.css` の `.kifuda`）。
+ * 地は木肌の色で、文字は墨。**形式の識別色（`formColor`）は紐と紋にだけ乗せる**
+ * （札そのものを染めると木ではなく色紙に見える）。
  *
- * **朱は両方とも同じ。** 朱は「今すぐ打つべきもの」の色で、形式で色を変えると
- * その意味が薄まる。見分けは紋（`FormMark`）と文字で付ける。
+ * 以前は角を1つ落とした横長の札に半透明の色を敷いていたが、チップに見えて
+ * 世界観から浮いたのでやめた。
  *
- * 角の落としは `clip-path`。枠線は clip で切れてしまうので、内側の影
- * （`shadow-[inset_…]`）で描く。落とした角に枠が無いのは、削った木の断面として
- * そのままにしてある。紐穴は大きい札だけに空ける（小さい札では黒い点にしか見えない）。
+ * 一覧は小（紋＋2文字）、詳細は大（紋＋文字＋問題数の副題）。どちらも横に並べて吊るす。
  */
 export function FormButton({
   form,
   href,
   size = "sm",
   label,
+  difficult = false,
 }: {
   form: PromptForm;
   href: string;
-  /** 一覧は sm（1行）、詳細は lg（問題数の副題つき） */
+  /** 一覧は sm、詳細は lg（問題数の副題つき） */
   size?: "sm" | "lg";
-  /** 既定は形式の呼び名「短文」「単語」「長文」（紋と札の形で「打てる」ことは伝わるので、動詞を付けない）。最適化練習は「打つ」 */
+  /** 既定は形式の呼び名「単語」「短文」「長文」。最適化練習は「打つ」 */
   label?: string;
+  /**
+   * その形式のプールが「生成困難」（`generation_status`）。札を暗くくすませて示す。
+   * 以前は紋を並べたバッジ（`DifficultBadge`）を別に置いていたが、形式ごとの状態は
+   * その形式の札そのものに出す方が対応が読める。管理画面だけ札が無いのでバッジのまま
+   */
+  difficult?: boolean;
 }) {
   const text = label ?? formLabel(form);
   const large = size === "lg";
+  const color = formColor(form);
 
   return (
     <a
       href={href}
-      className={
-        "group relative flex items-center gap-1.5 bg-shu/15 text-kinari shadow-[inset_0_0_0_1px_var(--color-shu)] transition-colors hover:bg-shu/30 " +
-        "[clip-path:polygon(12px_0,100%_0,100%_100%,0_100%,0_12px)] " +
-        // 紐穴は大きい札だけ。小さい札では落とした角と穴が近すぎて、穴が
-        // 黒い点にしか見えない（一覧の巻物で実際に気になった）。角の落としだけで
-        // 木札と分かるので、小さい方は穴を空けない
-        (large
-          ? "min-w-48 py-3 pr-6 pl-7 before:absolute before:top-2.5 before:left-2.5 before:size-1.5 before:rounded-full before:bg-sumi"
-          : "py-1.5 pr-2.5 pl-4")
+      className={`kifuda ${large ? "kifuda--lg" : "kifuda--sm"}${difficult ? " kifuda--difficult" : ""}`}
+      // 文言は札の文字（最適化練習は「打つ」）ではなく形式の呼び名から組む
+      title={
+        difficult ? `${formLabel(form)}のお題の生成が難しい（在庫があれば遊べます）` : undefined
       }
+      // 紐の色は形式ごと。CSS 変数で渡し、クラスは書き切る（Tailwind が拾うのは紋の側）
+      style={{ "--kifuda-cord": `var(--color-${color.token})` } as React.CSSProperties}
     >
-      <FormMark
-        form={form}
-        className={large ? "size-6 shrink-0 text-shu" : "size-3.5 shrink-0 text-shu"}
-      />
-      <span className="min-w-0">
-        <span
-          className={
-            large
-              ? "block font-gothic text-lg tracking-[0.2em]"
-              : "block text-xs tracking-widest whitespace-nowrap"
-          }
-        >
-          {text}
-        </span>
-        {large && (
-          <span className="mt-0.5 block font-mono text-xs tracking-normal text-kinari/60">
-            {/* 長文は1本で1プレイ。「1問ひと組」では意味が通らない */}
-            {form === "long" ? "1本を通しで" : `${playSize(form)}問ひと組`}
-          </span>
-        )}
+      <FormMark form={form} className={`${large ? "size-6" : "size-4"} shrink-0 ${color.text}`} />
+      <span
+        className={
+          large ? "font-mincho text-lg tracking-[0.3em]" : "font-mincho text-xs tracking-[0.2em]"
+        }
+      >
+        {text}
       </span>
+      {large && (
+        <span className="font-gothic text-[11px] tracking-[0.15em] opacity-75">
+          {/* 縦書きの中で数字だけ横に組む（縦中横）。1文字ずつ倒れると読めない */}
+          {form === "long" ? (
+            "一本"
+          ) : (
+            <>
+              <span className="[text-combine-upright:all]">{playSize(form)}</span>問
+            </>
+          )}
+        </span>
+      )}
     </a>
   );
 }

@@ -21,6 +21,7 @@ export function FormButton({
   href,
   size = "sm",
   label,
+  difficult = false,
 }: {
   form: PromptForm;
   href: string;
@@ -28,6 +29,12 @@ export function FormButton({
   size?: "sm" | "lg";
   /** 既定は形式の呼び名「単語」「短文」「長文」。最適化練習は「打つ」 */
   label?: string;
+  /**
+   * その形式のプールが「生成困難」（`generation_status`）。札を暗くくすませて示す。
+   * 以前は紋を並べたバッジ（`DifficultBadge`）を別に置いていたが、形式ごとの状態は
+   * その形式の札そのものに出す方が対応が読める。管理画面だけ札が無いのでバッジのまま
+   */
+  difficult?: boolean;
 }) {
   const text = label ?? formLabel(form);
   const large = size === "lg";
@@ -36,7 +43,8 @@ export function FormButton({
   return (
     <a
       href={href}
-      className={`kifuda ${large ? "kifuda--lg" : "kifuda--sm"}`}
+      className={`kifuda ${large ? "kifuda--lg" : "kifuda--sm"}${difficult ? " kifuda--difficult" : ""}`}
+      title={difficult ? `${text}のお題の生成が難しい（在庫があれば遊べます）` : undefined}
       // 紐の色は形式ごと。CSS 変数で渡し、クラスは書き切る（Tailwind が拾うのは紋の側）
       style={{ "--kifuda-cord": `var(--color-${color.token})` } as React.CSSProperties}
     >

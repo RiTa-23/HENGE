@@ -30,8 +30,8 @@ export function DetailScroll({
   eyebrow: string;
   title: string;
   description: ReactNode;
-  /** 在庫・プレイ回数など。値は等幅・金で出す。`badge` は値の下に添える印（生成困難など） */
-  stats: { label: string; value: number; unit?: string; badge?: ReactNode }[];
+  /** 在庫・プレイ回数など。値は等幅・金で出す（「生成困難」は数字ではなく札の側に出す） */
+  stats: { label: string; value: number; unit?: string }[];
   /** 「打つ」札（木札）。横に並べて折り目の線に吊るす */
   actions: ReactNode;
 }) {
@@ -63,7 +63,6 @@ export function DetailScroll({
                   <span className="ml-1 text-xs text-kinari/50">{stat.unit}</span>
                 )}
               </dd>
-              {stat.badge !== undefined && <div className="mt-1.5">{stat.badge}</div>}
             </div>
           ))}
         </dl>

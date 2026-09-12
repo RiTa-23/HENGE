@@ -2,7 +2,6 @@ import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import { AdjustingView } from "@/components/Adjusting";
 import { DetailScroll } from "@/components/DetailScroll";
-import { DifficultBadge } from "@/components/DifficultBadge";
 import { FormButton } from "@/components/FormButton";
 import { RankingBoard } from "@/components/RankingBoard";
 import { PracticeMark } from "@/components/ModeMark";
@@ -79,10 +78,6 @@ export default async function PracticeDetailPage({
             {
               label: "お題",
               value: theme.promptCounts.sentence,
-              badge:
-                theme.generationStatus === "difficult" ? (
-                  <DifficultBadge forms={["sentence"]} />
-                ) : undefined,
             },
             { label: "プレイ", value: theme.totalPlayCount, unit: "回" },
           ]}
@@ -92,6 +87,8 @@ export default async function PracticeDetailPage({
               size="lg"
               label="打つ"
               href={playHref("constraint", theme.name)}
+              // 「生成困難」は札を暗くして示す
+              difficult={theme.generationStatus === "difficult"}
             />
           }
         />

@@ -377,6 +377,18 @@
   filter: brightness(1.06);
 }
 
+/* 「生成困難」の形式の札。**色を抜いて暗くし、くすんだ古い札に見せる。**
+   押せることは変えない（在庫があれば遊べる。補充が止まっているだけ）。
+   紐の色も一緒に沈むので、どの形式が困難かは札の暗さで分かる */
+.kifuda--difficult {
+  filter: grayscale(0.85) brightness(0.62);
+}
+
+.kifuda--difficult:hover,
+.kifuda--difficult:focus-visible {
+  filter: grayscale(0.85) brightness(0.72);
+}
+
 /* 一覧のカード用（小）。縦書き2文字が読める最小の幅 */
 .kifuda--sm {
   --kifuda-hole: 5px;

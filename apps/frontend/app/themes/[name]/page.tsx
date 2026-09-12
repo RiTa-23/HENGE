@@ -2,7 +2,7 @@ import { PROMPT_FORMS } from "@henge/shared";
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import { DetailScroll } from "@/components/DetailScroll";
-import { DifficultBadge } from "@/components/DifficultBadge";
+import { difficultForms } from "@/components/DifficultBadge";
 import { FormButton } from "@/components/FormButton";
 import { RankingBoard } from "@/components/RankingBoard";
 import { ThemeMark } from "@/components/ModeMark";
@@ -55,6 +55,7 @@ export default async function ThemeDetailPage({
   const theme = await findTheme("theme", name);
   if (theme === null) notFound();
 
+  const difficult = difficultForms(theme);
   // ランキングは形式ごとに別。全部引いてタブで切り替える（`RankingBoard`）
   const boards = await Promise.all(
     PROMPT_FORMS.map(async (form) => ({ form, entries: await listRankings(theme.id, form) })),
@@ -74,30 +75,19 @@ export default async function ThemeDetailPage({
               どれも同じ文章・同じ語は繰り返し出ません。
             </>
           }
+          // 「生成困難」は在庫の数字ではなく、その形式の札を暗くして示す
           stats={[
             {
               label: "単語のお題",
               value: theme.promptCounts.word,
-              badge:
-                theme.wordGenerationStatus === "difficult" ? (
-                  <DifficultBadge forms={["word"]} />
-                ) : undefined,
             },
             {
               label: "短文のお題",
               value: theme.promptCounts.sentence,
-              badge:
-                theme.generationStatus === "difficult" ? (
-                  <DifficultBadge forms={["sentence"]} />
-                ) : undefined,
             },
             {
               label: "長文のお題",
               value: theme.promptCounts.long,
-              badge:
-                theme.longGenerationStatus === "difficult" ? (
-                  <DifficultBadge forms={["long"]} />
-                ) : undefined,
             },
             { label: "プレイ", value: theme.totalPlayCount, unit: "回" },
           ]}
@@ -113,6 +103,7 @@ export default async function ThemeDetailPage({
                 form={form}
                 size="lg"
                 href={playHref("theme", theme.name, form)}
+                difficult={difficult.includes(form)}
               />
             ))
           }

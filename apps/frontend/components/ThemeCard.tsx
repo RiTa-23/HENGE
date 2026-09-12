@@ -1,6 +1,6 @@
 import { PROMPT_FORMS } from "@henge/shared";
 import type { ThemeSummary } from "@/lib/api/themes";
-import { DifficultBadge, difficultForms } from "@/components/DifficultBadge";
+import { difficultForms } from "@/components/DifficultBadge";
 import { FormButton } from "@/components/FormButton";
 import { detailHref, playHref } from "@/lib/ui/kind";
 import "@/components/play/ninja.css";
@@ -54,17 +54,9 @@ export function ThemeCard({ theme }: { theme: ThemeSummary }) {
           >
             {theme.name}
           </a>
-          {/*
-            **行を増やさない。** 印を別の行にすると、そのカードだけ中身の位置がずれて
-            格子の中で浮く。プレイ回数と同じ行にバッジで並べる。名前の真横に置かないのは、
-            閉じた紙の幅（128px）だと名前が3文字ほどで切れてしまうため。
-            どの形式が困難かは紋で示す（文字で書くと閉じた紙に収まらない）
-          */}
-          <p className="mt-1 flex items-center gap-1.5 text-xs tracking-widest whitespace-nowrap text-kinari/50">
-            <span>
-              プレイ <span className="font-mono text-kinari/70">{theme.totalPlayCount}</span> 回
-            </span>
-            <DifficultBadge forms={difficult} compact />
+          {/* 「生成困難」はここに出さない。その形式の札を暗くして示す（FormButton の difficult） */}
+          <p className="mt-1 text-xs tracking-widest whitespace-nowrap text-kinari/50">
+            プレイ <span className="font-mono text-kinari/70">{theme.totalPlayCount}</span> 回
           </p>
         </div>
 
@@ -72,10 +64,20 @@ export function ThemeCard({ theme }: { theme: ThemeSummary }) {
         <div className="absolute inset-y-0 left-40 right-0 z-10 flex items-center justify-center-safe gap-2">
           {isTheme ? (
             PROMPT_FORMS.map((form) => (
-              <FormButton key={form} form={form} href={playHref(theme.kind, theme.name, form)} />
+              <FormButton
+                key={form}
+                form={form}
+                href={playHref(theme.kind, theme.name, form)}
+                difficult={difficult.includes(form)}
+              />
             ))
           ) : (
-            <FormButton form="sentence" href={playHref(theme.kind, theme.name)} label="打つ" />
+            <FormButton
+              form="sentence"
+              href={playHref(theme.kind, theme.name)}
+              label="打つ"
+              difficult={difficult.includes("sentence")}
+            />
           )}
         </div>
       </div>

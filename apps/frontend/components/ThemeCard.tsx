@@ -14,8 +14,8 @@ import "@/components/play/ninja.css";
  * **最初は閉じている。** 名前が読めるだけの狭い紙に、テーマ名とプレイ回数。
  * カーソルを合わせる（またはフォーカスが入る）と紙が横にほどけて、巻かれていた側に
  * 畳まれていた「短文」「単語」の札が現れる。縦幅は変わらない。
- * ボタンは紙の左端から固定の位置（`left-40`＝閉じたときの紙の幅160）に置き、
- * 紙が狭い間は右の軸の下に完全に隠れる（幅の遷移は `ninja.css`）。
+ * 木札は紙の左端から固定の位置（`left-40`＝閉じたときの紙の幅160）に**横に並べて吊るす**
+ * （紙の上端から紐が出る）。紙が狭い間は右の軸の下に完全に隠れる（幅の遷移は `ninja.css`）。
  * ホバーの無い端末では最初から開いている。
  *
  * 押せる場所は2種類ある。
@@ -27,8 +27,8 @@ import "@/components/play/ninja.css";
  * 「カード全体をリンクにする」ときの常套手段で、読み上げでもテーマ名のリンクと
  * ボタンが別々に辿れる。
  *
- * テーマは単語・短文・長文の3枚（短いものから）。札3枚ぶんの高さを紙に持たせる（`min-h-32`。
- * 紙は `overflow: hidden` なので、足りないと上下の札が切れる）。
+ * テーマは単語・短文・長文の3枚（短いものから）。縦長の札が収まる高さを紙に持たせる
+ * （`min-h-32`。紙は `overflow: hidden` なので、足りないと札の下が切れる）。
  * 最適化する音は形式が1つ（単語・長文を付けない）なので、ボタンは「打つ」1つ。
  * リンク先の組み立ては `lib/ui/kind.ts` に任せる（`?kind=` `?form=` を手で書かない）。
  */
@@ -67,7 +67,7 @@ export function ThemeCard({ theme }: { theme: ThemeSummary }) {
         </div>
 
         {/* ほどけた側に現れる部分。巻物全体を覆うリンクより上に置き、ここだけプレイへ直行する */}
-        <div className="absolute top-1/2 left-40 z-10 flex -translate-y-1/2 flex-col gap-1.5">
+        <div className="absolute top-3 left-40 z-10 flex gap-2">
           {isTheme ? (
             PROMPT_FORMS.map((form) => (
               <FormButton key={form} form={form} href={playHref(theme.kind, theme.name, form)} />

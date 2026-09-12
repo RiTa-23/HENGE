@@ -6,8 +6,13 @@
  */
 export type PromptForm = "sentence" | "word" | "long";
 
-/** すべての形式。画面の札やタブ、ロックの掃除など「形式ぶん並べる」ところで使う */
-export const PROMPT_FORMS: readonly PromptForm[] = ["sentence", "word", "long"];
+/**
+ * すべての形式。画面の札やタブ、ロックの掃除など「形式ぶん並べる」ところで使う。
+ *
+ * **並びは画面の並び（単語 → 短文 → 長文）。** 短いものから長いものへ並べる方が
+ * 分かりやすい。既定の形式（URLにクエリが無いとき）は短文のままで、並びとは別の話。
+ */
+export const PROMPT_FORMS: readonly PromptForm[] = ["word", "sentence", "long"];
 
 /**
  * 文字列を形式として読む。**既定は短文。未知の値も短文に倒す。**

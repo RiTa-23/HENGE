@@ -70,25 +70,25 @@ export default async function ThemeDetailPage({
           title={theme.name}
           description={
             <>
-              「{theme.name}」をテーマにしたお題です。短文・単語・長文の3つの打ち方があり、
+              「{theme.name}」をテーマにしたお題です。単語・短文・長文の3つの打ち方があり、
               どれも同じ文章・同じ語は繰り返し出ません。
             </>
           }
           stats={[
-            {
-              label: "短文のお題",
-              value: theme.promptCounts.sentence,
-              badge:
-                theme.generationStatus === "difficult" ? (
-                  <DifficultBadge forms={["sentence"]} />
-                ) : undefined,
-            },
             {
               label: "単語のお題",
               value: theme.promptCounts.word,
               badge:
                 theme.wordGenerationStatus === "difficult" ? (
                   <DifficultBadge forms={["word"]} />
+                ) : undefined,
+            },
+            {
+              label: "短文のお題",
+              value: theme.promptCounts.sentence,
+              badge:
+                theme.generationStatus === "difficult" ? (
+                  <DifficultBadge forms={["sentence"]} />
                 ) : undefined,
             },
             {
@@ -118,7 +118,12 @@ export default async function ThemeDetailPage({
           }
         />
 
-        <RankingBoard boards={boards} initialForm={parsePlayForm(ranking)} />
+        <RankingBoard
+          boards={boards}
+          // クエリが無ければ先頭のタブ（単語）。既定の形式（短文）とは別の話で、
+          // 並びの先頭が選ばれていないと変に見える
+          initialForm={ranking === undefined ? undefined : parsePlayForm(ranking)}
+        />
 
         <p className="mt-10 text-sm text-kinari/50">
           <a href="/themes" className="hover:text-kinari">

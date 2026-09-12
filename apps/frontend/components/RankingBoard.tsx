@@ -17,14 +17,14 @@ import { formLabel } from "@/lib/ui/kind";
  */
 export function RankingBoard({
   boards,
-  initialForm = "sentence",
+  initialForm,
 }: {
   boards: { form: PromptForm; entries: RankingEntry[] }[];
-  /** `?ranking=word` で単語のタブから開く（結果画面の「ランキングを見る」） */
+  /** `?ranking=word` などで指定のタブから開く（結果画面の「ランキングを見る」）。無ければ先頭 */
   initialForm?: PromptForm;
 }) {
   const [form, setForm] = useState<PromptForm>(
-    boards.some((board) => board.form === initialForm)
+    initialForm !== undefined && boards.some((board) => board.form === initialForm)
       ? initialForm
       : (boards[0]?.form ?? "sentence"),
   );

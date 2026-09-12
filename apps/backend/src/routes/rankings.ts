@@ -1,4 +1,4 @@
-import type { PlayStats, PromptForm } from "@henge/shared";
+import { type PlayStats, parsePromptForm, type PromptForm } from "@henge/shared";
 import { Hono } from "hono";
 import { createDb } from "../db/client";
 import { getPlayOffset } from "../db/progress";
@@ -26,7 +26,7 @@ interface RegisterBody {
 export const rankingRoutes = new Hono<{ Bindings: Env }>()
   .get("/rankings", async (c) => {
     const themeId = c.req.query("themeId") ?? "";
-    const form: PromptForm = c.req.query("form") === "word" ? "word" : "sentence";
+    const form = parsePromptForm(c.req.query("form"));
     return c.json({ entries: await listRankings(createDb(c.env.DB), themeId, form) });
   })
   .post("/rankings", async (c) => {

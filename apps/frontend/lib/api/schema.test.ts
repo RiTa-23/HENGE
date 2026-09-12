@@ -2,6 +2,7 @@ import { describe, expect, test } from "bun:test";
 import {
   adminPromptListQuerySchema,
   displayNameSchema,
+  promptTextSchema,
   rankingRegisterSchema,
   regenerateSchema,
   sessionStartSchema,
@@ -94,6 +95,8 @@ describe("出題の形式（form）", () => {
   test("単語を指定できる", () => {
     expect(sessionStartSchema.safeParse({ themeId: "t1", form: "word" }).data?.form).toBe("word");
     expect(regenerateSchema.safeParse({ themeId: "t1", form: "word" }).data?.form).toBe("word");
+    expect(sessionStartSchema.safeParse({ themeId: "t1", form: "long" }).data?.form).toBe("long");
+    expect(regenerateSchema.safeParse({ themeId: "t1", form: "long" }).data?.form).toBe("long");
   });
 
   // 存在しないプールをHonoに引かせない
@@ -205,5 +208,18 @@ describe("rankingRegisterSchema", () => {
     expect(rankingRegisterSchema.safeParse({ ...ok, misses: -1 }).success).toBe(false);
     expect(rankingRegisterSchema.safeParse({ ...ok, elapsedMs: "60000" }).success).toBe(false);
     expect(rankingRegisterSchema.safeParse({ ...ok, elapsedMs: Number.NaN }).success).toBe(false);
+  });
+});
+
+describe("promptTextSchema", () => {
+  test("長文の本文（表記で200文字超）を通す。100のままだと管理画面で長文を編集できない", () => {
+    expect(promptTextSchema.safeParse({ text: "手裏剣が闇を裂いた。".repeat(25) }).success).toBe(
+      true,
+    );
+  });
+
+  test("空・極端に長い本文は弾く", () => {
+    expect(promptTextSchema.safeParse({ text: "  " }).success).toBe(false);
+    expect(promptTextSchema.safeParse({ text: "あ".repeat(401) }).success).toBe(false);
   });
 });

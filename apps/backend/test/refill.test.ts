@@ -145,6 +145,47 @@ describe("kickRefill の消費記録（実際に使ったニューロンを加�
     expect(row?.generationStatus).toBe("difficult");
   });
 
+  it("長文は目標未達でも 'difficult' を立てず、1本も作れなかったときだけ立てる", async () => {
+    await seed();
+    const { waitUntil, flush } = manualWaitUntil();
+    // 在庫0・nextOffset=1 → target = 1 + 3 - 0 = 4本。応答は有効1本だけ
+    const long = "忍びは闇を走る。".repeat(14);
+    stubAi({ response: long, usage: TOKENS });
+    vi.spyOn(globalThis, "fetch").mockImplementation(
+      async () =>
+        new Response(
+          JSON.stringify({
+            result: { word: [{ surface: long, furigana: AI_READING.repeat(14) }] },
+          }),
+          { status: 200, headers: { "content-type": "application/json" } },
+        ),
+    );
+
+    const theme = (await getThemeDetail(db, "t1"))!;
+    await kickRefill(env, waitUntil, { db, theme, form: "long", nextOffset: 1, userId: "u1" });
+    await flush();
+
+    // 取れた1本は保存され、目標未達でも印は立たない
+    expect(await db.select().from(prompts).where(eq(prompts.form, "long"))).toHaveLength(1);
+    let [row] = await db.select().from(themes).where(eq(themes.id, "t1"));
+    expect(row?.longGenerationStatus).toBe("ok");
+
+    // 1本も作れなければ立つ（句点の無い一続き → punct）
+    await env.KV.delete(themeLockKey("t1", "long"));
+    stubAi({ response: "忍びは闇を走る".repeat(14), usage: TOKENS });
+    const again = (await getThemeDetail(db, "t1"))!;
+    await kickRefill(env, waitUntil, {
+      db,
+      theme: again,
+      form: "long",
+      nextOffset: 2,
+      userId: "u1",
+    });
+    await flush();
+    [row] = await db.select().from(themes).where(eq(themes.id, "t1"));
+    expect(row?.longGenerationStatus).toBe("difficult");
+  });
+
   /**
    * **記録は「AIが返った直後」に済ませる。** 生成の終わりにまとめて書く形だと、
    * 読み取得の途中でクライアントが切断してinvocationごと打ち切られたときに、

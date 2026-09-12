@@ -15,6 +15,7 @@ D1（SQLite）+ Drizzle ORM。Better Auth管理下のテーブル（`user` / `se
 | `created_by` | TEXT | NULL可, FK→`user.id` ON DELETE SET NULL | `user.id`。運営投入分はNULL。作成者が退会してもテーマは公開コンテンツとして残すためCASCADEにしない |
 | `generation_status` | TEXT | NOT NULL, default `'ok'` | `'ok'` / `'difficult'`。**短文プールの分** |
 | `word_generation_status` | TEXT | NOT NULL, default `'ok'` | 同上。**単語プールの分**。1本にまとめない（単語が作れないテーマで短文の補充まで止まる） |
+| `long_generation_status` | TEXT | NOT NULL, default `'ok'` | 同上。**長文プールの分** |
 | `total_play_count` | INTEGER | NOT NULL, default 0 | 人気順ソート用。プレイ開始のたび+1 |
 | `created_at` | INTEGER | NOT NULL | unixepoch |
 
@@ -66,7 +67,7 @@ CREATE INDEX themes_created_by ON themes (created_by, created_at DESC);
 | `keystroke_count` | INTEGER | NOT NULL | 打鍵数（10〜35） |
 | `source` | TEXT | NOT NULL | `'workers_ai'` |
 | `model` | TEXT | NULL可 | 生成に使ったモデル名 |
-| `form` | TEXT | NOT NULL, default `'sentence'` | `'sentence'` / `'word'`。**プールはこれで分かれる** |
+| `form` | TEXT | NOT NULL, default `'sentence'` | `'sentence'` / `'word'` / `'long'`。**プールはこれで分かれる** |
 | `sequence_number` | INTEGER | NOT NULL | テーマ内・**形式内**で1始まりの連番 |
 | `created_at` | INTEGER | NOT NULL | unixepoch |
 
@@ -89,7 +90,7 @@ CREATE UNIQUE INDEX prompts_theme_form_seq ON prompts (theme_id, form, sequence_
 |---|---|---|
 | `user_id` | TEXT | FK→`user.id` ON DELETE CASCADE |
 | `theme_id` | TEXT | FK→`themes.id` ON DELETE CASCADE |
-| `form` | TEXT | `'sentence'` / `'word'`。**進捗は形式ごとに持つ** |
+| `form` | TEXT | `'sentence'` / `'word'` / `'long'`。**進捗は形式ごとに持つ** |
 | `play_count` | INTEGER | その形式の1プレイ分（短文15／単語20）の倍数。次に配信する範囲のオフセット |
 | `updated_at` | INTEGER | unixepoch |
 
@@ -161,7 +162,7 @@ D1のCASCADEはD1の中でしか効かない。KVを消し忘れると「削除�
 | カラム | 型 | 説明 |
 |---|---|---|
 | `theme_id` | TEXT | FK→`themes.id` ON DELETE CASCADE |
-| `form` | TEXT | `'sentence'` / `'word'`。**短文と単語は別のランキング** |
+| `form` | TEXT | `'sentence'` / `'word'` / `'long'`。**形式ごとに別のランキング** |
 | `user_id` | TEXT | FK→`user.id` ON DELETE CASCADE |
 | `score` | INTEGER | e-typing 方式のスコア（`packages/shared` の `etypingScore`）。**サーバーで計算する** |
 | `hits` / `misses` / `elapsed_ms` | INTEGER | 生の値。一覧に打鍵/秒と正確率を出すためと、算出方法を変えたときに計算し直すため |
@@ -234,17 +235,18 @@ CASCADEが実際に効くことは `apps/backend/test/schema.test.ts` で検証�
 
 ## 出題の形式（form）
 
-`prompts.form` で短文と単語のプールを分ける。**`kind`（テーマ／最適化）とは直交する軸**で、
-同じテーマを2つの形式で遊ぶための区別。
+`prompts.form` で短文・単語・長文のプールを分ける。**`kind`（テーマ／最適化）とは直交する軸**で、
+同じテーマを複数の形式で遊ぶための区別。
 
 **`kind` に値を足す形にしない。** 一意制約が `(kind, normalized_name)` なので、
 「福岡（短文）」と「福岡（単語）」が別のテーマ行になり、一覧に同じ名前が2つ並ぶ。
 プレイ回数も作成者も分かれてしまう。
 
-| 形式 | 1プレイ | 在庫目標 | 打鍵数 |
-|---|---|---|---|
-| `sentence` | 15問 | 30 | 10〜35 |
-| `word` | 20問 | **30** | 4〜20 |
+| 形式 | 1プレイ | 在庫目標 | 打鍵数 | 1ラウンドの依頼数 |
+|---|---|---|---|---|
+| `sentence` | 15問 | 30 | 10〜35 | 20 |
+| `word` | 20問 | **30** | 4〜20 | 20 |
+| `long` | **1本** | **3** | **250〜450** | **5** |
 
 **単語の在庫目標を2プレイ分（60）にしない。** 補充が1回で作れるのは最大40件
 （20件×2ラウンド）で、在庫0から60は埋められない。目標未達は `'difficult'` を立てる
@@ -252,5 +254,13 @@ CASCADEが実際に効くことは `apps/backend/test/schema.test.ts` で検証�
 値は `packages/shared/src/session.ts` にあり、`session.test.ts` で「1回の補充で
 作れる上限を超えない」ことを固定している。
 
-**単語モードはテーマだけ。** 最適化練習（`kind: 'constraint'`）には付けない。
-短い語に指定の音を入れさせるのは短文よりさらに却下率が上がる（`docs/05-generation.md`）。
+**長文は1本で1プレイ。** 1本が読み仮名150〜220文字（打鍵250〜450）のまとまった文章で、
+短文1プレイ（約330打）と同じ程度の手応え。在庫目標3本は、1回の補充で作れる上限（5本×2ラウンド＝10本）に
+収まる（単語と同じ理由で、上限を超える目標にしない）。
+
+**「生成困難」の印は形式ごとの列で持つ**（`generation_status` / `word_generation_status` /
+`long_generation_status`）。形式ごとに持ちたい属性が**2つ以上**になったら `theme_pools (theme_id, form, …)`
+へ寄せる（列が形式×属性で増えるため）。印1つだけの間は列のままでよい。
+
+**単語モードと長文モードはテーマだけ。** 最適化練習（`kind: 'constraint'`）には付けない。
+短い語に指定の音を入れさせるのは短文よりさらに却下率が上がる（`docs/05-generation.md`）。長文も同じ扱いにする。

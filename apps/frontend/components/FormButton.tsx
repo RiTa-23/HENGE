@@ -1,5 +1,6 @@
 import { playSize, type PromptForm } from "@henge/shared";
-import { SentenceMark, WordMark } from "@/components/FormMark";
+import { FormMark } from "@/components/FormMark";
+import { formLabel } from "@/lib/ui/kind";
 
 /**
  * 「打つ」ボタン。**木札（きふだ）の形。**
@@ -24,11 +25,10 @@ export function FormButton({
   href: string;
   /** 一覧は sm（1行）、詳細は lg（問題数の副題つき） */
   size?: "sm" | "lg";
-  /** 既定は「短文」「単語」（紋と札の形で「打てる」ことは伝わるので、動詞を付けない）。最適化練習は「打つ」 */
+  /** 既定は形式の呼び名「短文」「単語」「長文」（紋と札の形で「打てる」ことは伝わるので、動詞を付けない）。最適化練習は「打つ」 */
   label?: string;
 }) {
-  const Mark = form === "word" ? WordMark : SentenceMark;
-  const text = label ?? (form === "word" ? "単語" : "短文");
+  const text = label ?? formLabel(form);
   const large = size === "lg";
 
   return (
@@ -45,7 +45,10 @@ export function FormButton({
           : "py-1.5 pr-2.5 pl-4")
       }
     >
-      <Mark className={large ? "size-6 shrink-0 text-shu" : "size-3.5 shrink-0 text-shu"} />
+      <FormMark
+        form={form}
+        className={large ? "size-6 shrink-0 text-shu" : "size-3.5 shrink-0 text-shu"}
+      />
       <span className="min-w-0">
         <span
           className={
@@ -58,7 +61,8 @@ export function FormButton({
         </span>
         {large && (
           <span className="mt-0.5 block font-mono text-xs tracking-normal text-kinari/60">
-            {playSize(form)}問ひと組
+            {/* 長文は1本で1プレイ。「1問ひと組」では意味が通らない */}
+            {form === "long" ? "1本を通しで" : `${playSize(form)}問ひと組`}
           </span>
         )}
       </span>

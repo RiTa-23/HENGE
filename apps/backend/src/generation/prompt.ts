@@ -1,5 +1,10 @@
 import type { PromptForm, ThemeKind } from "@henge/shared";
-import { WORD_KEYSTROKE_MAX, WORD_KEYSTROKE_MIN } from "@henge/shared";
+import {
+  LONG_KEYSTROKE_MAX,
+  LONG_KEYSTROKE_MIN,
+  WORD_KEYSTROKE_MAX,
+  WORD_KEYSTROKE_MIN,
+} from "@henge/shared";
 
 /**
  * 生成プロンプト。**全モデルで共通のものを1つだけ持つ。**
@@ -24,9 +29,18 @@ export const EXISTING_CONTEXT_SIZE = 30;
  */
 export const WORD_EXISTING_CONTEXT_SIZE = 200;
 
+/**
+ * 長文のときに遡る件数。**1本が長いので少なくてよい。** 1回の生成が5本×2ラウンドで、
+ * 完全一致の重複は文章ではまず起きない（起きるなら同じ文章を丸ごと返している）。
+ * 本文が長いぶんD1から読む量も大きいので、必要以上に取らない。
+ */
+export const LONG_EXISTING_CONTEXT_SIZE = 10;
+
 /** その形式で遡る件数 */
 export function existingContextSize(form: PromptForm): number {
-  return form === "word" ? WORD_EXISTING_CONTEXT_SIZE : EXISTING_CONTEXT_SIZE;
+  if (form === "word") return WORD_EXISTING_CONTEXT_SIZE;
+  if (form === "long") return LONG_EXISTING_CONTEXT_SIZE;
+  return EXISTING_CONTEXT_SIZE;
 }
 
 /**
@@ -55,6 +69,12 @@ const SYSTEM = [
 const SYSTEM_WORD = [
   "あなたは日本語タイピング練習用の言葉を集める職人です。",
   "指示された条件を厳密に守り、余計な説明を一切書かず、言葉だけを出力します。",
+].join("");
+
+/** 長文のシステムプロンプト。「短文」と言わない（短い文に寄る） */
+const SYSTEM_LONG = [
+  "あなたは日本語タイピング練習用の文章を書く職人です。",
+  "指示された条件を厳密に守り、余計な説明を一切書かず、文章だけを出力します。",
 ].join("");
 
 function rules(count: number): string[] {
@@ -118,6 +138,35 @@ function wordRules(count: number): string[] {
     "- ひらがなだけにしない。漢字かカタカナを含める",
     "- 実在する言葉だけを使う。**造語を作らない**",
     `- ${count}個すべて違うものにする`,
+  ];
+}
+
+/**
+ * 長文の指示。**短文用（`rules`）とは別に持つ。**
+ *
+ * 1本＝1プレイなので、短文15問ぶん（約330打）に相当する長さの、**筋の通った
+ * 1つの文章**を書かせる。短文の指示（1文8〜18文字・1行1文）を流用すると、
+ * 文が短く切れて箇条書きのような出力になる。
+ *
+ * 長さはかな文字数で近似して伝える（モデルは打鍵数を数えられない。短文と同じ理由）。
+ * 250〜450打はおおむねかな150〜220文字にあたる。**本の切れ目は空行**で、
+ * 1本の中では改行しない（`parseGeneratedLines` は行を1件と見なすので、
+ * 長文だけ `parseGeneratedBlocks` で空行区切りに読む）。
+ */
+function longRules(count: number): string[] {
+  return [
+    `- ちょうど${count}本の文章を書く`,
+    "- 1本は3〜5文からなる、ひとつながりの文章にする。箇条書きや見出しにしない",
+    "- **各文の終わりに必ず「。」を付ける。** 文の途中には読みやすいところに「、」を入れる。句読点の無い文章は拒否される",
+    `- 1本はひらがなに直して150〜220文字程度。**これより短いと拒否される**（打鍵数${LONG_KEYSTROKE_MIN}〜${LONG_KEYSTROKE_MAX}に相当）`,
+    "- 1本の中では改行しない。本と本の間だけを空行で区切る",
+    "- 番号や記号、見出しを付けない",
+    "- 使ってよい文字は、ひらがな・カタカナ・漢字と、次の5種類の記号だけ",
+    "  、 。 ー ！ ？",
+    "- 「」（）〜・：やアルファベット・数字・空白は絶対に使わない",
+    "- 漢字をかならず使う。ひらがなだけの文章にしない",
+    "- 意味の通る自然な日本語にする。説明文でも物語でもよい",
+    `- ${count}本は互いに違う話題・違う書き出しにする`,
   ];
 }
 
@@ -201,6 +250,17 @@ export function buildGenerationPrompt(input: {
     return { system: SYSTEM_WORD, user: lines.join("\n") };
   }
 
+  // **長文もテーマだけ**（最適化練習には付けない。単語と同じ理由）
+  if (input.form === "long") {
+    const lines = [
+      `テーマ「${input.name}」に沿った文章を書いてください。`,
+      "",
+      "条件:",
+      ...longRules(input.count),
+    ];
+    return { system: SYSTEM_LONG, user: lines.join("\n") };
+  }
+
   const subject =
     input.kind === "theme"
       ? `テーマ「${input.name}」に沿った短文を作ってください。`
@@ -221,15 +281,56 @@ export function buildGenerationPrompt(input: {
   return { system: SYSTEM, user: lines.join("\n") };
 }
 
+/** 1行の前後の空白と、行頭の番号・箇条書き記号を落とす */
+function cleanLine(line: string): string {
+  return line
+    .trim()
+    .replace(/^[-*・\d]+[.)、.]?\s*/u, "")
+    .trim();
+}
+
 /** モデルの出力を1文ずつに切る。番号や箇条書き記号が付いていても落とす */
 export function parseGeneratedLines(output: string): string[] {
   return output
     .split("\n")
-    .map((line) =>
-      line
-        .trim()
-        .replace(/^[-*・\d]+[.)、.]?\s*/u, "")
-        .trim(),
-    )
+    .map(cleanLine)
     .filter((line) => line.length > 0);
+}
+
+/**
+ * 行末に文の終わりが無ければ「。」を補う。
+ *
+ * モデルは指示に反して**1文ごとに改行し、そのとき「。」を落とす**（実測。
+ * 「〜イベントだ／参加者は〜」のように返ってきた）。改行をそのまま繋ぐと
+ * 「〜イベントだ参加者は〜」という区切りの無い文章になる。行の切れ目は文の切れ目と
+ * 見なして補う。「、」で終わる行（文の途中で折り返した）には足さない。
+ */
+function closeSentence(line: string): string {
+  return /[。！？、]$/u.test(line) ? line : `${line}。`;
+}
+
+/**
+ * 長文の出力を1本ずつに切る。**本の切れ目は空行**で、1本の中の改行は繋ぐ。
+ *
+ * 指示では改行しないことになっているが、モデルは1文ごとに改行することがある。
+ * 行で切ると1本が数件のお題に割れ、どれも打鍵数不足で落ちる。繋ぐときは行末に
+ * 「。」を補う（`closeSentence`）。空行が1つも無ければ出力全体を1本と見なす。
+ */
+export function parseGeneratedBlocks(output: string): string[] {
+  return output
+    .split(/\n\s*\n/u)
+    .map((block) =>
+      block
+        .split("\n")
+        .map(cleanLine)
+        .filter((line) => line.length > 0)
+        .map(closeSentence)
+        .join(""),
+    )
+    .filter((block) => block.length > 0);
+}
+
+/** 形式に合った切り出し。長文だけ空行区切り */
+export function parseGeneratedOutput(output: string, form: PromptForm): string[] {
+  return form === "long" ? parseGeneratedBlocks(output) : parseGeneratedLines(output);
 }

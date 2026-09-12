@@ -9,7 +9,7 @@ import {
   setGenerationStatus,
 } from "../db/themes";
 import { recordUsage } from "../db/usage";
-import { generateBatch } from "../generation/batch";
+import { acceptsPartialBatch, generateBatch } from "../generation/batch";
 import { AiQuotaExceededError, AiUnavailableError } from "../generation/ai";
 import { resolveModel } from "../generation/model";
 import { existingContextSize } from "../generation/prompt";
@@ -123,6 +123,14 @@ export const generateRoutes = new Hono<{ Bindings: Env }>()
 
     const form: PromptForm = body.form ?? "sentence";
 
+    // **単語・長文はテーマだけ。** 最適化練習（含む文字）には付けない
+    // （docs/05-generation.md）。URLを手で書けば `kind=constraint&form=long` の
+    // プレイ画面まで辿り着けるので、作る口はここで塞ぐ。長文の指示は指定文字を
+    // 入れさせないため、通すと偶然含んだ本だけのプールができる
+    if (theme.kind === "constraint" && form !== "sentence") {
+      return fail(c, "VALIDATION_ERROR", "最適化練習で作れるのは短文だけです");
+    }
+
     // 背景補充が走っている最中なら、二重に生成しない。**ロックは形式ごと**
     if (!(await acquireThemeLock(c.env.KV, body.themeId, form))) {
       return fail(c, "GENERATION_IN_PROGRESS");
@@ -152,17 +160,16 @@ export const generateRoutes = new Hono<{ Bindings: Env }>()
       });
 
       /**
-       * **単語は取れた分を必ず保存する。** 短文は目標未達なら1件も保存せず
-       * `GENERATION_FAILED` を返すが、単語で同じにすると割に合わない。目標は
-       * 1プレイ分の30語なのに対し、1回で作れるのは最大40件（20件×2ラウンド）
-       * しかない。少し届かないことは普通に起きるので、**有効な20語と消費した
+       * **単語と長文は取れた分を必ず保存する**（`acceptsPartialBatch`）。短文は
+       * 目標未達なら1件も保存せず `GENERATION_FAILED` を返すが、目標と1回で作れる
+       * 上限が近い形式で同じにすると、少し届かないだけで**有効なお題と消費した
        * ニューロンを捨てて何度も押させる**ことになる。
        *
        * 追加した先はテーマ既存のプールなので、途中まで積むこと自体に害はない
        * （新規作成で「お題ゼロのテーマを作らない」のとは事情が違う）。
        * 1件も作れなかったときだけ失敗として返す。
        */
-      const failed = form === "word" ? result.valid.length === 0 : !result.reachedTarget;
+      const failed = acceptsPartialBatch(form) ? result.valid.length === 0 : !result.reachedTarget;
       if (failed) return fail(c, "GENERATION_FAILED");
 
       await appendPrompts(db, theme.id, form, result.valid, model);

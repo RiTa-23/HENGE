@@ -1,0 +1,1 @@
+ALTER TABLE `themes` ADD `long_generation_status` text DEFAULT 'ok' NOT NULL;

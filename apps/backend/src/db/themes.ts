@@ -15,22 +15,23 @@ export interface ThemeSummary {
   generationStatus: GenerationStatus;
   /** 単語プールの「生成困難」の印。**短文と分けて持つ**（片方の失敗で両方止めない） */
   wordGenerationStatus: GenerationStatus;
+  /** 長文プールの「生成困難」の印。同上 */
+  longGenerationStatus: GenerationStatus;
 }
 
 /** その形式の印を取る。呼び出し側に `form === "word" ? ... : ...` を書かせない */
 export function generationStatusOf(theme: ThemeSummary, form: PromptForm): GenerationStatus {
-  return form === "word" ? theme.wordGenerationStatus : theme.generationStatus;
+  if (form === "word") return theme.wordGenerationStatus;
+  if (form === "long") return theme.longGenerationStatus;
+  return theme.generationStatus;
 }
 
 /** 形式ごとの在庫数 */
-export interface PromptCounts {
-  sentence: number;
-  word: number;
-}
+export type PromptCounts = Record<PromptForm, number>;
 
 /** その形式の在庫数 */
 export function promptCountOf(counts: PromptCounts, form: PromptForm): number {
-  return form === "word" ? counts.word : counts.sentence;
+  return counts[form];
 }
 
 export const LIST_LIMIT_DEFAULT = 20;
@@ -56,6 +57,7 @@ export async function listThemes(
       createdAt: themes.createdAt,
       generationStatus: themes.generationStatus,
       wordGenerationStatus: themes.wordGenerationStatus,
+      longGenerationStatus: themes.longGenerationStatus,
     })
     .from(themes)
     .where(eq(themes.kind, params.kind))
@@ -95,6 +97,7 @@ export async function listThemesByCreator(
       createdAt: themes.createdAt,
       generationStatus: themes.generationStatus,
       wordGenerationStatus: themes.wordGenerationStatus,
+      longGenerationStatus: themes.longGenerationStatus,
     })
     .from(themes)
     .where(eq(themes.createdBy, params.userId))
@@ -125,6 +128,7 @@ export async function findThemeByName(
       createdAt: themes.createdAt,
       generationStatus: themes.generationStatus,
       wordGenerationStatus: themes.wordGenerationStatus,
+      longGenerationStatus: themes.longGenerationStatus,
     })
     .from(themes)
     .where(and(eq(themes.kind, kind), eq(themes.normalizedName, normalizeName(kind, name))))
@@ -147,6 +151,7 @@ export interface ThemeDetail extends ThemeSummary {
 const promptCountColumns = {
   sentence: sql<number>`coalesce(sum(case when ${prompts.form} = 'sentence' then 1 else 0 end), 0)`,
   word: sql<number>`coalesce(sum(case when ${prompts.form} = 'word' then 1 else 0 end), 0)`,
+  long: sql<number>`coalesce(sum(case when ${prompts.form} = 'long' then 1 else 0 end), 0)`,
 };
 
 export async function getThemeDetail(db: Db, id: string): Promise<ThemeDetail | null> {
@@ -159,8 +164,10 @@ export async function getThemeDetail(db: Db, id: string): Promise<ThemeDetail | 
       createdAt: themes.createdAt,
       generationStatus: themes.generationStatus,
       wordGenerationStatus: themes.wordGenerationStatus,
+      longGenerationStatus: themes.longGenerationStatus,
       sentenceCount: promptCountColumns.sentence,
       wordCount: promptCountColumns.word,
+      longCount: promptCountColumns.long,
     })
     .from(themes)
     .leftJoin(prompts, eq(prompts.themeId, themes.id))
@@ -168,8 +175,11 @@ export async function getThemeDetail(db: Db, id: string): Promise<ThemeDetail | 
     .groupBy(themes.id)
     .limit(1);
   if (row === undefined) return null;
-  const { sentenceCount, wordCount, ...theme } = row;
-  return { ...theme, promptCounts: { sentence: sentenceCount, word: wordCount } };
+  const { sentenceCount, wordCount, longCount, ...theme } = row;
+  return {
+    ...theme,
+    promptCounts: { sentence: sentenceCount, word: wordCount, long: longCount },
+  };
 }
 
 /** プレイ開始のたびに+1。人気順ソートの材料 */
@@ -190,7 +200,12 @@ export async function setGenerationStatus(
   form: PromptForm,
   status: GenerationStatus,
 ): Promise<void> {
-  const column = form === "word" ? { wordGenerationStatus: status } : { generationStatus: status };
+  const column =
+    form === "word"
+      ? { wordGenerationStatus: status }
+      : form === "long"
+        ? { longGenerationStatus: status }
+        : { generationStatus: status };
   await db.update(themes).set(column).where(eq(themes.id, themeId));
 }
 
@@ -225,9 +240,11 @@ export async function listThemesForAdmin(
       createdAt: themes.createdAt,
       generationStatus: themes.generationStatus,
       wordGenerationStatus: themes.wordGenerationStatus,
+      longGenerationStatus: themes.longGenerationStatus,
       createdBy: themes.createdBy,
       sentenceCount: promptCountColumns.sentence,
       wordCount: promptCountColumns.word,
+      longCount: promptCountColumns.long,
     })
     .from(themes)
     .leftJoin(prompts, eq(prompts.themeId, themes.id))
@@ -239,9 +256,11 @@ export async function listThemesForAdmin(
 
   const hasMore = rows.length > limit;
   return {
-    themes: rows.slice(0, limit).map(({ sentenceCount, wordCount, ...theme }) =>
+    themes: rows.slice(0, limit).map(({ sentenceCount, wordCount, longCount, ...theme }) =>
       // 分割で作った新しいオブジェクトなので、そのまま足してよい（spread を重ねない）
-      Object.assign(theme, { promptCounts: { sentence: sentenceCount, word: wordCount } }),
+      Object.assign(theme, {
+        promptCounts: { sentence: sentenceCount, word: wordCount, long: longCount },
+      }),
     ),
     nextCursor: hasMore ? params.cursor + limit : null,
   };

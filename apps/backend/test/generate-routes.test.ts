@@ -401,6 +401,54 @@ describe("POST /prompts/regenerate", () => {
     expect(await db.select().from(prompts)).toHaveLength(0);
   });
 
+  it("長文も目標に届かなくても取れた分を保存し、1本も作れなければ失敗にする", async () => {
+    await seedUser("u1");
+    await db.insert(themes).values({
+      id: "t1",
+      kind: "theme",
+      name: "忍びの心得",
+      normalizedName: "忍びの心得",
+    });
+    // 1文≒21打 × 14 ≒ 294打。応答は空行区切りで2本（目標は1本）
+    const body = "忍びは闇を走る。".repeat(14);
+    stubGeneration(
+      [[`${body}\n\n${"影は森を駆ける。".repeat(14)}`]],
+      "しのびはやみをはしる。".repeat(14),
+    );
+
+    const ok = await post("/prompts/regenerate", { themeId: "t1", userId: "u1", form: "long" });
+    expect(ok.status).toBe(200);
+    expect(ok.body.added).toBe(2);
+    expect(await db.select().from(prompts).where(eq(prompts.form, "long"))).toHaveLength(2);
+
+    // 句点の無い一続き → punct で全滅 → 失敗
+    stubGeneration([["忍びは闇を走る".repeat(14)]], "しのびはやみをはしる".repeat(14));
+    const failed = await post("/prompts/regenerate", { themeId: "t1", userId: "u1", form: "long" });
+    expect(failed.status).toBe(422);
+    expect((failed.body.error as { code: string }).code).toBe("GENERATION_FAILED");
+  });
+
+  it("最適化練習（含む文字）に単語・長文は作れない", async () => {
+    await seedUser("u1");
+    await db
+      .insert(themes)
+      .values({ id: "c1", kind: "constraint", name: "ざ", normalizedName: "ざ" });
+    stubValidGeneration();
+
+    const results = await Promise.all(
+      (["word", "long"] as const).map((form) =>
+        post("/prompts/regenerate", { themeId: "c1", userId: "u1", form }),
+      ),
+    );
+    for (const { status, body } of results) {
+      expect(status).toBe(400);
+      expect((body.error as { code: string }).code).toBe("VALIDATION_ERROR");
+    }
+    // AI を呼んでいない（クォータを消費しない）
+    expect(env.AI.run).not.toHaveBeenCalled();
+    expect(await db.select().from(prompts)).toHaveLength(0);
+  });
+
   it("単語も1件も作れなければ失敗として返す", async () => {
     await seedUser("u1");
     await db.insert(themes).values({

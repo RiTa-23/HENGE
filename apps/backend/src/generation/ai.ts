@@ -1,4 +1,4 @@
-import { buildGenerationPrompt, parseGeneratedLines } from "./prompt";
+import { buildGenerationPrompt, parseGeneratedOutput } from "./prompt";
 import {
   DEFAULT_MAX_TOKENS,
   modelConfig,
@@ -59,14 +59,21 @@ export function classifyAiError(error: unknown): Error | null {
 }
 
 /**
- * 生成の経路。**単語のときは `:word` を付ける。**
+ * 生成の経路。**単語のときは `:word`、長文のときは `:long` を付ける。**
  *
  * AI Gatewayのメタデータは1リクエスト5件までで、リクエスト時に4件
  * （themeId / kind / round / path）、`patchLog` で1件（counts）を使い切っている。
  * **形式のためのキーを増やせない**（6件目は例外もログも無く捨てられる）ので、
  * 経路の値に畳む。短文の値はこれまでのままなので、既存の絞り込みは壊れない。
  */
-export type GenerationPath = "create" | "regenerate" | "refill" | "regenerate:word" | "refill:word";
+export type GenerationPath =
+  | "create"
+  | "regenerate"
+  | "refill"
+  | "regenerate:word"
+  | "refill:word"
+  | "regenerate:long"
+  | "refill:long";
 
 /** AI Gatewayのメタデータは1リクエスト5件まで。値は文字列・数値・真偽値のみ */
 export interface GenerationMetadata {
@@ -169,7 +176,7 @@ export async function requestPrompts(
   );
 
   return {
-    texts: parseGeneratedLines(extractText(response)),
+    texts: parseGeneratedOutput(extractText(response), input.form),
     logId: env.AI.aiGatewayLogId ?? undefined,
     neurons: neuronsUsed(input.model, response.usage),
   };

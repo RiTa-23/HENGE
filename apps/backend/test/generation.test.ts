@@ -1,14 +1,21 @@
 import { buildRomanCandidates } from "@henge/shared";
 import { env } from "cloudflare:test";
 import { describe, expect, it } from "vitest";
-import { generateBatch, type GenerateBatchInput } from "../src/generation/batch";
+import {
+  acceptsPartialBatch,
+  generateBatch,
+  type GenerateBatchInput,
+  N_REQUEST,
+  N_REQUEST_LONG,
+  requestCount,
+} from "../src/generation/batch";
 import {
   DEFAULT_MAX_TOKENS,
   DEFAULT_MODEL,
   modelConfig,
   resolveModel,
 } from "../src/generation/model";
-import { parseGeneratedLines } from "../src/generation/prompt";
+import { parseGeneratedBlocks, parseGeneratedLines } from "../src/generation/prompt";
 import type { GetReading } from "../src/reading/index";
 
 describe("parseGeneratedLines", () => {
@@ -29,6 +36,52 @@ describe("parseGeneratedLines", () => {
 
   it("空行を無視する", () => {
     expect(parseGeneratedLines("忍び。\n\n\n影。")).toEqual(["忍び。", "影。"]);
+  });
+});
+
+describe("parseGeneratedBlocks（長文）", () => {
+  it("空行で1本ずつに切り、本の中の改行は繋ぐ", () => {
+    expect(
+      parseGeneratedBlocks("忍びは走る。\n影が揺れた。\n\n闇に消えた。\n夜が明けた。"),
+    ).toEqual(["忍びは走る。影が揺れた。", "闇に消えた。夜が明けた。"]);
+  });
+
+  it("空行が無ければ全体を1本と見なす", () => {
+    expect(parseGeneratedBlocks("忍びは走る。\n影が揺れた。")).toEqual([
+      "忍びは走る。影が揺れた。",
+    ]);
+  });
+
+  /**
+   * モデルは1文ごとに改行して「。」を落とすことがある（実測: 「〜イベントだ／参加者は〜」）。
+   * そのまま繋ぐと区切りの無い文章になるので、行末に「。」を補う
+   */
+  it("「。」の無い行末には「。」を補い、「、」で終わる行（文の途中）には足さない", () => {
+    expect(parseGeneratedBlocks("忍びは走る\n影が揺れた！\n闇に、\n消えた")).toEqual([
+      "忍びは走る。影が揺れた！闇に、消えた。",
+    ]);
+  });
+
+  it("番号や箇条書き記号、空白だけの行を落とす", () => {
+    expect(parseGeneratedBlocks("1. 忍びは走る。\n  \n\n- 影が揺れた。")).toEqual([
+      "忍びは走る。",
+      "影が揺れた。",
+    ]);
+  });
+});
+
+describe("形式ごとの生成の規則", () => {
+  it("長文は1ラウンド5本、それ以外は20件（2ラウンドで50を超えない）", () => {
+    expect(requestCount("long")).toBe(N_REQUEST_LONG);
+    expect(requestCount("sentence")).toBe(N_REQUEST);
+    expect(requestCount("word")).toBe(N_REQUEST);
+    expect(N_REQUEST_LONG * 2).toBeLessThanOrEqual(50);
+  });
+
+  it("単語と長文は取れた分を保存し、短文は目標未達で失敗にする", () => {
+    expect(acceptsPartialBatch("sentence")).toBe(false);
+    expect(acceptsPartialBatch("word")).toBe(true);
+    expect(acceptsPartialBatch("long")).toBe(true);
   });
 });
 
@@ -307,11 +360,11 @@ describe("generateBatch", () => {
 
     expect(logs).toHaveLength(2);
     expect(logs[0]?.metadata?.counts).toBe(
-      "charset:1,kanji:0,opening:0,keystroke:0,constraint:0,dup:0",
+      "charset:1,kanji:0,opening:0,keystroke:0,constraint:0,punct:0,dup:0",
     );
     // 累積を渡していれば charset:2 になる
     expect(logs[1]?.metadata?.counts).toBe(
-      "charset:1,kanji:0,opening:0,keystroke:0,constraint:0,dup:0",
+      "charset:1,kanji:0,opening:0,keystroke:0,constraint:0,punct:0,dup:0",
     );
   });
 
@@ -358,6 +411,81 @@ describe("単語モードの検証", () => {
     });
 
     expect(result.valid.map((p) => p.text)).toEqual(["ラーメン"]);
+    expect(result.rejected.kanji).toBe(1);
+  });
+});
+
+describe("長文の検証", () => {
+  const sentence = "手裏剣が闇を裂いて標的を正確に射抜いた瞬間だった。";
+  /** 文ごとに READINGS を引いて繋ぐ。長文は既知の文の繰り返しで作る */
+  const longReading: GetReading = async (text) => {
+    const kana = text
+      .split("。")
+      .filter((part) => part.length > 0)
+      .map((part) => READINGS[`${part}。`] ?? `${part}。`)
+      .join("");
+    return { kana, roman: buildRomanCandidates(kana) };
+  };
+
+  it("空行区切りの応答を1本ずつ受け、打鍵数250〜450の本だけを採る", async () => {
+    // 1文≒56打。6文で約336打（範囲内）、2文で約112打（下限未満）
+    const okBody = sentence.repeat(6);
+    const shortBody = sentence.repeat(2);
+    const result = await generateBatch(envWithAiResponses([[`${okBody}\n\n${shortBody}`]]), {
+      ...input({ form: "long", target: 1 }),
+      getReading: longReading,
+    });
+
+    expect(result.valid.map((p) => p.text)).toEqual([okBody]);
+    expect(result.valid[0]?.keystrokeCount).toBeGreaterThanOrEqual(250);
+    expect(result.rejected.keystroke).toBe(1);
+    expect(result.reachedTarget).toBe(true);
+  });
+
+  it("本の中で改行されていても1本として繋ぐ", async () => {
+    const body = sentence.repeat(6);
+    // 3文ごとに折り返した応答
+    const wrapped = `${sentence.repeat(3)}\n${sentence.repeat(3)}`;
+    const result = await generateBatch(envWithAiResponses([[wrapped]]), {
+      ...input({ form: "long", target: 1 }),
+      getReading: longReading,
+    });
+
+    expect(result.valid.map((p) => p.text)).toEqual([body]);
+  });
+
+  it("文の終わり（。！？）が足りない本は punct で却下する", async () => {
+    // 句点を落とした一続き（改行も無いので parseGeneratedBlocks では補えない）
+    const noPunct = sentence.repeat(6).replaceAll("。", "");
+    const result = await generateBatch(envWithAiResponses([[noPunct]]), {
+      ...input({ form: "long", target: 1 }),
+      getReading: longReading,
+    });
+    expect(result.valid).toEqual([]);
+    expect(result.rejected.punct).toBe(1);
+  });
+
+  it("短文では文の終わりを検査しない（punct は常に0）", async () => {
+    const result = await generateBatch(envWithAiResponses([["影が揺れた"]]), {
+      ...input({ target: 1 }),
+      getReading: async () => {
+        const kana = "かげがゆれた";
+        return { kana, roman: buildRomanCandidates(kana) };
+      },
+    });
+    expect(result.valid.map((p) => p.text)).toEqual(["影が揺れた"]);
+    expect(result.rejected.punct).toBe(0);
+  });
+
+  it("ひらがなだけの本は kanji で却下する", async () => {
+    const result = await generateBatch(
+      envWithAiResponses([["しのびはやみをはしる。".repeat(12)]]),
+      {
+        ...input({ form: "long", target: 1 }),
+        getReading: longReading,
+      },
+    );
+    expect(result.valid).toEqual([]);
     expect(result.rejected.kanji).toBe(1);
   });
 });

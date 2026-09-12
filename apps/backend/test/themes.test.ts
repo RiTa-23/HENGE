@@ -120,6 +120,34 @@ describe("GET /themes/:id", () => {
     expect((body.theme as { promptCounts: { sentence: number } }).promptCounts.sentence).toBe(0);
   });
 
+  it("在庫数と生成困難の印は3形式ぶん返る", async () => {
+    await seedTheme({ id: "t1", longGenerationStatus: "difficult" });
+    await db.insert(prompts).values(
+      (["sentence", "word", "long"] as const).map((form, n) => ({
+        id: `p${n}`,
+        themeId: "t1",
+        form,
+        text: "あ",
+        readingKana: "あ",
+        readingRomanJson: "[]",
+        keystrokeCount: 12,
+        source: "workers_ai" as const,
+        sequenceNumber: 1,
+      })),
+    );
+
+    const { body } = await get("/themes/t1");
+    const theme = body.theme as {
+      promptCounts: Record<string, number>;
+      generationStatus: string;
+      wordGenerationStatus: string;
+      longGenerationStatus: string;
+    };
+    expect(theme.promptCounts).toEqual({ sentence: 1, word: 1, long: 1 });
+    expect(theme.longGenerationStatus).toBe("difficult");
+    expect(theme.generationStatus).toBe("ok");
+  });
+
   it("存在しないテーマは NOT_FOUND を返す（入力の形式は正しいため）", async () => {
     const { status, body } = await get("/themes/none");
     expect(status).toBe(404);

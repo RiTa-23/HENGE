@@ -174,13 +174,15 @@ describe("DELETE /admin/themes/:id", () => {
   it("生成ロックも消える（TTLの満了を待たない）", async () => {
     await seedTheme({ id: "t1" });
     await env.KV.put(themeLockKey("t1", "sentence"), "1");
-    // ロックは形式ごとに別のキー。**両方**消えることを見る（不変条件6）
+    // ロックは形式ごとに別のキー。**3形式すべて**消えることを見る（不変条件6）
     await env.KV.put(themeLockKey("t1", "word"), "1");
+    await env.KV.put(themeLockKey("t1", "long"), "1");
 
     await request("/admin/themes/t1", { method: "DELETE" });
 
     expect(await env.KV.get(themeLockKey("t1", "sentence"))).toBeNull();
     expect(await env.KV.get(themeLockKey("t1", "word"))).toBeNull();
+    expect(await env.KV.get(themeLockKey("t1", "long"))).toBeNull();
   });
 
   it("存在しないテーマは NOT_FOUND", async () => {
@@ -444,6 +446,56 @@ describe("PATCH /admin/prompts", () => {
 
     expect(status).toBe(400);
     expect((body.error as { code: string }).code).toBe("VALIDATION_ERROR");
+  });
+
+  it("長文は長文の範囲（250〜450打）で判定し、文言もその範囲で返す", async () => {
+    await seedTheme({ id: "t1" });
+    await seedPrompt({ id: "l1", themeId: "t1", form: "long", sequenceNumber: 1 });
+    // 短文なら通る25打の読み。長文の下限250に届かない
+    const stub = stubReading("しゅりけんがやみをさいた。");
+
+    const { status, body } = await request("/admin/prompts", {
+      method: "PATCH",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ id: "l1", text: "手裏剣が闇を裂いた。二度。" }),
+    });
+    stub.mockRestore();
+
+    expect(status).toBe(400);
+    expect((body.error as { message: string }).message).toContain("250〜450");
+  });
+
+  it("長文は文の終わり（。！？）が足りない本文を弾く（生成の punct と同じ）", async () => {
+    await seedTheme({ id: "t1" });
+    await seedPrompt({ id: "l1", themeId: "t1", form: "long", sequenceNumber: 1 });
+    const stub = stubReading("しゅりけんがやみをさいた".repeat(14));
+
+    const { status, body } = await request("/admin/prompts", {
+      method: "PATCH",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ id: "l1", text: "手裏剣が闇を裂いた".repeat(14) }),
+    });
+    stub.mockRestore();
+
+    expect(status).toBe(400);
+    expect((body.error as { message: string }).message).toContain("文の終わり");
+  });
+
+  it("長文は範囲内の読みと文の区切りがあれば通る", async () => {
+    await seedTheme({ id: "t1" });
+    await seedPrompt({ id: "l1", themeId: "t1", form: "long", sequenceNumber: 1 });
+    // 1文≒25打 × 12 ≒ 300打
+    const stub = stubReading("しゅりけんがやみをさいた。".repeat(12));
+
+    const { status, body } = await request("/admin/prompts", {
+      method: "PATCH",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ id: "l1", text: "手裏剣が闇を裂いた。".repeat(12) }),
+    });
+    stub.mockRestore();
+
+    expect(status).toBe(200);
+    expect(body.keystrokeCount).toBeGreaterThanOrEqual(250);
   });
 
   it("読みに打てないかなが残ったら弾く", async () => {

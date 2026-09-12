@@ -2,7 +2,7 @@
 
 import { accuracyRatio, keysPerSecond, type PromptForm, RANKING_SIZE } from "@henge/shared";
 import { useState } from "react";
-import { SentenceMark, WordMark } from "@/components/FormMark";
+import { FormMark } from "@/components/FormMark";
 import type { RankingEntry } from "@/lib/api/rankings";
 import { formLabel } from "@/lib/ui/kind";
 
@@ -17,14 +17,14 @@ import { formLabel } from "@/lib/ui/kind";
  */
 export function RankingBoard({
   boards,
-  initialForm = "sentence",
+  initialForm,
 }: {
   boards: { form: PromptForm; entries: RankingEntry[] }[];
-  /** `?ranking=word` で単語のタブから開く（結果画面の「ランキングを見る」） */
+  /** `?ranking=word` などで指定のタブから開く（結果画面の「ランキングを見る」）。無ければ先頭 */
   initialForm?: PromptForm;
 }) {
   const [form, setForm] = useState<PromptForm>(
-    boards.some((board) => board.form === initialForm)
+    initialForm !== undefined && boards.some((board) => board.form === initialForm)
       ? initialForm
       : (boards[0]?.form ?? "sentence"),
   );
@@ -51,11 +51,7 @@ export function RankingBoard({
                       : "flex items-center gap-1.5 rounded-full border border-kinari/15 px-4 py-1 text-sm tracking-widest text-kinari/60 hover:text-kinari"
                   }
                 >
-                  {board.form === "word" ? (
-                    <WordMark className="size-3.5 text-kin" />
-                  ) : (
-                    <SentenceMark className="size-3.5 text-kin" />
-                  )}
+                  <FormMark form={board.form} className="size-3.5 text-kin" />
                   {formLabel(board.form)}
                 </button>
               );

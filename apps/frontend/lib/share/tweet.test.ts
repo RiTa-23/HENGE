@@ -27,6 +27,12 @@ describe("buildShareText", () => {
     );
   });
 
+  it("テーマモード（長文）", () => {
+    expect(buildShareText({ kind: "theme", form: "long", themeName: "忍びの心得", stats })).toBe(
+      `HENGEで「忍びの心得」の長文を打った。\nスコア 249／打鍵/秒 4.4／正確率 98%\n#HENGE`,
+    );
+  });
+
   it("最適化モード。文字だけだと文として成立しないため「最適化練習」を挟む", () => {
     // 最適化練習に単語モードは無いので、形式を書き足さない
     expect(buildShareText({ kind: "constraint", form: "sentence", themeName: "ざ", stats })).toBe(

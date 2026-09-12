@@ -1,4 +1,4 @@
-import type { PromptForm, ThemeKind } from "@henge/shared";
+import { parsePromptForm, type PromptForm, type ThemeKind } from "@henge/shared";
 
 /**
  * テーマモードと最適化モードの**URL上の区別**をここだけに閉じ込める。
@@ -20,12 +20,14 @@ export function parseThemeKind(value: string | undefined): ThemeKind {
  * **短文にクエリを付けない**ので、これまでに共有されたURLはそのまま短文で開く。
  */
 export function parsePlayForm(value: string | undefined): PromptForm {
-  return value === "word" ? "word" : "sentence";
+  return parsePromptForm(value);
 }
 
 /** 画面に出す形式の呼び名 */
 export function formLabel(form: PromptForm): string {
-  return form === "word" ? "単語" : "短文";
+  if (form === "word") return "単語";
+  if (form === "long") return "長文";
+  return "短文";
 }
 
 /**
@@ -42,7 +44,7 @@ export function playHref(kind: ThemeKind, name: string, form: PromptForm = "sent
   const path = `/play/${encodeURIComponent(name)}`;
   const query = [
     ...(kind === "constraint" ? ["kind=constraint"] : []),
-    ...(form === "word" ? ["form=word"] : []),
+    ...(form === "sentence" ? [] : [`form=${form}`]),
   ];
   return query.length === 0 ? path : `${path}?${query.join("&")}`;
 }
@@ -60,7 +62,7 @@ export function detailHref(kind: ThemeKind, name: string): string {
  */
 export function rankingHref(kind: ThemeKind, name: string, form: PromptForm = "sentence"): string {
   const base = detailHref(kind, name);
-  return `${base}${form === "word" ? "?ranking=word" : ""}#ranking`;
+  return `${base}${form === "sentence" ? "" : `?ranking=${form}`}#ranking`;
 }
 
 /** そのモードの一覧ページ。プレイ画面の「一覧に戻る」が使う */

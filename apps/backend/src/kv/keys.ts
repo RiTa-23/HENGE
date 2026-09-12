@@ -1,4 +1,4 @@
-import type { PromptForm, ThemeKind } from "@henge/shared";
+import { PROMPT_FORMS, type PromptForm, type ThemeKind } from "@henge/shared";
 
 /**
  * KVのキーはここでだけ組み立てる。文字列を直書きしない。
@@ -24,7 +24,7 @@ export function themeLockKey(themeId: string, form: PromptForm): string {
 
 /** テーマ削除時に消すロックのキー。**形式ぶんすべて消す**（不変条件6） */
 export function themeLockKeys(themeId: string): string[] {
-  return [themeLockKey(themeId, "sentence"), themeLockKey(themeId, "word")];
+  return PROMPT_FORMS.map((form) => themeLockKey(themeId, form));
 }
 
 /**

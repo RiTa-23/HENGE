@@ -5,7 +5,7 @@ import { recordUsage } from "../db/usage";
 import { promptCountOf, setGenerationStatus, type ThemeDetail } from "../db/themes";
 import { acquireThemeLock, releaseThemeLock } from "../kv/lock";
 import { createGetReading } from "../reading/index";
-import { generateBatch } from "./batch";
+import { acceptsPartialBatch, generateBatch } from "./batch";
 import { resolveModel } from "./model";
 import { existingContextSize } from "./prompt";
 
@@ -67,11 +67,11 @@ async function refill(env: Env, input: RefillInput): Promise<void> {
     // 何度やっても在庫が積み上がらないテーマの印。無駄な再試行を止める。
     // 既存の在庫は普通に配信され続ける。
     //
-    // **単語だけ条件が違う。** 単語は1プレイ30問に対し、1回の補充で作れるのが
-    // 最大40件しかない。目標に少し届かなかっただけで印を立てると、**普通に
-    // 作れているテーマの補充まで止まる**。単語では「1件も作れなかった」ことだけを
-    // 生成困難と見なす。短文は目標未達で立てる（従来どおり）。
-    const difficult = form === "word" ? result.valid.length === 0 : !result.reachedTarget;
+    // **単語と長文は条件が違う**（`acceptsPartialBatch`）。目標と1回で作れる上限が
+    // 近いので、目標に少し届かなかっただけで印を立てると、**普通に作れている
+    // テーマの補充まで止まる**。「1件も作れなかった」ことだけを生成困難と見なす。
+    // 短文は目標未達で立てる（従来どおり）。
+    const difficult = acceptsPartialBatch(form) ? result.valid.length === 0 : !result.reachedTarget;
     if (difficult) await setGenerationStatus(db, theme.id, form, "difficult");
   } catch (error) {
     // 誰も待っていない処理なので、失敗しても握って記録するだけにする。

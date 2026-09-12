@@ -123,6 +123,14 @@ export const generateRoutes = new Hono<{ Bindings: Env }>()
 
     const form: PromptForm = body.form ?? "sentence";
 
+    // **単語・長文はテーマだけ。** 最適化練習（含む文字）には付けない
+    // （docs/05-generation.md）。URLを手で書けば `kind=constraint&form=long` の
+    // プレイ画面まで辿り着けるので、作る口はここで塞ぐ。長文の指示は指定文字を
+    // 入れさせないため、通すと偶然含んだ本だけのプールができる
+    if (theme.kind === "constraint" && form !== "sentence") {
+      return fail(c, "VALIDATION_ERROR", "最適化練習で作れるのは短文だけです");
+    }
+
     // 背景補充が走っている最中なら、二重に生成しない。**ロックは形式ごと**
     if (!(await acquireThemeLock(c.env.KV, body.themeId, form))) {
       return fail(c, "GENERATION_IN_PROGRESS");

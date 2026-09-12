@@ -1,17 +1,16 @@
 import {
   containsKanji,
   countKeystrokes,
+  countSentenceEnds,
   includesConstraint,
   isHiraganaOnlyWord,
   isKeystrokeCountInRange,
   isTypableText,
   isTypableWord,
-  KEYSTROKE_MAX,
-  KEYSTROKE_MIN,
+  keystrokeRange,
+  LONG_SENTENCE_MIN,
   parsePromptForm,
   UnsupportedKanaError,
-  WORD_KEYSTROKE_MAX,
-  WORD_KEYSTROKE_MIN,
 } from "@henge/shared";
 import { Hono } from "hono";
 import { createDb } from "../db/client";
@@ -125,6 +124,14 @@ export const adminRoutes = new Hono<{ Bindings: Env }>()
         isWord ? "ひらがなだけの単語は登録できません" : "漢字を1つ以上入れてください",
       );
     }
+    // 長文は文の区切りが要る（生成の `punct` と同じ検査）
+    if (target.form === "long" && countSentenceEnds(text) < LONG_SENTENCE_MIN) {
+      return fail(
+        c,
+        "VALIDATION_ERROR",
+        `文の終わり（。！？）を${LONG_SENTENCE_MIN}つ以上入れてください`,
+      );
+    }
 
     let reading: Awaited<ReturnType<ReturnType<typeof createGetReading>>>;
     try {
@@ -139,9 +146,8 @@ export const adminRoutes = new Hono<{ Bindings: Env }>()
 
     const keystrokeCount = countKeystrokes(reading.roman);
     if (!isKeystrokeCountInRange(keystrokeCount, target.form)) {
-      const [min, max] = isWord
-        ? [WORD_KEYSTROKE_MIN, WORD_KEYSTROKE_MAX]
-        : [KEYSTROKE_MIN, KEYSTROKE_MAX];
+      // 文言の範囲も形式に合わせる（判定だけ合っていて文言が短文の値だと読めない）
+      const [min, max] = keystrokeRange(target.form);
       return fail(
         c,
         "VALIDATION_ERROR",

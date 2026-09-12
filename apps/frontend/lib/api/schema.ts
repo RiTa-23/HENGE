@@ -79,7 +79,10 @@ export const promptIdParamSchema = z.object({ id: z.string().min(1) });
  * 同じ検査を通す。ここで中途半端に真似ると、2か所の規則がずれる。
  */
 export const promptTextSchema = z.object({
-  text: z.string().trim().min(1).max(100),
+  // 長文は表記で150〜250文字になる（打鍵450 ≒ かな220文字）。100のままだと
+  // 管理画面で長文を編集した時点で必ず弾かれる。打鍵数の本当の上限は Hono 側が
+  // 読み仮名から検査するので、ここは形式に依らず十分に大きい枠でよい
+  text: z.string().trim().min(1).max(400),
 });
 
 /** 表示名の最大文字数。フォームの `maxLength` と検証で同じ値を使う */

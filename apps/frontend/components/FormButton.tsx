@@ -60,13 +60,21 @@ export function FormButton({
         {text}
       </span>
       {large && (
-        <span className="font-gothic text-[11px] tracking-[0.15em] opacity-75">
-          {/* 縦書きの中で数字だけ横に組む（縦中横）。1文字ずつ倒れると読めない */}
+        /*
+          副題は**横書きに戻して**数字と単位を縦に積む。縦中横（text-combine-upright）で
+          数字だけ横に組む形は、字間が乗って「20」の箱が「問」の中心からずれた。
+          横書きの箱の中で中央揃えにすれば、数字の桁数が変わってもずれない
+        */
+        <span className="flex flex-col items-center gap-0.5 font-gothic text-[11px] leading-none opacity-75 [writing-mode:horizontal-tb]">
           {form === "long" ? (
-            "一本"
+            <>
+              <span>一</span>
+              <span>本</span>
+            </>
           ) : (
             <>
-              <span className="[text-combine-upright:all]">{playSize(form)}</span>問
+              <span className="font-mono">{playSize(form)}</span>
+              <span>問</span>
             </>
           )}
         </span>

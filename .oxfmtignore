@@ -7,3 +7,6 @@
 
 # ドキュメントは手で整形している（表やコードブロックが崩れるため）。
 **/*.md
+
+# wasm-bindgen が生成する（packages/reading-wasm/README.md）。再生成で元に戻る
+packages/reading-wasm/pkg/

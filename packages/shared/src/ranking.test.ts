@@ -8,7 +8,7 @@ describe("打鍵数の範囲", () => {
     expect(maxHits("sentence")).toBe(PLAY_SIZE * 35 * 2);
   });
 
-  it("単語は 20問 × 4〜20打鍵", () => {
+  it("単語は 30問 × 4〜20打鍵", () => {
     expect(minHits("word")).toBe(PLAY_SIZE_WORD * 4);
     expect(maxHits("word")).toBe(PLAY_SIZE_WORD * 20 * 2);
   });

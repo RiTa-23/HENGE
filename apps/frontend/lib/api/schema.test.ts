@@ -184,8 +184,8 @@ describe("rankingRegisterSchema", () => {
     expect(rankingRegisterSchema.safeParse({ ...ok, elapsedMs: 1000 }).success).toBe(false);
   });
 
-  test("形式で範囲が変わる（単語なら80打鍵で足りる）", () => {
-    expect(rankingRegisterSchema.safeParse({ ...ok, form: "word", hits: 80 }).success).toBe(true);
+  test("形式で範囲が変わる（単語なら120打鍵で足りる）", () => {
+    expect(rankingRegisterSchema.safeParse({ ...ok, form: "word", hits: 120 }).success).toBe(true);
     expect(rankingRegisterSchema.safeParse({ ...ok, form: "sentence", hits: 80 }).success).toBe(
       false,
     );

@@ -23,12 +23,11 @@ import type { ModelId } from "./model";
 /**
  * 1ラウンドあたりのリクエスト件数。
  *
- * **`MAX_ROUNDS × N_REQUEST ≤ 50` を必ず満たすこと。**
- * 読み仮名の取得はお題1件につき外部サブリクエストを1回消費し、
- * Workers無料プランの上限は1実行につき50回。20件×3ラウンド=60回で静かに失敗する。
- * N_REQUEST を変える場合はラウンド数もセットで見直すこと。
+ * **`N_REQUEST ≤ MAX_TEXTS`（読み Worker の1回あたりの上限30）を必ず満たすこと。**
+ * 読み取得は1ラウンド1回のバッチ呼び出しにまとまるので、残るサブリクエストは
+ * Workers AI の呼び出しだけ（ラウンドごとに1回）。
  */
-export const N_REQUEST = 20;
+export const N_REQUEST = 30;
 export const MAX_ROUNDS = 2;
 
 /**
@@ -36,11 +35,10 @@ export const MAX_ROUNDS = 2;
  *
  * 1本≒短文15問ぶんの出力で、20本頼むと応答が長すぎる（時間も `max_tokens` も）。
  * 1プレイ1本・在庫目標3本なので、5本×2ラウンド＝最大10本で十分埋まる。
- * 読み取得も1本1回なので `2 × 5 = 10 ≤ 50` に余裕で収まる。
  */
 export const N_REQUEST_LONG = 5;
 
-/** その形式の1ラウンドの件数。**`MAX_ROUNDS × これ ≤ 50` を満たすこと** */
+/** その形式の1ラウンドの件数。**読み Worker の `MAX_TEXTS` を超えないこと** */
 export function requestCount(form: PromptForm): number {
   return form === "long" ? N_REQUEST_LONG : N_REQUEST;
 }

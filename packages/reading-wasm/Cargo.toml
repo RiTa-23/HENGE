@@ -1,0 +1,23 @@
+[package]
+name = "reading-wasm"
+version = "0.1.0"
+edition = "2021"
+publish = false
+description = "HENGE の読み Worker が使う Vibrato の薄い Wasm ラッパー"
+license = "MIT"
+
+[lib]
+crate-type = ["cdylib", "rlib"]
+
+[dependencies]
+ruzstd = "0.9.0" # MIT。zstd を Wasm の中でストリーム展開する（辞書を展開済みで持たずに済ませる）
+# 本体は改変しない（ライセンス上も、追従の手間の上も）。train は学習用なので外す
+vibrato = { version = "0.5.2", default-features = false } # MIT or Apache-2.0
+wasm-bindgen = "0.2" # MIT or Apache-2.0
+
+# 公式の Wasm デモ（examples/wasm/Cargo.toml）に合わせる。サイズ優先
+[profile.release]
+panic = "abort"
+codegen-units = 1
+opt-level = 3
+lto = true

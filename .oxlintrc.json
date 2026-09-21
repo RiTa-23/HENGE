@@ -10,6 +10,7 @@
     "**/.open-next/**",
     "**/.wrangler/**",
     "**/worker-configuration.d.ts",
-    "**/next-env.d.ts"
+    "**/next-env.d.ts",
+    "packages/reading-wasm/pkg/**"
   ]
 }

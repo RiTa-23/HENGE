@@ -1,0 +1,16 @@
+{
+  "$schema": "../../node_modules/wrangler/config-schema.json",
+  "name": "henge-reading",
+  "main": "src/index.ts",
+  "compatibility_date": "2026-08-22",
+  // 外部に公開しない。Hono Worker から Service Binding 経由でのみ呼ばれる。
+  // 認証は持たないので、公開すると誰でも解析を回せる（不変条件1の考え方をここにも適用）。
+  "workers_dev": false,
+  "observability": { "enabled": true },
+  // 辞書（zstd 圧縮のまま）とそのライセンス文。スクリプトの一部にすると起動が重くなるので
+  // 静的アセットに置き、初回リクエストで読む。
+  "assets": {
+    "directory": "./assets",
+    "binding": "ASSETS",
+  },
+}

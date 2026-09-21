@@ -7,8 +7,6 @@ interface __BaseEnv_Env {
 	AI: Ai;
 	READING: Fetcher;
 	GENERATION_MODEL: "@cf/qwen/qwen3-30b-a3b-fp8";
-	READING_PROVIDER: "shadow";
-	YAHOO_APP_ID: string;
 }
 declare namespace Cloudflare {
 	interface GlobalProps {
@@ -21,7 +19,7 @@ type StringifyValues<EnvType extends Record<string, unknown>> = {
 	[Binding in keyof EnvType]: EnvType[Binding] extends string ? EnvType[Binding] : string;
 };
 declare namespace NodeJS {
-	interface ProcessEnv extends StringifyValues<Pick<Cloudflare.Env, "GENERATION_MODEL" | "READING_PROVIDER" | "YAHOO_APP_ID">> {}
+	interface ProcessEnv extends StringifyValues<Pick<Cloudflare.Env, "GENERATION_MODEL">> {}
 }
 
 // Begin runtime types

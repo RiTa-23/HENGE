@@ -8,10 +8,10 @@ export interface Reading {
 }
 
 /**
- * 読み仮名の取得。**必ずこの抽象を経由すること。Yahoo APIを直接呼ばない。**
+ * 読み仮名の取得。**必ずこの抽象を経由すること。読み Worker を直接呼ばない。**
  *
- * Yahoo! JLP は個人での商用利用が不可のため、将来の差し替えが確定している。
- * 後から挟むのでは間に合わない。
+ * 実装は読み Worker（Vibrato + UniDic トリム辞書）の1つ。プロバイダが
+ * 変わったときに呼び出し側を直さなくて済むように、入口はここに閉じる。
  */
 export type GetReading = (text: string) => Promise<Reading>;
 
@@ -30,7 +30,7 @@ export type ReadingOutcome =
  */
 export type GetReadings = (texts: string[]) => Promise<ReadingOutcome[]>;
 
-/** 1件ずつ呼ぶ実装をバッチ形に畳む。Yahoo などバッチ API を持たないプロバイダ用 */
+/** 1件ずつ呼ぶ実装をバッチ形に畳む。テストで注入する偽の実装を作るためのもの */
 export function fromSingle(getReading: GetReading): GetReadings {
   return async (texts) =>
     Promise.all(

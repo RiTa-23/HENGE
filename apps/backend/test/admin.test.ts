@@ -9,16 +9,11 @@ import { themeIdKey, themeLockKey } from "../src/kv/keys";
 
 const db = createDb(env.DB);
 
-const realFetch = globalThis.fetch.bind(globalThis);
-
-/** ルビ振りAPIだけを差し替える。Worker自身への fetch は素通しする */
-function stubReading(furigana: string) {
-  return vi.spyOn(globalThis, "fetch").mockImplementation(async (input) => {
-    const url = String(input);
-    if (!url.includes("yahooapis")) return realFetch(input as RequestInfo);
-    return Response.json({
-      result: { word: [{ surface: "手裏剣", furigana }] },
-    });
+/** 読み Worker（READING バインディング）の応答を差し替える */
+function stubReading(kana: string) {
+  return vi.spyOn(env.READING, "fetch").mockImplementation(async (_input, init) => {
+    const { texts } = JSON.parse(String(init?.body)) as { texts: string[] };
+    return Response.json({ results: texts.map(() => ({ kana })) });
   });
 }
 

@@ -49,17 +49,12 @@ async function seed() {
   }
 }
 
-/** Yahoo ルビ振りAPI の応答を差し替える（外部サブリクエストを消費しない） */
-function stubYahooReading() {
-  vi.spyOn(globalThis, "fetch").mockImplementation(
-    async () =>
-      new Response(
-        JSON.stringify({
-          result: { word: [{ surface: AI_TEXT, furigana: AI_READING }] },
-        }),
-        { status: 200, headers: { "content-type": "application/json" } },
-      ),
-  );
+/** 読み Worker（READING バインディング）の応答を差し替える */
+function stubReadingWorker(kana: string = AI_READING) {
+  vi.spyOn(env.READING, "fetch").mockImplementation(async (_input, init) => {
+    const { texts } = JSON.parse(String(init?.body)) as { texts: string[] };
+    return Response.json({ results: texts.map(() => ({ kana })) });
+  });
 }
 
 function stubAi(response: unknown) {
@@ -95,7 +90,7 @@ describe("kickRefill の消費記録（実際に使ったニューロンを加�
   it("お題が増えたら、その回で使ったニューロンを加算する", async () => {
     await seed();
     stubAi({ response: AI_TEXT, usage: TOKENS });
-    stubYahooReading();
+    stubReadingWorker();
     const { waitUntil, flush } = manualWaitUntil();
 
     const theme = (await getThemeDetail(db, "t1"))!;
@@ -151,15 +146,7 @@ describe("kickRefill の消費記録（実際に使ったニューロンを加�
     // 在庫0・nextOffset=1 → target = 1 + 3 - 0 = 4本。応答は有効1本だけ
     const long = "忍びは闇を走る。".repeat(14);
     stubAi({ response: long, usage: TOKENS });
-    vi.spyOn(globalThis, "fetch").mockImplementation(
-      async () =>
-        new Response(
-          JSON.stringify({
-            result: { word: [{ surface: long, furigana: AI_READING.repeat(14) }] },
-          }),
-          { status: 200, headers: { "content-type": "application/json" } },
-        ),
-    );
+    stubReadingWorker(AI_READING.repeat(14));
 
     const theme = (await getThemeDetail(db, "t1"))!;
     await kickRefill(env, waitUntil, { db, theme, form: "long", nextOffset: 1, userId: "u1" });
@@ -196,13 +183,11 @@ describe("kickRefill の消費記録（実際に使ったニューロンを加�
     await seed();
     stubAi({ response: AI_TEXT, usage: TOKENS });
     let neuronsAtReadingTime: number | null = null;
-    vi.spyOn(globalThis, "fetch").mockImplementation(async () => {
+    vi.spyOn(env.READING, "fetch").mockImplementation(async (_input, init) => {
       // 最初の読み取得が走った時点の台帳を覗く
       neuronsAtReadingTime ??= (await getUsage(db, "u1")).neurons;
-      return new Response(
-        JSON.stringify({ result: { word: [{ surface: AI_TEXT, furigana: AI_READING }] } }),
-        { status: 200, headers: { "content-type": "application/json" } },
-      );
+      const { texts } = JSON.parse(String(init?.body)) as { texts: string[] };
+      return Response.json({ results: texts.map(() => ({ kana: AI_READING })) });
     });
     const { waitUntil, flush } = manualWaitUntil();
 
@@ -220,7 +205,7 @@ describe("kickRefill の消費記録（実際に使ったニューロンを加�
   it("読み取得が落ちて例外になっても、AIで使った分は加算する", async () => {
     await seed();
     stubAi({ response: AI_TEXT, usage: TOKENS });
-    vi.spyOn(globalThis, "fetch").mockRejectedValue(new Error("Yahoo API障害"));
+    vi.spyOn(env.READING, "fetch").mockRejectedValue(new Error("読み Worker 障害"));
     const { waitUntil, flush } = manualWaitUntil();
 
     const theme = (await getThemeDetail(db, "t1"))!;

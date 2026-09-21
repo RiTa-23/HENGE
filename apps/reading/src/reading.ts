@@ -42,8 +42,8 @@ export function readingOf(
       kana.push(katakanaToHiragana(reading));
       continue;
     }
-    // 読みが無い語。かな・記号だけならそのまま打てる（Yahoo も漢字を含まない語には
-    // ふりがなを返さなかった）。漢字を含むなら読みが分からないので却下
+    // 読みが無い語。かな・記号だけならそのまま打てる。漢字を含むなら
+    // 読みが分からないので却下
     if (containsKanji(surface)) return { error: "UNKNOWN_READING", surface };
     kana.push(katakanaToHiragana(surface));
   }

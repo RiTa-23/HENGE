@@ -15,9 +15,8 @@ import {
   LONG_SENTENCE_MIN,
   type PromptForm,
   type ThemeKind,
-  UnsupportedKanaError,
 } from "@henge/shared";
-import type { GetReading } from "../reading/index";
+import { type GetReadings, ReadingError } from "../reading/index";
 import { recordGenerationResult, requestPrompts } from "./ai";
 import type { ModelId } from "./model";
 
@@ -140,7 +139,7 @@ export interface GenerateBatchInput {
   /** 重複回避の文脈。既存お題の本文 */
   existing: string[];
   model: ModelId;
-  getReading: GetReading;
+  getReadings: GetReadings;
   /** 検証結果のログ書き戻しを遅らせる。Honoハンドラからは c.executionCtx.waitUntil を渡す */
   waitUntil?: (promise: Promise<unknown>) => void;
   /**
@@ -159,7 +158,7 @@ export interface GenerateBatchInput {
  *
  * 1. LLMに N_REQUEST 件リクエスト
  * 2. ホワイトリスト検査（読み取得の前に無料で弾く）
- * 3. getReading() で読み仮名・ローマ字を取得
+ * 3. getReadings() で読み仮名・ローマ字を取得
  * 4. 打鍵数の検査
  * 5. 「含む」モードなら指定文字の検査
  * 6. 目標に達していなければ、もう1ラウンドだけ繰り返す
@@ -320,22 +319,24 @@ async function validateInto(
     return true;
   });
 
-  // 読み取得は1件につき外部サブリクエストを1回消費する。並列にして待ち時間だけ縮める
-  const readings = await Promise.allSettled(
-    candidates.map(async (text) => ({ text, reading: await input.getReading(text) })),
-  );
+  // 読み取得はバッチ1回の呼び出しにまとめる。読み Worker への Service Binding も
+  // サブリクエストに数えるため、件数分呼ぶと外部サブリクエスト上限を食う
+  const outcomes = await input.getReadings(candidates);
 
-  for (const result of readings) {
-    if (result.status === "rejected") {
-      // テーブルに無いかなが読みに残っていた場合。APIの障害はここで握りつぶさず外へ投げる
-      if (result.reason instanceof UnsupportedKanaError) {
-        rejected.charset++;
-        continue;
-      }
-      throw result.reason;
+  for (const [i, text] of candidates.entries()) {
+    const outcome = outcomes[i];
+    // 入力と応答は同じ長さで揃っている前提（プロバイダの契約）。崩れていたら実装の不具合
+    if (outcome === undefined) {
+      throw new ReadingError("読み取得の応答と要求がずれている");
+    }
+    // 読みが引けない・読みにテーブル外のかなが残った場合はそのお題を却下。
+    // APIの障害は GetReadings 自体が例外を投げるので、ここでは握りつぶさず外へ伝わる
+    if (!outcome.ok) {
+      rejected.charset++;
+      continue;
     }
 
-    const { text, reading } = result.value;
+    const reading = outcome.reading;
     const keystrokeCount = countKeystrokes(reading.roman);
     if (!isKeystrokeCountInRange(keystrokeCount, input.form)) {
       rejected.keystroke++;

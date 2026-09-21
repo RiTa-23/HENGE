@@ -16,7 +16,7 @@ import {
   resolveModel,
 } from "../src/generation/model";
 import { parseGeneratedBlocks, parseGeneratedLines } from "../src/generation/prompt";
-import type { GetReading } from "../src/reading/index";
+import { fromSingle, type GetReading } from "../src/reading/index";
 
 describe("parseGeneratedLines", () => {
   it("1行1文に切る", () => {
@@ -178,7 +178,7 @@ function input(overrides: Partial<GenerateBatchInput> = {}): GenerateBatchInput 
     target: 2,
     existing: [],
     model: DEFAULT_MODEL,
-    getReading: fakeReading,
+    getReadings: fromSingle(fakeReading),
     ...overrides,
   };
 }
@@ -224,7 +224,7 @@ describe("generateBatch", () => {
 
     const result = await generateBatch(
       envWithAiResponses([["「忍び」の心得", "忍びは闇を走る。"], []]),
-      input({ target: 2, getReading: counting }),
+      input({ target: 2, getReadings: fromSingle(counting) }),
     );
 
     expect(result.rejected.charset).toBe(1);
@@ -260,7 +260,7 @@ describe("generateBatch", () => {
 
     const result = await generateBatch(
       envWithAiResponses([["ざあざあとふるあめ。", "忍びは闇を走る。"], []]),
-      input({ target: 2, getReading: counting }),
+      input({ target: 2, getReadings: fromSingle(counting) }),
     );
 
     expect(result.rejected.kanji).toBe(1);
@@ -393,7 +393,7 @@ describe("単語モードの検証", () => {
   it("句読点の付いた語を charset として却下する", async () => {
     const result = await generateBatch(envWithAiResponses([["忍者", "手裏剣。", "城"]]), {
       ...input({ form: "word", target: 3 }),
-      getReading: wordReading,
+      getReadings: fromSingle(wordReading),
     });
 
     expect(result.valid.map((p) => p.text)).toEqual(["忍者", "城"]);
@@ -407,7 +407,7 @@ describe("単語モードの検証", () => {
   it("カタカナ語は通し、ひらがなだけの語を却下する", async () => {
     const result = await generateBatch(envWithAiResponses([["ラーメン", "にんじゃ"]]), {
       ...input({ form: "word", target: 2 }),
-      getReading: wordReading,
+      getReadings: fromSingle(wordReading),
     });
 
     expect(result.valid.map((p) => p.text)).toEqual(["ラーメン"]);
@@ -433,7 +433,7 @@ describe("長文の検証", () => {
     const shortBody = sentence.repeat(2);
     const result = await generateBatch(envWithAiResponses([[`${okBody}\n\n${shortBody}`]]), {
       ...input({ form: "long", target: 1 }),
-      getReading: longReading,
+      getReadings: fromSingle(longReading),
     });
 
     expect(result.valid.map((p) => p.text)).toEqual([okBody]);
@@ -448,7 +448,7 @@ describe("長文の検証", () => {
     const wrapped = `${sentence.repeat(3)}\n${sentence.repeat(3)}`;
     const result = await generateBatch(envWithAiResponses([[wrapped]]), {
       ...input({ form: "long", target: 1 }),
-      getReading: longReading,
+      getReadings: fromSingle(longReading),
     });
 
     expect(result.valid.map((p) => p.text)).toEqual([body]);
@@ -459,7 +459,7 @@ describe("長文の検証", () => {
     const noPunct = sentence.repeat(6).replaceAll("。", "");
     const result = await generateBatch(envWithAiResponses([[noPunct]]), {
       ...input({ form: "long", target: 1 }),
-      getReading: longReading,
+      getReadings: fromSingle(longReading),
     });
     expect(result.valid).toEqual([]);
     expect(result.rejected.punct).toBe(1);
@@ -468,10 +468,10 @@ describe("長文の検証", () => {
   it("短文では文の終わりを検査しない（punct は常に0）", async () => {
     const result = await generateBatch(envWithAiResponses([["影が揺れた"]]), {
       ...input({ target: 1 }),
-      getReading: async () => {
+      getReadings: fromSingle(async () => {
         const kana = "かげがゆれた";
         return { kana, roman: buildRomanCandidates(kana) };
-      },
+      }),
     });
     expect(result.valid.map((p) => p.text)).toEqual(["影が揺れた"]);
     expect(result.rejected.punct).toBe(0);
@@ -482,7 +482,7 @@ describe("長文の検証", () => {
       envWithAiResponses([["しのびはやみをはしる。".repeat(12)]]),
       {
         ...input({ form: "long", target: 1 }),
-        getReading: longReading,
+        getReadings: fromSingle(longReading),
       },
     );
     expect(result.valid).toEqual([]);
@@ -500,7 +500,7 @@ describe("重複の計測", () => {
   it("既存プールと同じものは dup として数える", async () => {
     const result = await generateBatch(envWithAiResponses([["忍者", "手裏剣"]]), {
       ...input({ form: "word", target: 2, existing: ["忍者"] }),
-      getReading: wordReading,
+      getReadings: fromSingle(wordReading),
     });
 
     expect(result.valid.map((p) => p.text)).toEqual(["手裏剣"]);
@@ -510,7 +510,7 @@ describe("重複の計測", () => {
   it("同じ生成の中で重なったものも数える", async () => {
     const result = await generateBatch(envWithAiResponses([["忍者", "忍者", "城"]]), {
       ...input({ form: "word", target: 3 }),
-      getReading: wordReading,
+      getReadings: fromSingle(wordReading),
     });
 
     expect(result.valid.map((p) => p.text)).toEqual(["忍者", "城"]);

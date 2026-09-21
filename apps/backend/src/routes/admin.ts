@@ -10,7 +10,6 @@ import {
   keystrokeRange,
   LONG_SENTENCE_MIN,
   parsePromptForm,
-  UnsupportedKanaError,
 } from "@henge/shared";
 import { Hono } from "hono";
 import { createDb } from "../db/client";
@@ -21,7 +20,7 @@ import {
   PROMPT_LIST_LIMIT_DEFAULT,
   updatePromptText,
 } from "../db/prompts";
-import { createGetReading } from "../reading/index";
+import { createGetReadings } from "../reading/index";
 import { deleteTheme, LIST_LIMIT_DEFAULT, listThemesForAdmin } from "../db/themes";
 import { listUsers, USER_LIST_LIMIT_DEFAULT } from "../db/users";
 import { fail } from "../http/error";
@@ -133,16 +132,13 @@ export const adminRoutes = new Hono<{ Bindings: Env }>()
       );
     }
 
-    let reading: Awaited<ReturnType<ReturnType<typeof createGetReading>>>;
-    try {
-      reading = await createGetReading(c.env)(text);
-    } catch (error) {
-      // 読みにテーブル外のかなが残った場合。打てないお題になるので通さない
-      if (error instanceof UnsupportedKanaError) {
-        return fail(c, "VALIDATION_ERROR", "読み仮名に打てない文字が含まれています");
-      }
-      throw error;
+    // 1件でもバッチ口を通す（読み Worker 側のエンドポイントはバッチ形のみ）
+    const [outcome] = await createGetReadings(c.env)([text]);
+    if (!outcome?.ok) {
+      // 読みが引けない・読みにテーブル外のかなが残った場合。打てないお題になるので通さない
+      return fail(c, "VALIDATION_ERROR", "読み仮名に打てない文字が含まれています");
     }
+    const reading = outcome.reading;
 
     const keystrokeCount = countKeystrokes(reading.roman);
     if (!isKeystrokeCountInRange(keystrokeCount, target.form)) {

@@ -17,7 +17,21 @@ export default defineConfig({
       // CI（特にforkからのPR）でテストが動かせなくなる。
       remoteBindings: false,
       miniflare: {
-        bindings: { TEST_MIGRATIONS: migrations },
+        bindings: {
+          TEST_MIGRATIONS: migrations,
+          // テストは常に Yahoo 経路（globalThis.fetch の差し替えで応答を作る）を通す。
+          // wrangler.jsonc の既定は shadow で、読み Worker のバインディングはテスト環境に無い
+          READING_PROVIDER: "yahoo",
+        },
+        // wrangler.jsonc の READING Service Binding が指すサービスのスタブ。
+        // 無いと workerd が起動を拒否する。yahoo 経路では呼ばれない
+        workers: [
+          {
+            name: "henge-reading",
+            modules: true,
+            script: `export default { fetch: () => new Response("reading stub", { status: 500 }) }`,
+          },
+        ],
       },
     }),
   ],

@@ -6,7 +6,7 @@
 
 - `src/lib.rs` … Rust。**Vibrato 本体は改変しない。** 辞書のバイト列から `Reader` を作る・文を解析して `表層形\t特徴列` を返す、の2つだけ
 - `pkg/` … ビルド成果物（`wasm-bindgen --target web`）。**コミットする。** Rust が無い環境（CI・他の開発者・`bun run dev`）でもそのまま動くようにするため
-- 特徴列の解釈（IPADIC の読み列、未知語）は TypeScript 側（`apps/reading`）。Rust 側に置くと辞書を変えるたびに Wasm を焼き直すことになる
+- 特徴列の解釈（UniDic トリム辞書の読み列、未知語）は TypeScript 側（`apps/reading`）。Rust 側に置くと辞書を変えるたびに Wasm を焼き直すことになる
 
 ## ビルド
 

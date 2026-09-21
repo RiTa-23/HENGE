@@ -54,6 +54,22 @@
         "wrangler": "^4.129.0",
       },
     },
+    "apps/reading": {
+      "name": "@henge/reading",
+      "version": "0.0.0",
+      "dependencies": {
+        "@henge/reading-wasm": "workspace:*",
+        "@henge/shared": "workspace:*",
+        "hono": "^4.13.5",
+      },
+      "devDependencies": {
+        "wrangler": "^4.129.0",
+      },
+    },
+    "packages/reading-wasm": {
+      "name": "@henge/reading-wasm",
+      "version": "0.0.0",
+    },
     "packages/shared": {
       "name": "@henge/shared",
       "version": "0.0.0",
@@ -348,6 +364,10 @@
     "@henge/backend": ["@henge/backend@workspace:apps/backend"],
 
     "@henge/frontend": ["@henge/frontend@workspace:apps/frontend"],
+
+    "@henge/reading": ["@henge/reading@workspace:apps/reading"],
+
+    "@henge/reading-wasm": ["@henge/reading-wasm@workspace:packages/reading-wasm"],
 
     "@henge/shared": ["@henge/shared@workspace:packages/shared"],
 

@@ -23,13 +23,10 @@ function stubGeneration(lines: string[][], reading = "しのび") {
   vi.spyOn(env.AI, "gateway").mockReturnValue({
     patchLog: async () => {},
   } as unknown as ReturnType<typeof env.AI.gateway>);
-  vi.spyOn(globalThis, "fetch").mockImplementation(async (input) => {
-    const url = String(input);
-    // Yahoo API だけを差し替える。Worker自身への fetch は素通しする
-    if (!url.includes("yahooapis")) return realFetch(input as RequestInfo);
-    return Response.json({
-      result: { word: [{ surface: "しのび", furigana: reading }] },
-    });
+  // 読み Worker（READING バインディング）だけを差し替える
+  vi.spyOn(env.READING, "fetch").mockImplementation(async (_input, init) => {
+    const { texts } = JSON.parse(String(init?.body)) as { texts: string[] };
+    return Response.json({ results: texts.map(() => ({ kana: reading })) });
   });
 }
 
@@ -65,8 +62,6 @@ function stubValidGeneration() {
   ];
   stubGeneration([nums.map((n) => `${n}の忍びが闇を走る。`)], "しのびはやみをはしる。");
 }
-
-const realFetch = globalThis.fetch.bind(globalThis);
 
 async function post(path: string, body: unknown) {
   const res = await SELF.fetch(`http://backend${path}`, {

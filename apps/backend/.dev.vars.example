@@ -1,5 +1,4 @@
 # Hono Worker のローカル開発用。`.dev.vars` にコピーして値を入れる。
 # 本番は `wrangler secret put <名前>` で設定する（リポジトリにコミットしない）。
 
-# Yahoo! JLP ルビ振りAPI のアプリケーションID
-YAHOO_APP_ID=""
+# 現在、Hono Worker が使う secret は無い。読み取得は読み Worker（Service Binding）経由

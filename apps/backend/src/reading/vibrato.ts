@@ -16,6 +16,7 @@ interface ReadingsResponse {
 
 export function createVibratoReadings(reading: Fetcher): GetReadings {
   return async (texts: string[]): Promise<ReadingOutcome[]> => {
+    if (texts.length === 0) return [];
     const res = await reading.fetch(PATH, {
       method: "POST",
       headers: { "Content-Type": "application/json" },

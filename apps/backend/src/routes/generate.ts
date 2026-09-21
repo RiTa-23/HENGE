@@ -16,7 +16,7 @@ import { existingContextSize } from "../generation/prompt";
 import { fail } from "../http/error";
 import { cacheThemeId, getCachedThemeId } from "../kv/themes";
 import { acquireThemeLock, releaseThemeLock } from "../kv/lock";
-import { createGetReading } from "../reading/index";
+import { createGetReadings } from "../reading/index";
 
 interface CreateBody {
   kind: ThemeKind;
@@ -82,7 +82,7 @@ export const generateRoutes = new Hono<{ Bindings: Env }>()
         target: playSize("sentence"),
         existing: [],
         model,
-        getReading: createGetReading(c.env),
+        getReadings: createGetReadings(c.env),
         waitUntil: (promise) => c.executionCtx.waitUntil(promise),
         // **消費が確定した直後に記録する。** ここより後で何が起きても
         // （生成失敗、保存の失敗、クライアント切断によるキャンセル）記録は残る。
@@ -150,7 +150,7 @@ export const generateRoutes = new Hono<{ Bindings: Env }>()
         target: playSize(form),
         existing: await recentPromptTexts(db, theme.id, form, existingContextSize(form)),
         model,
-        getReading: createGetReading(c.env),
+        getReadings: createGetReadings(c.env),
         waitUntil: (promise) => c.executionCtx.waitUntil(promise),
         // 消費が確定した直後に記録する（POST /themes と同じ理由）
         onNeurons: async (used) => {

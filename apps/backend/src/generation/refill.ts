@@ -4,7 +4,7 @@ import { appendPrompts, recentPromptTexts } from "../db/prompts";
 import { recordUsage } from "../db/usage";
 import { promptCountOf, setGenerationStatus, type ThemeDetail } from "../db/themes";
 import { acquireThemeLock, releaseThemeLock } from "../kv/lock";
-import { createGetReading } from "../reading/index";
+import { createGetReadings } from "../reading/index";
 import { acceptsPartialBatch, generateBatch } from "./batch";
 import { resolveModel } from "./model";
 import { existingContextSize } from "./prompt";
@@ -55,7 +55,7 @@ async function refill(env: Env, input: RefillInput): Promise<void> {
       target: nextOffset + stockTarget(form) - promptCountOf(theme.promptCounts, form),
       existing: await recentPromptTexts(db, theme.id, form, existingContextSize(form)),
       model,
-      getReading: createGetReading(env),
+      getReadings: createGetReadings(env),
       // **消費が確定した直後に記録する。** 補充は waitUntil の中で走り、
       // レスポンス送信から30秒で打ち切られる。終わってから記録する形だと、
       // 打ち切られた回の消費が丸ごと台帳に載らない

@@ -1,8 +1,9 @@
 /**
  * 辞書（UniDic cwj-3.1.1 の自前トリム版）を取得して `apps/reading/assets/` に置く。
  *
- * - 取得元はこのリポジトリの GitHub Release `unidic-cwj-trim-v1`。
- *   辞書は `scripts/unidic/BUILD.md` の手順で自前ビルドしたものをアップロードしてある
+ * - 取得元は公開リポジトリ RiTa-23/unidic-cwj-trim の GitHub Release `unidic-cwj-trim-v1`。
+ *   HENGE 本体が private 化されても辞書取得は無認証のまま動くよう、
+ *   辞書アセットはあちらに置く。中身は `scripts/unidic/BUILD.md` の手順で自前ビルドしたもの
  * - sha256 を照合する。取得元が差し替わっても気づけるように
  * - ライセンス文も一緒に置く。UniDic cwj は GPL/LGPL/BSD のトリプルライセンスで、
  *   ここでは **BSD** を選択している（licses/COPYING 参照）。再頒布には BSD 条文と
@@ -15,7 +16,7 @@ import { createHash } from "node:crypto";
 import { mkdir } from "node:fs/promises";
 
 const RELEASE = "unidic-cwj-trim-v1";
-const BASE = `https://github.com/RiTa-23/HENGE/releases/download/${RELEASE}`;
+const BASE = `https://github.com/RiTa-23/unidic-cwj-trim/releases/download/${RELEASE}`;
 
 /** [アセット名, assets内のファイル名, sha256] */
 const FILES = [

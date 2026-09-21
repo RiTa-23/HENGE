@@ -4,7 +4,7 @@ import type { ThemeKind } from "@henge/shared";
  * テーマモードと最適化モードの切替。**排他**（どちらか一方）。
  *
  * 組み合わせ可能にすると「テーマ × 最適化する音」ごとに別プールが必要になり、
- * 生成回数とYahoo APIの消費が組合せ的に増える（docs/05-generation.md）。
+ * 生成回数とニューロン消費が組合せ的に増える（docs/05-generation.md）。
  * 排他であることを画面でも見せるため、タブで並べて片方だけを選ばせる。
  */
 export function ModeTabs({ current }: { current: ThemeKind }) {

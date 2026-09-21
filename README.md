@@ -48,7 +48,7 @@ Hono Worker … 外部非公開。D1 / KV / Workers AI へのアクセスを担�
 | バックエンド | Hono |
 | Worker間通信 | Service Bindings（HTTP方式）＋ Hono RPC（`hc`） |
 | データ | D1（Drizzle ORM）＋ KV |
-| お題生成 | Workers AI（AI Gateway経由）＋ Yahoo! JLPルビ振りAPI（読み仮名の取得） |
+| お題生成 | Workers AI（AI Gateway経由）＋ 読み Worker（Vibrato + UniDic トリム辞書で読み仮名の取得） |
 | 認証 | Better Auth（Googleプロバイダのみ。Next.js Worker側のみに置く） |
 | 入力検証 | Zod（公開APIの入口で行う） |
 | スタイル | Tailwind CSS v4（`@theme` トークンで4色・3書体に制限） |
@@ -62,8 +62,10 @@ Hono Worker … 外部非公開。D1 / KV / Workers AI へのアクセスを担�
 apps/
   frontend/   Next.js Worker。画面・Route Handler・認証
   backend/    Hono Worker。D1/KV/Workers AIへのアクセス
+  reading/    読み Worker。読み仮名の解析（外部非公開）
 packages/
   shared/     型定義、ローマ字入力エンジン、正規化関数、JST日付関数
+  reading-wasm/  Vibrato の Wasm ラッパー（読み Worker 専用）
 docs/         実装ドキュメント
 ```
 
@@ -71,10 +73,10 @@ docs/         実装ドキュメント
 
 1. ユーザーがテーマ（または含む文字）を指定する
 2. Workers AIがお題の候補文をバッチで生成する
-3. Yahoo! JLPルビ振りAPIで読み仮名を取り、ローマ字候補テーブルで打鍵数を計算する
+3. 読み Worker（Service Binding経由）で読み仮名を取り、ローマ字候補テーブルで打鍵数を計算する
 4. 検証（打てる文字種・漢字の有無・打鍵数10〜35・「含む」文字）を通ったものだけをD1に保存する
 
-生成は1プレイ15問を揃えることを目標に、リトライは最大2ラウンド。上限はWorkers無料プランの外部サブリクエスト制約による。
+生成は1プレイ15問（単語は30問）を揃えることを目標に、リトライは最大2ラウンド。1ラウンドの依頼数は読み Worker のバッチ上限（30件）に揃えている。
 
 ## 開発コマンド
 

@@ -53,7 +53,9 @@ bun run db:migrate:local         # ローカルD1に適用
 ```
 apps/frontend/   Next.js Worker。画面・Route Handler・認証
 apps/backend/    Hono Worker。D1/KV/Workers AIへのアクセス
+apps/reading/    読み Worker。Vibrato+UniDic トリム辞書で読み仮名を返す（外部非公開）
 packages/shared/ 型定義、ローマ字入力エンジン、正規化関数、日次消費の窓（UTC）
+packages/reading-wasm/ Vibrato の Wasm ラッパー（読み Worker 専用）
 docs/            実装ドキュメント
 ```
 
@@ -65,11 +67,11 @@ docs/            実装ドキュメント
 1. **認証は Next.js Worker 側にのみ置く。** Hono側にBetter Authを実装しない。**Honoに公開ルートを生やさない**（外部非公開であることが、Next.jsで認証を完結させる前提になっている）
 2. **Service Bindings は HTTP方式**（`env.BACKEND.fetch`）。`WorkerEntrypoint`によるRPC方式に変えない。Hono RPCとSmart Placementの両方を失う
 3. **日次消費の日付は必ず `packages/shared` の `usageDateKey()` を経由する（00:00 UTC 基準）。** JSTに直さない。Workers AI の無料枠が 00:00 UTC にリセットされるため、窓をずらすと1アカウント日の中に利用者のリセットが挟まり、**1人が上限の2倍まで消費できてしまう**。利用者への表示だけ日本時間にする（`quotaResetAt()` が朝9時として返す）
-4. **生成は最大2ラウンド × 20件（長文は5本）。** `2 × N_request ≤ 50`（Workers無料プランの外部サブリクエスト上限）を破らない。3ラウンド目で静かに失敗する
+4. **生成は最大2ラウンド × 30件（長文は5本）。** `N_REQUEST ≤ MAX_TEXTS`（読み Worker の1回あたりの上限30）を破らない。読み取得は1ラウンド1回のバッチ呼び出しにまとまっている
 5. **テーマ行はお題15問と同じバッチで挿入する。** 先に作ると、生成失敗時にお題ゼロのテーマが公開一覧に残る
 6. **テーマ削除時はKVも明示的に消す。** D1のCASCADEはD1の中でしか効かない
 7. **タイピング判定に `<input>` / `<textarea>` を使わない。** IMEが介入して打鍵を拾えなくなる。`<div tabindex="0">` へのkeydownで実装する
-8. **読み仮名の取得は必ず `getReading()` 経由。** Yahoo APIを直接呼ばない（将来の差し替えが確定しているため）
+8. **読み仮名の取得は必ず `getReadings()` 経由。** 読み Worker を直接呼ばない（プロバイダを差し替えても呼び出し側を直さなくて済むようにするため）
 9. **色・書体はTailwindの `@theme` トークンのみ使う。** 生の16進数値や `blue-600` のような汎用色を書かない
 10. **匿名ユーザーのデータをサーバーに持たない。** 進捗はクライアントのlocalStorageで管理する
 11. **バックグラウンド補充を発火できるのはログインユーザーのみ。** 匿名のプレイではキックしない。発火したら、その生成で使った**ニューロンをそのユーザーに加算する**（上限は500ニューロン/日。回数では数えない）。**成果が0件でも、例外で落ちても加算する** — ニューロンは呼んだ時点で消費されている

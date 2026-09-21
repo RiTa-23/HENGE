@@ -10,16 +10,19 @@ Next.js Worker（OpenNext）… 画面のSSR、セッション検証、認可
    |  ② Service Bindings（HTTP方式）
    v
 Hono Worker … 外部非公開。D1 / KV / Workers AI へのアクセスを担う
+   |  ② Service Bindings（HTTP方式）
+   v
+読み Worker … 外部非公開。Vibrato + UniDic トリム辞書で読み仮名を返す
 ```
 
-**Workerは2つに分かれている。** 責務は次のとおり。
+**Workerは3つに分かれている。** 責務は次のとおり。
 
-| | Next.js Worker | Hono Worker |
-|---|---|---|
-| 役割 | 画面表示、認証、認可 | データ操作、AI生成 |
-| 外部公開 | される | **されない** |
-| 認証 | Better Authでセッション検証 | **しない**（渡された`userId`を信頼する） |
-| バインディング | **D1（認証テーブル限定の例外）** | D1 / KV / Workers AI |
+| | Next.js Worker | Hono Worker | 読み Worker |
+|---|---|---|---|
+| 役割 | 画面表示、認証、認可 | データ操作、AI生成 | 読み仮名の解析 |
+| 外部公開 | される | **されない** | **されない** |
+| 認証 | Better Authでセッション検証 | **しない**（渡された`userId`を信頼する） | **しない** |
+| バインディング | **D1（認証テーブル限定の例外）** | D1 / KV / Workers AI / READING | 静的アセット（辞書） |
 
 ## 認証テーブルへのD1アクセス（例外の線引き）
 
@@ -90,11 +93,13 @@ CloudflareにはRPC方式（`WorkerEntrypoint`のメソッドを直接呼ぶ）�
 apps/
   frontend/   … Next.js Worker。画面とRoute Handler
   backend/    … Hono Worker。D1/KV/Workers AIへのアクセス
+  reading/    … 読み Worker。読み仮名の解析（外部非公開）
 packages/
   shared/     … 型定義、ローマ字入力エンジン、正規化関数など両者で使うもの
+  reading-wasm/ … Vibrato の Wasm ラッパー（読み Worker 専用）
 ```
 
-`wrangler.jsonc` は `apps/frontend` と `apps/backend` にそれぞれ1本ずつ置く。
+`wrangler.jsonc` は `apps/frontend`・`apps/backend`・`apps/reading` にそれぞれ1本ずつ置く。
 
 ## 環境変数・シークレット
 
@@ -103,7 +108,6 @@ packages/
 | `GOOGLE_CLIENT_ID` / `GOOGLE_CLIENT_SECRET` | Google OAuth。Google Cloud Console で作り、リダイレクトURIに `BETTER_AUTH_URL/api/auth/callback/google` を登録する | Wranglerのシークレット（Next.js側） |
 | `BETTER_AUTH_SECRET` | セッション署名。`openssl rand -base64 32` 等で作る | 同上 |
 | `BETTER_AUTH_URL` | Better Auth の baseURL。ローカルは `http://localhost:3000`、本番は**公開ドメイン**。**認証だけでなく、シェアURLとOGPの基準URLもここから引く**（`lib/og.ts` の `siteUrl()`） | 同上（URLそのものは公開情報だが、環境ごとに値が変わるため vars ではなくシークレットとして管理する） |
-| `YAHOO_APP_ID` | ルビ振りAPI | 同上（Hono側） |
 | `ADMIN_EMAILS` | 管理者判定（カンマ区切り） | 同上（Next.js側） |
 
 ローカル開発では `.dev.vars` を使う。テンプレートは `apps/frontend/.dev.vars.example` / `apps/backend/.dev.vars.example`。**リポジトリにコミットしない。**

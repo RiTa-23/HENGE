@@ -32,7 +32,7 @@ export const metadata: Metadata = {
  *
  * **実装と食い違ったまま置かない。** ここに書いてあることは、
  * `packages/shared/src/db/auth-schema.ts` と `apps/backend/src/db/schema.ts` の
- * 列、および外部APIの呼び出し先（Workers AI / Yahoo）と一致していること。
+ * 列、および外部APIの呼び出し先（Workers AI）と一致していること。
  * 保存する項目や送り先を変えたら、このページも同じPRで直す。
  */
 
@@ -111,12 +111,7 @@ export default function PrivacyPage() {
               お題を作るとき、入力されたテーマ名が生成の指示文に含まれます。
               本サービスはCloudflare上で動いており、通信もCloudflareを経由します
             </li>
-            <li>
-              <b className="font-normal text-kinari">LINEヤフー株式会社</b>
-              {" — "}
-              生成されたお題の本文を、読み仮名を得るためにテキスト解析APIへ送ります。
-              利用者を特定できる情報は含みません
-            </li>
+
             <li>
               <b className="font-normal text-kinari">Google LLC</b>
               {" — "}

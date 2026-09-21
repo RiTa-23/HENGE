@@ -9,7 +9,7 @@ import { planRebuild, type StoredPrompt, updateStatement } from "./rebuild-roman
  * **ローマ字候補は生成時に計算してD1へ焼き込んでいる**ため、テーブルに打ち方を
  * 足しても既存のお題には遡及しない（docs/06-typing-engine.md）。これがその埋め合わせ。
  *
- * **読み仮名はD1にあるので、Yahoo APIは叩かない。** `buildRomanCandidates` は
+ * **読み仮名はD1にあるので、読み Worker は叩かない。** `buildRomanCandidates` は
  * 純粋関数なので、全部ローカルで完結する。
  *
  * 使い方（リポジトリのルートから）:

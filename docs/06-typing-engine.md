@@ -81,7 +81,7 @@ bun run rebuild:roman -- --remote            # 下見（書かない）
 bun run rebuild:roman -- --remote --apply    # 書き込む
 ```
 
-**読み仮名はD1にあるので、Yahoo APIは叩かない。** `buildRomanCandidates()` は純粋関数で、
+**読み仮名はD1にあるので、読み Worker は叩かない。** `buildRomanCandidates()` は純粋関数で、
 全部ローカルで完結する。`reading_roman_json` と `keystroke_count` は必ず一緒に作り直す
 （片方だけ直すと、画面に出る打鍵数と実際の打鍵数が食い違う）。
 

@@ -9,6 +9,7 @@
   "scripts": {
     "dev": "wrangler dev",
     "deploy": "wrangler deploy",
+    "test": "bun test",
     "typecheck": "tsc --noEmit",
     "cf-typegen": "wrangler types",
     "dict:fetch": "bun ../../scripts/unidic/fetch-dict.ts"

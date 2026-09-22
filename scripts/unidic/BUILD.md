@@ -75,9 +75,14 @@ UniDic cwj は GPL / LGPL / **BSD** のトリプルライセンス（licses/COPY
 ## ユーザー辞書（誤読の個別修正）
 
 システム辞書とは別に `apps/reading/assets/user-lex.csv`（MeCab 書式、
-`表層,lid,rid,cost,特徴13列`、git 管理・コミット対象）を Vibrato の
-`reset_user_lexicon_from_reader` で重ねている。誤読を見つけたら
-CSV に1行足して PR を出すだけでよい（マージで自動デプロイ）。
+`表層,lid,rid,cost,特徴13列`）を Vibrato の
+`reset_user_lexicon_from_reader` で重ねている。
+**管理元は辞書リポジトリ（RiTa-23/unidic-cwj-trim）に移った**
+（lid/rid が辞書ビルドの接続ID空間を参照するため、辞書と同じ場所で
+バージョン管理する）。本リポジトリ側は `dict:fetch` で Release 資産を
+取得するだけで、誤読の追加は辞書リポジトリへの PR になる。
+誤読を見つけたら辞書リポジトリの CSV に1行足して PR → マージ後に
+Release アセットを差し替え、HENGE を再デプロイするだけでよい。
 
 書き方:
 - `lid`/`rid` はシステム辞書の接続ID空間の有効値が要る。
@@ -115,9 +120,11 @@ CSV に1行足して PR を出すだけでよい（マージで自動デプロ�
   両読みを同コストで登録する方式は、コネクタ近似誤差で間違った側を
   選ぶ文脈が残るため確実ではない
 - 特徴列は読み（列12=index11）が必須、あとは pos1 の1文字＋`*` 埋めでよい
-- 行追加後は `bun run --cwd apps/reading test`（user-lex.test.ts）で
-  誤読修正と複合語非破壊の両方が検査できる。複合語が増えたら
-  同ファイルの「複合語が壊れない」ケースにも足す
+- 行追加の検証は2段: 辞書リポジトリ側は `validate-user-lex.ts` が
+  構文（13列・整数・カタカナ読み）だけを検査し、本格的な誤読回帰は
+  **HENGE側の `bun run --cwd apps/reading test`（user-lex.test.ts）が
+  dict:fetch した最新 csv に対して** CI で行う。つまり壊れた行は
+  辞書リポジトリにマージできても、HENGE の適用で必ず弾かれる。
 
 辞書本体の語彙を増やす根治はこちらの手順で `.dic` を作り直すが、
 個別の誤読はユーザー辞書の方が軽い（再ビルド・再配布が不要）。

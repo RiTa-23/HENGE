@@ -7,7 +7,7 @@
   ],
   "type": "module",
   "scripts": {
-    "dev": "concurrently -n backend,frontend -c cyan,magenta \"bun run --cwd apps/backend dev\" \"bun run --cwd apps/frontend dev\"",
+    "dev": "bun scripts/unidic/fetch-dict.ts --if-missing && concurrently -n backend,frontend,reading -c cyan,magenta,yellow \"bun run --cwd apps/backend dev\" \"bun run --cwd apps/frontend dev\" \"bun run --cwd apps/reading dev\"",
     "preview": "bun run --cwd apps/frontend preview",
     "build": "bun run --cwd apps/frontend build",
     "lint": "oxlint .",

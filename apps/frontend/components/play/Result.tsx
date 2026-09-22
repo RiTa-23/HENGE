@@ -41,7 +41,7 @@ export function Result({
   /** ランキングの登録に使う。名前ではなくIDで送る（`kind` を落とすと別のプールになる） */
   themeId: string;
   stats: PlayStats;
-  /** 打ち損ねた文字と回数。1プレイ（短文15問／単語20問）の通算 */
+  /** 打ち損ねた文字と回数。1プレイ（短文10問／単語20問）の通算 */
   missedKeys: ReadonlyMap<string, number>;
   onRetry: () => void;
   themeName: string;
@@ -76,7 +76,7 @@ export function Result({
       <div className="w-full max-w-2xl rounded-lg border border-kin/60 bg-kinari/5 px-10 py-12">
         {/*
           見出しはテーマ名（または最適化の文字）だけ。**問題数は出さない。**
-          形式ごとに固定（短文15／単語20）なので、書いても情報が増えない。
+          形式ごとに固定（短文10／単語20）なので、書いても情報が増えない。
           **形式は出す。** テーマ名だけだと、あとから見て短文の記録か単語の記録か
           分からない
         */}

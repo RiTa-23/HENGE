@@ -24,8 +24,8 @@ git diff main...HEAD
 1. 認証はNext.js Workerのみか。Hono側にBetter Authや公開ルートを生やしていないか
 2. Service BindingsはHTTP方式（`env.BACKEND.fetch`）のままか。`WorkerEntrypoint`のRPC方式に変えていないか
 3. 日付は`packages/shared`のJST変換関数を経由しているか。`new Date().toISOString()`を直接使っていないか
-4. 生成の1ラウンドの依頼数が読み Worker の `MAX_TEXTS`（30）を超えていないか
-5. テーマ行はお題15問と同じバッチで挿入されているか（先に挿入していないか）
+4. 生成の1ラウンドの依頼数が読み Worker の `MAX_TEXTS`（40）を超えていないか
+5. テーマ行はお題10問と同じバッチで挿入されているか（先に挿入していないか）
 6. テーマ削除時にKVも明示的に消しているか
 7. タイピング判定に`<input>` / `<textarea>`を使っていないか
 8. 読み仮名の取得が`getReadings()`経由か。読み Worker を直接呼んでいないか

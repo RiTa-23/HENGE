@@ -171,7 +171,7 @@ export function PlayScreen({
   const [promptIndex, setPromptIndex] = useState(0);
   const [progress, setProgress] = useState<TypingProgress>(() => startTyping([]));
   const [stats, setStats] = useState<PlayStats>({ hits: 0, misses: 0, elapsedMs: 0 });
-  /** 15問を通した苦手キー。問題ごとの集計をここへ畳む */
+  /** 1プレイを通した苦手キー。問題ごとの集計をここへ畳む */
   const [missedKeys, setMissedKeys] = useState<ReadonlyMap<string, number>>(() => new Map());
   /**
    * 日本語入力のまま打たれたことがあるか。**一度でも見たら出しっぱなしにする。**
@@ -210,7 +210,7 @@ export function PlayScreen({
   /**
    * 途中でやめて開始前へ戻る。**取得済みのお題は捨てる。**
    *
-   * 持ち回して再開できるようにすると、**一度お題を見たうえで同じ15問を打ち直せて
+   * 持ち回して再開できるようにすると、**一度お題を見たうえで同じ10問を打ち直せて
    * しまう。** 暗記による有利を作らないことがこのサービスの前提なので、見たお題を
    * 再配布しない。オフセットは受け取った時点で消費が確定している（docs/04-api.md）
    * ため、やめた分の在庫は戻らない。それは中断の代償として受け入れる。
@@ -458,7 +458,7 @@ export function PlayScreen({
       <div className="flex min-h-dvh items-center justify-center p-6">
         <div className="w-full max-w-lg rounded-lg border border-kin/60 bg-kinari/5 px-10 py-16 text-center">
           {/* 開始前に出すのはテーマ名だけ。総数を出しても遊べる残り数とは違ううえ、
-              15問ひと組は例外なく成り立つので添えても情報が増えない */}
+              10問ひと組は例外なく成り立つので添えても情報が増えない */}
           <h1 className="font-mincho text-4xl leading-snug tracking-wider text-kinari">
             {themeName}
           </h1>

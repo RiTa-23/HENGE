@@ -7,6 +7,7 @@ import {
   type GenerateBatchInput,
   N_REQUEST,
   N_REQUEST_LONG,
+  N_REQUEST_WORD,
   requestCount,
 } from "../src/generation/batch";
 import {
@@ -71,11 +72,15 @@ describe("parseGeneratedBlocks（長文）", () => {
 });
 
 describe("形式ごとの生成の規則", () => {
-  it("長文は1ラウンド5本、それ以外は20件（2ラウンドで50を超えない）", () => {
+  it("1ラウンドの依頼数は単語40・短文20・長文5で、読み Worker の上限（40）を超えない", () => {
     expect(requestCount("long")).toBe(N_REQUEST_LONG);
     expect(requestCount("sentence")).toBe(N_REQUEST);
-    expect(requestCount("word")).toBe(N_REQUEST);
+    expect(requestCount("word")).toBe(N_REQUEST_WORD);
     expect(N_REQUEST_LONG * 2).toBeLessThanOrEqual(50);
+    // 読み取得は1ラウンド1回のバッチ呼び出しなので、依頼数は MAX_TEXTS を超えられない
+    for (const form of ["sentence", "word", "long"] as const) {
+      expect(requestCount(form)).toBeLessThanOrEqual(40);
+    }
   });
 
   it("単語と長文は取れた分を保存し、短文は目標未達で失敗にする", () => {

@@ -73,15 +73,15 @@
 **実施済み（#176 / #177）。** Yahoo! JLP API から読み Worker（Vibrato + UniDic cwj-3.1.1
 トリム辞書）へ差し替え、外部サブリクエストに縛られていた値を見直した。
 
-- 不変条件4を `N_REQUEST ≤ MAX_TEXTS`（読み Worker の1回上限30）に置き替え
-- **単語の1プレイを20問から30問へ戻した**（`PLAY_SIZE_WORD`）
-- 単語の在庫目標（`STOCK_TARGET_WORD`）は30件のまま維持（1回の補充で埋まる）
+- 不変条件4を `N_REQUEST ≤ MAX_TEXTS`（読み Worker の1回上限40）に置き替え
+- **1プレイの問題数を単語20問・短文10問に調整した**（`PLAY_SIZE_WORD` / `PLAY_SIZE`。単語は30問→20問、短文は15問→10問）
+- 単語の在庫目標（`STOCK_TARGET_WORD`）は40件（2プレイ分。1回の補充＝最大80件で埋まる）
 
 ## Phase 8: 動作確認・実測・デプロイ
 
 - 両Workerのデプロイ、Service Bindingsの本番設定
 - **モデル比較の実測**（品質・速度・ニューロン消費。AI Gatewayのダッシュボードを使う）
-- 却下率・重複率を実測し、N_requestを調整（**`N_REQUEST ≤ MAX_TEXTS`（30）を維持すること**）
+- 却下率・重複率を実測し、N_requestを調整（**各形式の依頼数 ≤ `MAX_TEXTS`（40）を維持すること**）
 - Google OAuthの公開ステータスを「本番」に切り替える
 - Web Analyticsを有効化
 - 初期テーマ5〜10個の事前生成とD1投入

@@ -19,7 +19,7 @@ export interface PlayStats {
   hits: number;
   /** ミス打鍵の延べ回数 */
   misses: number;
-  /** 15問にかかった時間（ミリ秒） */
+  /** 1プレイにかかった時間（ミリ秒） */
   elapsedMs: number;
 }
 

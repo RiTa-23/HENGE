@@ -10,10 +10,11 @@
  */
 
 /**
- * 1回で受け付ける最大件数。1ラウンドの依頼数（N_REQUEST）より少し多め。
+ * 1回で受け付ける最大件数。1ラウンドの依頼数の最大（単語の40）に合わせる。
+ * Vibrato はローカル処理なので、件数を増やしても外部リソースは消費しない。
  * エントリ（index.ts）に named export を置くと workerd がハンドラと誤認して起動しないので、ここに置く
  */
-export const MAX_TEXTS = 30;
+export const MAX_TEXTS = 40;
 
 export type ReadingResult =
   | { kana: string }

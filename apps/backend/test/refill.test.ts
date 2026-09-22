@@ -34,7 +34,7 @@ async function seed() {
     name: "忍びの心得",
     normalizedName: "忍びの心得",
   });
-  const rows = Array.from({ length: 44 }, (_, i) => ({
+  const rows = Array.from({ length: 34 }, (_, i) => ({
     id: `p${i + 1}`,
     themeId: "t1",
     text: `お題${i + 1}`,
@@ -94,7 +94,7 @@ describe("kickRefill の消費記録（実際に使ったニューロンを加�
     const { waitUntil, flush } = manualWaitUntil();
 
     const theme = (await getThemeDetail(db, "t1"))!;
-    // 在庫44に対し nextOffset=15 → target = 15 + 30 - 44 = 1
+    // 在庫34に対し nextOffset=15 → target = 15 + 20 - 34 = 1
     const kicked = await kickRefill(env, waitUntil, {
       db,
       theme,
@@ -106,7 +106,7 @@ describe("kickRefill の消費記録（実際に使ったニューロンを加�
     await flush();
 
     const promptsAfter = await db.select().from(prompts);
-    expect(promptsAfter).toHaveLength(45);
+    expect(promptsAfter).toHaveLength(35);
     // 1ラウンドで目標に達したので1回分
     const usage = await getUsage(db, "u1");
     expect(usage.count).toBe(1);

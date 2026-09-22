@@ -71,7 +71,7 @@ export default async function PracticeDetailPage({
           description={
             <>
               読み仮名に「{theme.name}」を含む文章だけが出ます。表記に現れていなくても構いません。
-              15問ひと組で、同じ文章は繰り返し出ません。
+              10問ひと組で、同じ文章は繰り返し出ません。
             </>
           }
           stats={[

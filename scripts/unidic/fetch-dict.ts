@@ -25,6 +25,9 @@ const FILES = [
     "unidic.dic.zst",
     "aae2f56b6f88a2a6a2671a072248220166b708a1a4a8d2ffbff610d6c0d06d9f",
   ],
+  // user-lex.csv は誤読修正のたびに更新されるアセットなので sha は固定しない。
+  // 取り込まれた内容は apps/reading のテスト（誤読回帰・非破壊）が取得後に検査する
+  ["user-lex.csv", "user-lex.csv", null],
   ["COPYING.unidic", "COPYING.unidic", null],
   ["LICENSE-BSD.unidic", "LICENSE-BSD.unidic", null],
   ["AUTHORS.unidic", "AUTHORS.unidic", null],

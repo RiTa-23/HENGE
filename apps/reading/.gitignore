@@ -1,2 +1,3 @@
 # 辞書は `bun run dict:fetch` で取得する（GitHub Release の固定版）。ライセンス文はコミットする
 assets/*.zst
+assets/user-lex.csv

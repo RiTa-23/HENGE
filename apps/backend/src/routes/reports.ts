@@ -47,13 +47,12 @@ export const reportRoutes = new Hono<{ Bindings: Env }>()
     const limit = Number.parseInt(c.req.query("limit") ?? "", 10);
     const cursor = Number.parseInt(c.req.query("cursor") ?? "", 10);
     const db = createDb(c.env.DB);
-    return c.json(
-      await listReadingReports(db, {
-        status,
-        limit: Number.isNaN(limit) ? REPORT_LIST_LIMIT_DEFAULT : Math.min(limit, 200),
-        cursor: Number.isNaN(cursor) || cursor < 0 ? 0 : cursor,
-      }),
-    );
+    const reports = await listReadingReports(db, {
+      status,
+      limit: Number.isNaN(limit) ? REPORT_LIST_LIMIT_DEFAULT : Math.min(limit, 200),
+      cursor: Number.isNaN(cursor) || cursor < 0 ? 0 : cursor,
+    });
+    return c.json({ reports });
   })
   /**
    * 承認/却下。承認時は expectedKana（カタカナ正規化済み）と cost を確定する。

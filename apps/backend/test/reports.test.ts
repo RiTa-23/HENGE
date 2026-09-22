@@ -51,9 +51,9 @@ describe("reading_reports", () => {
     const id = (await insertReadingReports(db, [base]))[0]!;
     const rows = await listReadingReports(db, { status: "pending", limit: 50, cursor: 0 });
     expect(rows).toHaveLength(1);
-    expect(rows[0].id).toBe(id);
-    expect(rows[0].userId).toBeNull();
-    expect(rows[0].status).toBe("pending");
+    expect(rows[0]?.id).toBe(id);
+    expect(rows[0]?.userId).toBeNull();
+    expect(rows[0]?.status).toBe("pending");
   });
 
   it("バッチ挿入は件数分の id を返す", async () => {

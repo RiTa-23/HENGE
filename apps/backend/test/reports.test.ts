@@ -66,7 +66,7 @@ describe("reading_reports", () => {
   it("ログインユーザーの報告は userId が残る", async () => {
     await insertReadingReports(db, [{ ...base, userId: "u1" }]);
     const rows = await listReadingReports(db, { status: "pending", limit: 50, cursor: 0 });
-    expect(rows[0].userId).toBe("u1");
+    expect(rows[0]?.userId).toBe("u1");
   });
 
   it("approve は status を approved にし、pending 一覧から消える", async () => {
@@ -85,8 +85,8 @@ describe("reading_reports", () => {
       cursor: 0,
     });
     expect(approved).toHaveLength(1);
-    expect(approved[0].expectedKana).toBe("カキゴオリ");
-    expect(approved[0].cost).toBe(-20000);
+    expect(approved[0]?.expectedKana).toBe("カキゴオリ");
+    expect(approved[0]?.cost).toBe(-20000);
   });
 
   it("処理済みの報告を二度承認しようとしても弾かれる", async () => {

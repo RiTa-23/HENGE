@@ -185,6 +185,11 @@ export const readingReportActionSchema = z.object({
   cost: z.number().int().min(-20000).max(20000).optional(),
 });
 
+/** ワークフローからの適用完了通知（辞書PRマージ後に approved → applied） */
+export const readingReportAppliedSchema = z.object({
+  ids: z.array(z.string().min(1)).min(1).max(500),
+});
+
 /** 管理画面の報告一覧クエリ */
 export const readingReportListQuerySchema = z.object({
   status: z.enum(["pending", "approved", "rejected", "applied"]).default("pending"),

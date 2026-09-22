@@ -198,6 +198,10 @@
 // 承認/却下。承認時は expectedKana をカタカナ正規化値・cost を確定する
 { "id": "...", "action": "approve", "expectedKana": "カキゴオリ", "cost": -20000 }
 { "id": "...", "action": "reject" }
+// GET /api/admin/reading-reports と POST /api/admin/reading-reports/applied は
+//   Authorization: Bearer <REPORTS_SYNC_TOKEN> でも通る（辞書リポの自動PRワークフロー用。
+//   未設定なら機械アクセス不可）。POST applied は approved→applied に閉じる通知
+{ "ids": ["...", "..."] }
 // createdAt は認証テーブル（Better Auth）の列でミリ秒精度のため、themes と違い ISO 文字列で返る
 { "users": [{ "id": "...", "name": "Rita", "email": "...", "image": null,
               "createdAt": "2026-09-05T12:00:00.000Z",

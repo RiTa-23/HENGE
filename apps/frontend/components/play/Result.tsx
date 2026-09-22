@@ -38,6 +38,7 @@ export function Result({
   kind,
   form,
   shareUrl,
+  prompts,
 }: {
   /** ランキングの登録に使う。名前ではなくIDで送る（`kind` を落とすと別のプールになる） */
   themeId: string;

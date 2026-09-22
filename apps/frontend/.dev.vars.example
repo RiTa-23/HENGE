@@ -14,3 +14,6 @@ BETTER_AUTH_URL="http://localhost:3000"
 
 # 管理者のメールアドレス（カンマ区切り）
 ADMIN_EMAILS=""
+
+# 辞書リポの報告同期ワークフローが使う機械認証トークン（未設定なら機械アクセス不可）
+REPORTS_SYNC_TOKEN=""

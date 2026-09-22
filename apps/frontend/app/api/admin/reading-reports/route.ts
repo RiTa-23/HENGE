@@ -1,13 +1,18 @@
 import { forbidNonAdmin } from "@/lib/api/admin";
+import { forbidNonSyncOrAdmin } from "@/lib/api/sync-guard";
 import { backendClient, relay } from "@/lib/api/backend";
 import { errorResponse } from "@/lib/api/error";
 import { readingReportActionSchema, readingReportListQuerySchema } from "@/lib/api/schema";
 
 export const dynamic = "force-dynamic";
 
-/** 報告一覧。管理画面用。`?status=pending|approved|rejected|applied` */
+/**
+ * 報告一覧。管理画面用。`?status=pending|approved|rejected|applied`
+ * 辞書リポのワークフローも `Bearer REPORTS_SYNC_TOKEN` で `status=approved` を
+ * 取りに来る（機械アクセス。ユーザー辞書に転記する行のエクスポート経路）
+ */
 export async function GET(request: Request) {
-  const denied = await forbidNonAdmin(request);
+  const denied = await forbidNonSyncOrAdmin(request);
   if (denied !== null) return denied;
 
   const url = new URL(request.url);

@@ -30,13 +30,18 @@ describe("/api/admin/* のルート構造", () => {
     expect(files.length).toBeGreaterThan(0);
   });
 
-  it.each(files)("%s は forbidNonAdmin を通している", (file) => {
-    expect(readFileSync(file, "utf8")).toContain("await forbidNonAdmin(request)");
+  // 認可ガードはどちらかを通す。機械アクセスを許すルート（辞書リポの
+  // ワークフローが来るもの）は forbidNonSyncOrAdmin で、Bearer トークンか
+  // 管理セッションのどちらかで通る。どちらも判定自体はNext.js側で完結する
+  const GUARD = /await forbid(?:NonSyncOrAdmin|NonAdmin)\(request\)/;
+
+  it.each(files)("%s は forbidNonAdmin / forbidNonSyncOrAdmin を通している", (file) => {
+    expect(readFileSync(file, "utf8")).toMatch(GUARD);
   });
 
   it.each(files)("%s は Hono を呼ぶ前に認可を判定している", (file) => {
     const source = readFileSync(file, "utf8");
-    const guard = source.indexOf("await forbidNonAdmin(request)");
+    const guard = source.search(GUARD);
     const callBackend = source.indexOf("await backendClient()");
 
     expect(guard).toBeGreaterThanOrEqual(0);

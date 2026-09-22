@@ -179,6 +179,32 @@ CREATE INDEX rankings_theme_form_score ON rankings (theme_id, form, score DESC);
 - 登録の「upsert → 刈り込み → 順位の計算」は非原子。同じプールへの同時登録で瞬間的に101件を超えたり、返す順位が1つずれたりしうるが、**害はその程度なので許容する**（クォータの「判定 → 生成 → 加算」と同じ扱い）。トランザクションで直そうとしないこと（D1 の `batch` は文をまたいだ読み書きの依存を表せない）
 - 記録は自己申告で改ざんは防げない（MVPでは対策しない）。範囲外の値（`playStatsRejection`）と、**そのプールを遊んだ記録（`user_theme_progress`）が無いユーザー**は弾く
 
+## reading_reports
+
+読み違いのユーザー報告。**承認→user-lex.csv 追記PR（辞書リポジトリ側の GitHub Actions）までのワークキュー。**
+
+| カラム | 型 | 説明 |
+|---|---|---|
+| `id` | TEXT | PK（uuid） |
+| `theme_id` | TEXT | FK→`themes.id` ON DELETE CASCADE。テーマが消えたらその報告も要らない |
+| `sentence_no` | INTEGER | リザルト一覧でのお題番号（1始まり）。`prompts` の連番ではなく表示位置 |
+| `prompt_text` | TEXT | 報告時点のお題文。お題の編集・削除で報告が読めなくならないよう冗長に持つ |
+| `surface` | TEXT | 誤っている読みの部分（お題文中の表層） |
+| `reported_kana` | TEXT | 生成時に実際に出た（誤った）読み |
+| `expected_kana` | TEXT | ユーザー申告の正しい読み。承認時にカタカナ正規化値で上書きされる |
+| `user_id` | TEXT NULL | FK→`user.id` ON DELETE SET NULL。**匿名は NULL**（報告は進捗データではないので受け付ける） |
+| `status` | TEXT | `'pending'`/`'approved'`/`'rejected'`/`'applied'`。applied は approved からのみ進む |
+| `cost` | INTEGER NULL | 承認時に確定する user-lex コスト値。NULL はワークフローの自動推定 |
+| `created_at` | INTEGER | 報告時刻 |
+| `applied_at` | INTEGER NULL | PRが取り込まれた時刻 |
+
+```sql
+CREATE INDEX reading_reports_status ON reading_reports (status, created_at DESC);
+```
+
+- **`prompts` へのFKを張らない。** お題が消えても報告内容は残す（`prompt_text` で自己完結）
+- 処理済みの報告を二度操作できない（`updateReadingReportStatus` は pending からのみ遷移）
+
 ## user（Better Auth 管理）に足した列
 
 Better Auth の4テーブルは CLI の出力をそのまま使うが、**`user` にだけアプリの列を1つ足している**。

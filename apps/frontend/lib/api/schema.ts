@@ -146,3 +146,48 @@ export const rankingRegisterSchema = z
     const reason = playStatsRejection(value, value.form);
     if (reason !== null) ctx.addIssue({ code: "custom", message: reason });
   });
+
+/**
+ * 読み違い報告の1件分。`expectedKana` はひらがなのみ（カタカナ入力は
+ * ひらがなへ寄せてから送る UI 側の責務。ここでは厳しめにかな文字だけ許す）。
+ * `surface` はお題文に含まれる表層で、長さは複合語程度まで。
+ */
+export const readingReportSchema = z.object({
+  themeId: z.string().min(1),
+  sentenceNo: z.number().int().min(1).max(100),
+  promptText: z.string().trim().min(1).max(400),
+  surface: z.string().trim().min(1).max(30),
+  reportedKana: z.string().trim().min(1).max(400),
+  expectedKana: z
+    .string()
+    .trim()
+    .min(1)
+    .max(60)
+    .regex(/^[ぁ-んァ-ヶー]+$/, "読みはひらがなかカタカナで入力してください"),
+});
+
+/** リザルト画面からのまとめて報告（複数お題・複数箇所を一度に送れる） */
+export const readingReportBatchSchema = z.object({
+  reports: z.array(readingReportSchema).min(1).max(15),
+});
+
+/** 管理画面の報告承認/却下 */
+export const readingReportActionSchema = z.object({
+  id: z.string().min(1),
+  action: z.enum(["approve", "reject"]),
+  /** 承認時に確定する読み（カタカナ正規化済み。省略時は申告値を使う） */
+  expectedKana: z
+    .string()
+    .trim()
+    .regex(/^[ァ-ヶー]+$/, "読みはカタカナにしてください")
+    .optional(),
+  /** 承認時に確定する user-lex コスト値。省略時はワークフローの自動推定 */
+  cost: z.number().int().min(-20000).max(20000).optional(),
+});
+
+/** 管理画面の報告一覧クエリ */
+export const readingReportListQuerySchema = z.object({
+  status: z.enum(["pending", "approved", "rejected", "applied"]).default("pending"),
+  limit: z.coerce.number().int().min(1).max(200).optional(),
+  cursor: z.coerce.number().int().min(0).optional(),
+});

@@ -204,6 +204,50 @@ export const rankings = sqliteTable(
 );
 
 /**
+ * 読み違いのユーザー報告。承認→user-lex.csv追記PR（辞書リポジトリ側）までの
+ * ワークキューとして持つ。`prompts` へのFKではなく `theme_id`+`sentence_no`+
+ * `prompt_text` で自己完結させる — お題が後で編集・削除されても報告内容は
+ * 残る。
+ *
+ * 匿名ユーザーの報告は `user_id` NULL で受け付ける（報告は進捗データでは
+ * ない）。
+ */
+export const readingReports = sqliteTable(
+  "reading_reports",
+  {
+    id: text("id").primaryKey(),
+    themeId: text("theme_id")
+      .notNull()
+      .references(() => themes.id, { onDelete: "cascade" }),
+    /** リザルト一覧でのお題番号（1始まり）。prompts の連番ではなく表示位置 */
+    sentenceNo: integer("sentence_no").notNull(),
+    /** 報告時点のお題文。お題が消えても報告は読めるように冗長に持つ */
+    promptText: text("prompt_text").notNull(),
+    /** 誤っている読みの部分（お題文中の表層） */
+    surface: text("surface").notNull(),
+    /** 生成時に実際に出た（誤った）読み */
+    reportedKana: text("reported_kana").notNull(),
+    /** ユーザーが申告した正しい読み（ひらがな。承認時にカタカナ正規化される） */
+    expectedKana: text("expected_kana").notNull(),
+    /** 報告者。匿名は NULL */
+    userId: text("user_id").references(() => user.id, { onDelete: "set null" }),
+    status: text("status", { enum: ["pending", "approved", "rejected", "applied"] })
+      .notNull()
+      .default("pending"),
+    /** 承認時に確定する user-lex コスト値。既定はワークフローの自動推定 */
+    cost: integer("cost"),
+    createdAt: integer("created_at")
+      .notNull()
+      .default(sql`(unixepoch())`),
+    appliedAt: integer("applied_at"),
+  },
+  (t) => [
+    // 承認画面（pending一覧）とワークフロー（approved取得）の両方が status で絞る
+    index("reading_reports_status").on(t.status, desc(t.createdAt)),
+  ],
+);
+
+/**
  * Better Auth 管理下のテーブル。@better-auth/cli generate が生成したものを
  * packages/shared に置き、両Workerから参照する。
  *

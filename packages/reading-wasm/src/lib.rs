@@ -32,10 +32,16 @@ impl Reader {
     /// 渡すと JS 側バッファと Wasm 側の辞書が同時に存在して上限を超える。圧縮のまま渡し
     /// （~7MB）、Wasm の中でストリーム展開しながら `Dictionary::read` に流すと、
     /// ピークは「圧縮 ~7MB ＋ 辞書 +84MB ＋ 展開の作業領域」で済む。
+    ///
+    /// `user_csv` はユーザー辞書（MeCab CSV 書式）。システム辞書とは別に語彙を重ねられ、
+    /// 誤読・分割ミス・辞書欠落語を Viterbi 競合で直接直せる。不要なら省略（undefined）。
     #[wasm_bindgen]
-    pub fn from_zstd(compressed: &[u8]) -> Result<Reader, JsError> {
+    pub fn from_zstd(compressed: &[u8], user_csv: Option<String>) -> Result<Reader, JsError> {
         let decoder = StreamingDecoder::new(compressed).map_err(|e| JsError::new(&e.to_string()))?;
         let dict = Dictionary::read(decoder).map_err(|e| JsError::new(&e.to_string()))?;
+        let dict = dict
+            .reset_user_lexicon_from_reader(user_csv.as_deref().map(str::as_bytes))
+            .map_err(|e| JsError::new(&e.to_string()))?;
         Ok(Reader { tokenizer: Tokenizer::new(dict) })
     }
 

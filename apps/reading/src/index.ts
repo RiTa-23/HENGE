@@ -30,11 +30,18 @@ function getReader(env: Env): Promise<Reader> {
 async function loadReader(env: Env): Promise<Reader> {
   initSync({ module: wasmModule });
   // ASSETS へのリクエストはパスだけ見られる。ホスト名は何でもよい
-  const response = await env.ASSETS.fetch("https://assets/unidic.dic.zst");
-  if (!response.ok) throw new Error(`辞書が読めない: ${response.status}`);
+  const [dictResponse, userLexResponse] = await Promise.all([
+    env.ASSETS.fetch("https://assets/unidic.dic.zst"),
+    env.ASSETS.fetch("https://assets/user-lex.csv"),
+  ]);
+  if (!dictResponse.ok) throw new Error(`辞書が読めない: ${dictResponse.status}`);
+  if (!userLexResponse.ok) throw new Error(`ユーザー辞書が読めない: ${userLexResponse.status}`);
   // zstd 圧縮のまま渡し、Wasm の中でストリーム展開する。
   // JS 側で展開すると展開済みバッファが JS と Wasm の両方にできて 128MB を超える
-  return Reader.from_zstd(new Uint8Array(await response.arrayBuffer()));
+  return Reader.from_zstd(
+    new Uint8Array(await dictResponse.arrayBuffer()),
+    await userLexResponse.text(),
+  );
 }
 
 const app = new Hono<{ Bindings: Env }>();

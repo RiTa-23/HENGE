@@ -31,11 +31,11 @@ function stubGeneration(lines: string[][], reading = "しのび") {
 }
 
 /**
- * 1ラウンドで15問揃う有効な応答。
+ * 1ラウンドで10問揃う有効な応答。
  *
  * テキストはすべてユニークにするだけでなく、**書き出しも散らす**。
  * 同じ書き出しは2本までしか採らない（batch.ts の OPENING_MAX）ため、
- * 全部を同じ語で始めると15問に届かず GENERATION_FAILED になる。
+ * 全部を同じ語で始めると10問に届かず GENERATION_FAILED になる。
  */
 function stubValidGeneration() {
   const nums = [

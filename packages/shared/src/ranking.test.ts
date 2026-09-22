@@ -3,12 +3,12 @@ import { MAX_KEYS_PER_SECOND, maxHits, minHits, playStatsRejection, RANKING_SIZE
 import { PLAY_SIZE, PLAY_SIZE_WORD } from "./session";
 
 describe("打鍵数の範囲", () => {
-  it("短文は 15問 × 10〜35打鍵（上限は最短候補基準なので2倍）", () => {
+  it("短文は 10問 × 10〜35打鍵（上限は最短候補基準なので2倍）", () => {
     expect(minHits("sentence")).toBe(PLAY_SIZE * 10);
     expect(maxHits("sentence")).toBe(PLAY_SIZE * 35 * 2);
   });
 
-  it("単語は 30問 × 4〜20打鍵", () => {
+  it("単語は 20問 × 4〜20打鍵", () => {
     expect(minHits("word")).toBe(PLAY_SIZE_WORD * 4);
     expect(maxHits("word")).toBe(PLAY_SIZE_WORD * 20 * 2);
   });
@@ -46,8 +46,8 @@ describe("playStatsRejection", () => {
   });
 
   it("形式で範囲が変わる（短文の下限は単語では上限側に寄る）", () => {
-    // 短文として最小の150打鍵は、単語（80〜800）でも通る
-    expect(playStatsRejection({ ...ok, hits: 150 }, "word")).toBeNull();
+    // 短文として最小の100打鍵は、単語（80〜800）でも通る
+    expect(playStatsRejection({ ...ok, hits: 100 }, "word")).toBeNull();
     // 単語として最小の80打鍵は短文では足りない
     expect(playStatsRejection({ ...ok, hits: 80 }, "sentence")).not.toBeNull();
   });

@@ -38,7 +38,7 @@ export default async function ThemesPage({
       <main className="mx-auto w-full max-w-5xl px-6 py-16">
         <h1 className="font-mincho text-3xl tracking-wide text-kinari">テーマで打つ</h1>
         <p className="mt-6 max-w-2xl leading-loose text-kinari/70">
-          選んだテーマに沿った文章が出ます。15問ひと組で、同じ文章は繰り返し出ません。
+          選んだテーマに沿った文章が出ます。10問ひと組で、同じ文章は繰り返し出ません。
         </p>
 
         <div className="mt-8">

@@ -103,7 +103,7 @@ beforeEach(async () => {
 });
 
 describe("配信", () => {
-  it("15問返す", async () => {
+  it("10問返す", async () => {
     await seed(45);
     const { body } = await start({ themeId: "t1", offset: 0 });
     expect((body.prompts as unknown[]).length).toBe(PLAY_SIZE);
@@ -121,7 +121,7 @@ describe("配信", () => {
     const { body } = await start({ themeId: "t1", offset: 15 });
     const texts = (body.prompts as { text: string }[]).map((p) => p.text).toSorted();
     expect(texts[0]).toBe("お題16");
-    expect(texts.at(-1)).toBe("お題30");
+    expect(texts.at(-1)).toBe("お題25");
   });
 
   it("オフセット30でも続きから配る", async () => {
@@ -129,7 +129,7 @@ describe("配信", () => {
     const { body } = await start({ themeId: "t1", offset: 30 });
     const texts = (body.prompts as { text: string }[]).map((p) => p.text).toSorted();
     expect(texts[0]).toBe("お題31");
-    expect(body.nextOffset).toBe(45);
+    expect(body.nextOffset).toBe(40);
   });
 
   it("続けて遊ぶとオフセットが進み続ける（巻き戻らない）", async () => {
@@ -137,8 +137,8 @@ describe("配信", () => {
     const first = await start({ themeId: "t1", userId: "u1" });
     const second = await start({ themeId: "t1", userId: "u1" });
 
-    expect(first.body.nextOffset).toBe(15);
-    expect(second.body.nextOffset).toBe(30);
+    expect(first.body.nextOffset).toBe(10);
+    expect(second.body.nextOffset).toBe(20);
     // 2回目に1回目と同じお題が混ざっていない
     const firstTexts = new Set((first.body.prompts as { text: string }[]).map((p) => p.text));
     const secondTexts = (second.body.prompts as { text: string }[]).map((p) => p.text);
@@ -161,8 +161,8 @@ describe("配信", () => {
   it("nextOffset と remainingInPool を返す", async () => {
     await seed(45);
     const { body } = await start({ themeId: "t1", offset: 0 });
-    expect(body.nextOffset).toBe(15);
-    expect(body.remainingInPool).toBe(30);
+    expect(body.nextOffset).toBe(10);
+    expect(body.remainingInPool).toBe(35);
   });
 });
 
@@ -175,13 +175,13 @@ describe("オフセットの扱い", () => {
       .select()
       .from(userThemeProgress)
       .where(eq(userThemeProgress.userId, "u1"));
-    expect(row?.playCount).toBe(15);
+    expect(row?.playCount).toBe(10);
   });
 
   it("ログイン時はクライアントの offset を無視する（改ざんで先に進めない）", async () => {
     await seed(45);
     const { body } = await start({ themeId: "t1", userId: "u1", offset: 30 });
-    expect(body.nextOffset).toBe(15);
+    expect(body.nextOffset).toBe(10);
   });
 
   it("匿名はサーバーに進捗を持たない", async () => {
@@ -193,7 +193,7 @@ describe("オフセットの扱い", () => {
   it("負のオフセットは0として扱う", async () => {
     await seed(45);
     const { body } = await start({ themeId: "t1", offset: -100 });
-    expect(body.nextOffset).toBe(15);
+    expect(body.nextOffset).toBe(10);
   });
 
   it("プレイ回数を+1する（人気順の材料）", async () => {
@@ -205,8 +205,8 @@ describe("オフセットの扱い", () => {
 });
 
 describe("補充のキック", () => {
-  it("残りが30を下回り、許可されていればキックする", async () => {
-    await seed(44); // 15問配ると残り29
+  it("残りが20を下回り、許可されていればキックする", async () => {
+    await seed(29); // 10問配ると残り19
     const { body } = await start({ themeId: "t1", userId: "u1", allowRefill: true });
     expect(body.remainingInPool).toBe(STOCK_TARGET - 1);
     expect(body.refillKicked).toBe(true);
@@ -214,28 +214,28 @@ describe("補充のキック", () => {
     expect(await env.KV.get(themeLockKey("t1", "sentence"))).not.toBeNull();
   });
 
-  it("残りがちょうど30ならキックしない（境界値）", async () => {
-    await seed(45);
+  it("残りがちょうど20ならキックしない（境界値）", async () => {
+    await seed(30);
     const { body } = await start({ themeId: "t1", userId: "u1", allowRefill: true });
     expect(body.remainingInPool).toBe(STOCK_TARGET);
     expect(body.refillKicked).toBe(false);
   });
 
   it("匿名ではキックしない（在庫を消費するだけ）", async () => {
-    await seed(44);
+    await seed(29);
     const { body } = await start({ themeId: "t1", offset: 0 });
     expect(body.refillKicked).toBe(false);
     expect(await env.KV.get(themeLockKey("t1", "sentence"))).toBeNull();
   });
 
   it("生成困難なテーマではキックしない", async () => {
-    await seed(44, { generationStatus: "difficult" });
+    await seed(29, { generationStatus: "difficult" });
     const { body } = await start({ themeId: "t1", userId: "u1", allowRefill: true });
     expect(body.refillKicked).toBe(false);
   });
 
   it("すでにロックが取られていればキックせず、クォータも消費しない", async () => {
-    await seed(44);
+    await seed(29);
     await env.KV.put(themeLockKey("t1", "sentence"), "1", { expirationTtl: 60 });
 
     const { body } = await start({ themeId: "t1", userId: "u1", allowRefill: true });
@@ -243,14 +243,14 @@ describe("補充のキック", () => {
   });
 
   it("許可フラグが無ければキックしない（Next.jsが残数0と判定した場合）", async () => {
-    await seed(44);
+    await seed(29);
     const { body } = await start({ themeId: "t1", userId: "u1" });
     expect(body.refillKicked).toBe(false);
     expect(await env.KV.get(themeLockKey("t1", "sentence"))).toBeNull();
   });
 
   it("許可フラグがfalseでもプレイ自体は成功する（プレイはクォータを消費しないため）", async () => {
-    await seed(44);
+    await seed(29);
     const { status, body } = await start({ themeId: "t1", userId: "u1", allowRefill: false });
     expect(status).toBe(200);
     expect((body.prompts as unknown[]).length).toBe(PLAY_SIZE);
@@ -259,8 +259,8 @@ describe("補充のキック", () => {
 });
 
 describe("枯渇", () => {
-  it("在庫が15問に満たなければ THEME_EXHAUSTED", async () => {
-    await seed(14);
+  it("在庫が10問に満たなければ THEME_EXHAUSTED", async () => {
+    await seed(9);
     const { status, body } = await start({ themeId: "t1", offset: 0 });
     expect(status).toBe(409);
     expect((body.error as { code: string }).code).toBe("THEME_EXHAUSTED");
@@ -273,13 +273,13 @@ describe("枯渇", () => {
   });
 
   it("枯渇時はオフセットを進めない", async () => {
-    await seed(14);
+    await seed(9);
     await start({ themeId: "t1", userId: "u1" });
     expect(await db.select().from(userThemeProgress)).toHaveLength(0);
   });
 
   it("生成ロックがあれば GENERATION_IN_PROGRESS（本当に尽きたのと区別する）", async () => {
-    await seed(14);
+    await seed(9);
     await env.KV.put(themeLockKey("t1", "sentence"), "1", { expirationTtl: 60 });
 
     const { status, body } = await start({ themeId: "t1", offset: 0 });
@@ -294,7 +294,7 @@ describe("枯渇", () => {
 });
 
 describe("形式ごとに別のプール・別の進捗", () => {
-  it("単語を指定すると、単語のお題が1プレイ分（30問）返る", async () => {
+  it("単語を指定すると、単語のお題が1プレイ分（20問）返る", async () => {
     await seed(PLAY_SIZE);
     await seedWords(PLAY_SIZE_WORD);
 
@@ -317,8 +317,8 @@ describe("形式ごとに別のプール・別の進捗", () => {
 
   /**
    * **これが混ざると、遊んでいない短文のお題が飛ばされる。**
-   * 単語を1プレイ（30問）遊んだぶんだけ短文のオフセットも進むと、次に短文を
-   * 開いたときに31問目から配られる。
+   * 単語を1プレイ（20問）遊んだぶんだけ短文のオフセットも進むと、次に短文を
+   * 開いたときに21問目から配られる。
    */
   it("単語を遊んでも、短文の進捗は進まない", async () => {
     await seed(PLAY_SIZE * 3);

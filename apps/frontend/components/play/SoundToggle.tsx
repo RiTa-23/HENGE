@@ -7,6 +7,8 @@
  *
  * **トグルスイッチで出す。** 「音入/音切」のラベル差し替えは、いまどちらの
  * 状態か一目で読めない。軌道とつまみの位置＋ON/OFF表記で状態を示す。
+ * **全体の幅は常に同じにする。** ON/OFF の文字数差でボタンが伸縮すると、
+ * クリックのたびに指標が揺れる。状態表記は固定幅で出す。
  */
 export function SoundToggle({ muted, onToggle }: { muted: boolean; onToggle: () => void }) {
   const on = !muted;
@@ -32,7 +34,9 @@ export function SoundToggle({ muted, onToggle }: { muted: boolean; onToggle: () 
           }`}
         />
       </span>
-      <span className={`font-mono ${on ? "text-kinari" : "text-kinari/40"}`}>
+      <span
+        className={`inline-block w-8 text-center font-mono ${on ? "text-kinari" : "text-kinari/40"}`}
+      >
         {on ? "ON" : "OFF"}
       </span>
     </button>

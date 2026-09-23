@@ -1,4 +1,7 @@
+import type { Metadata } from "next";
 import { redirect } from "next/navigation";
+
+export const metadata: Metadata = { robots: { index: false, follow: false } };
 
 /**
  * `/admin` の入口は報告キューへ流す。管理画面の正史は `/admin/reports`。

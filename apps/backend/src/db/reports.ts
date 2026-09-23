@@ -24,7 +24,11 @@ export interface ReadingReportRow extends ReadingReportInput {
 
 export const REPORT_LIST_LIMIT_DEFAULT = 50;
 
-/** 報告を挿入する。複数件は1バッチで。 */
+// D1 は1文あたり100個までしかバインド変数を受け付けない。
+// 列8項目 × 行数で超過するため、INSERT はこの件数ごとに分ける。
+const REPORT_INSERT_CHUNK = 10;
+
+/** 報告を挿入する。複数件はチャンクごとのバッチで。 */
 export async function insertReadingReports(db: Db, rows: ReadingReportInput[]): Promise<string[]> {
   const values = rows.map((row) => ({
     id: crypto.randomUUID(),
@@ -36,7 +40,9 @@ export async function insertReadingReports(db: Db, rows: ReadingReportInput[]): 
     expectedKana: row.expectedKana,
     userId: row.userId,
   }));
-  await db.insert(readingReports).values(values);
+  for (let i = 0; i < values.length; i += REPORT_INSERT_CHUNK) {
+    await db.insert(readingReports).values(values.slice(i, i + REPORT_INSERT_CHUNK));
+  }
   return values.map((v) => v.id);
 }
 

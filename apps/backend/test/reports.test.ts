@@ -63,6 +63,15 @@ describe("reading_reports", () => {
     expect(rows).toHaveLength(2);
   });
 
+  it("スキーマ上限の15件でもチャンク分割して挿入できる", async () => {
+    const rows = Array.from({ length: 15 }, (_, i) => ({ ...base, sentenceNo: i + 1 }));
+    const ids = await insertReadingReports(db, rows);
+    expect(ids).toHaveLength(15);
+    expect(await listReadingReports(db, { status: "pending", limit: 50, cursor: 0 })).toHaveLength(
+      15,
+    );
+  });
+
   it("ログインユーザーの報告は userId が残る", async () => {
     await insertReadingReports(db, [{ ...base, userId: "u1" }]);
     const rows = await listReadingReports(db, { status: "pending", limit: 50, cursor: 0 });

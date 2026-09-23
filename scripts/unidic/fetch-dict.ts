@@ -11,8 +11,11 @@
  *   `AUTHORS.unidic` を辞書の横に置く
  *
  * 使い方: `bun scripts/unidic/fetch-dict.ts`（リポジトリルートから）
+ * `--if-missing` を付けると、ファイルが揃っているときは何もしない
+ * （`bun run dev` の前段用。中身の更新はフラグなしで呼ぶ）
  */
 import { createHash } from "node:crypto";
+import { existsSync } from "node:fs";
 import { mkdir } from "node:fs/promises";
 
 const RELEASE = "unidic-cwj-trim-v1";
@@ -35,6 +38,23 @@ const FILES = [
 
 const assetsDir = new URL("../../apps/reading/assets/", import.meta.url).pathname;
 await mkdir(assetsDir, { recursive: true });
+
+// `--if-missing`: 揃っていればネットワークに出ずに終わる。
+// 辞書は前回の取得が途中で切れた場合（存在するが壊れている）を拾えるよう sha256 まで見る
+if (process.argv.includes("--if-missing")) {
+  const ok = await Promise.all(
+    FILES.map(async ([, to, sha256]) => {
+      const path = `${assetsDir}${to}`;
+      if (!existsSync(path)) return false;
+      if (sha256 === null) return true;
+      const digest = createHash("sha256")
+        .update(new Uint8Array(await Bun.file(path).arrayBuffer()))
+        .digest("hex");
+      return digest === sha256;
+    }),
+  );
+  if (ok.every(Boolean)) process.exit(0);
+}
 
 await Promise.all(
   FILES.map(async ([name, to, sha256]) => {

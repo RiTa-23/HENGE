@@ -50,6 +50,13 @@
       "when": 1789171057287,
       "tag": "0006_military_gargoyle",
       "breakpoints": true
+    },
+    {
+      "idx": 7,
+      "version": "6",
+      "when": 1790051897161,
+      "tag": "0007_outgoing_pixie",
+      "breakpoints": true
     }
   ]
 }

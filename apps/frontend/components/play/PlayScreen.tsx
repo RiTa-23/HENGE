@@ -620,6 +620,7 @@ export function PlayScreen({
         kind={kind}
         form={form}
         shareUrl={shareUrl}
+        prompts={phase.session.prompts}
       />
     );
   }

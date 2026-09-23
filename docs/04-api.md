@@ -125,6 +125,25 @@
 - 登録のたびに101位以下を消す（`RANKING_SIZE`。`docs/03-data-model.md`）
 - 閲覧の公開APIは持たない。詳細ページが SSR で Hono の `GET /rankings` を直接引く
 
+### POST /api/reading-reports
+
+```jsonc
+// リクエスト。リザルト画面のお題一覧から複数件まとめて送れる（1〜15件）
+{ "reports": [
+    { "themeId": "01H...", "sentenceNo": 3,
+      "promptText": "かき氷の店が混んでいた",
+      "surface": "かき氷",
+      "reportedKana": "かきこおりのみせがこんでいた",
+      "expectedKana": "かきごおり" } ] }
+
+// レスポンス
+{ "inserted": 1, "ids": ["01H..."] }
+```
+
+- **認証は必須ではない。** 匿名ユーザーの報告は `user_id` NULL で受け付ける（報告は利用者の進捗データではないので不変条件10の対象外。ログインしていれば user_id が残る）
+- `expectedKana` はかな文字のみ（ひらがな・カタカナ）。非かな・超長文は `VALIDATION_ERROR`
+- 承認→user-lex.csv追記PRの流れは `docs/03-data-model.md` の `reading_reports` を参照
+
 ### GET /api/me
 
 ```jsonc
@@ -172,6 +191,17 @@
 
 // GET /api/admin/users?limit=&cursor=
 // 閲覧のみ。更新・削除の口は持たない
+// GET /api/admin/reading-reports?status=pending&limit=&cursor=
+// 報告一覧。status は pending/approved/rejected/applied。
+// 管理画面は pending、辞書リポジトリの自動PRワークフローは approved を取る
+// PATCH /api/admin/reading-reports
+// 承認/却下。承認時は expectedKana をカタカナ正規化値・cost を確定する
+{ "id": "...", "action": "approve", "expectedKana": "カキゴオリ", "cost": -20000 }
+{ "id": "...", "action": "reject" }
+// GET /api/admin/reading-reports と POST /api/admin/reading-reports/applied は
+//   Authorization: Bearer <REPORTS_SYNC_TOKEN> でも通る（辞書リポの自動PRワークフロー用。
+//   未設定なら機械アクセス不可）。POST applied は approved→applied に閉じる通知
+{ "ids": ["...", "..."] }
 // createdAt は認証テーブル（Better Auth）の列でミリ秒精度のため、themes と違い ISO 文字列で返る
 { "users": [{ "id": "...", "name": "Rita", "email": "...", "image": null,
               "createdAt": "2026-09-05T12:00:00.000Z",

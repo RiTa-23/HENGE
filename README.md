@@ -82,7 +82,7 @@ docs/         実装ドキュメント
 
 ```bash
 bun install                      # 依存インストール
-bun run dev                      # 両Workerをローカル起動（wrangler dev）
+bun run dev                      # 3 Workerをローカル起動（wrangler dev）。辞書が無ければ先に取得する
 bun test                         # 純粋関数のテスト
 bun run test:workers             # D1/KV依存のテスト（vitest-pool-workers）
 bun run lint                     # oxlint

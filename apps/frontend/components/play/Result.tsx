@@ -9,6 +9,7 @@ import {
 } from "@henge/shared";
 import { FormMark } from "@/components/FormMark";
 import { RankingRegister } from "@/components/play/RankingRegister";
+import { ReportPanel, type ReportablePrompt } from "@/components/play/ReportPanel";
 import { topMissedKeys } from "@/lib/play/misses";
 import { formColor, formLabel, rankingHref } from "@/lib/ui/kind";
 import { buildShareText, buildTweetIntentUrl } from "@/lib/share/tweet";
@@ -37,6 +38,7 @@ export function Result({
   kind,
   form,
   shareUrl,
+  prompts,
 }: {
   /** ランキングの登録に使う。名前ではなくIDで送る（`kind` を落とすと別のプールになる） */
   themeId: string;
@@ -62,6 +64,8 @@ export function Result({
   form: PromptForm;
   /** X投稿で共有するURL（着地ページの絶対URL）。サーバー側で組み立て済み */
   shareUrl: string;
+  /** このプレイで出題されたお題。読み違い報告の一覧に使う */
+  prompts: ReportablePrompt[];
 }) {
   const missed = topMissedKeys(missedKeys, MISSED_KEY_LIMIT);
   const items = [
@@ -125,6 +129,8 @@ export function Result({
             </ul>
           </div>
         )}
+
+        <ReportPanel themeId={themeId} prompts={prompts} />
 
         <RankingRegister
           themeId={themeId}

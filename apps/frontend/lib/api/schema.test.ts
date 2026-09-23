@@ -4,6 +4,8 @@ import {
   displayNameSchema,
   promptTextSchema,
   rankingRegisterSchema,
+  readingReportActionSchema,
+  readingReportBatchSchema,
   regenerateSchema,
   sessionStartSchema,
   themeListQuerySchema,
@@ -221,5 +223,76 @@ describe("promptTextSchema", () => {
   test("空・極端に長い本文は弾く", () => {
     expect(promptTextSchema.safeParse({ text: "  " }).success).toBe(false);
     expect(promptTextSchema.safeParse({ text: "あ".repeat(401) }).success).toBe(false);
+  });
+});
+
+describe("readingReportBatchSchema", () => {
+  const ok = {
+    themeId: "t1",
+    sentenceNo: 3,
+    promptText: "かき氷の店が混んでいた",
+    surface: "かき氷",
+    reportedKana: "かきこおりのみせがこんでいた",
+    expectedKana: "かきごおり",
+  };
+
+  test("まとめて報告（複数件）を通す", () => {
+    expect(
+      readingReportBatchSchema.safeParse({ reports: [ok, { ...ok, sentenceNo: 4 }] }).success,
+    ).toBe(true);
+  });
+
+  test("かな以外の読みは弾く（英字・漢字・数字・空白）", () => {
+    for (const bad of ["kaki", "漢字", "123", "かき ごおり", "かき、"]) {
+      expect(
+        readingReportBatchSchema.safeParse({ reports: [{ ...ok, expectedKana: bad }] }).success,
+      ).toBe(false);
+    }
+  });
+
+  test("カタカナの正しい読みも通す", () => {
+    expect(
+      readingReportBatchSchema.safeParse({ reports: [{ ...ok, expectedKana: "カキゴオリ" }] })
+        .success,
+    ).toBe(true);
+  });
+
+  test("空配列・超過件数・欠落フィールドは弾く", () => {
+    expect(readingReportBatchSchema.safeParse({ reports: [] }).success).toBe(false);
+    expect(
+      readingReportBatchSchema.safeParse({
+        reports: Array.from({ length: 16 }, () => ok),
+      }).success,
+    ).toBe(false);
+    const { surface: _drop, ...noSurface } = ok;
+    expect(readingReportBatchSchema.safeParse({ reports: [noSurface] }).success).toBe(false);
+  });
+});
+
+describe("readingReportActionSchema", () => {
+  test("approve/reject を通す。承認時の読みはカタカナ", () => {
+    expect(
+      readingReportActionSchema.safeParse({
+        id: "r1",
+        action: "approve",
+        expectedKana: "カキゴオリ",
+        cost: -20000,
+      }).success,
+    ).toBe(true);
+    expect(readingReportActionSchema.safeParse({ id: "r1", action: "reject" }).success).toBe(true);
+  });
+
+  test("ひらがなの承認読み・範囲外コスト・未知actionは弾く", () => {
+    expect(
+      readingReportActionSchema.safeParse({
+        id: "r1",
+        action: "approve",
+        expectedKana: "かきごおり",
+      }).success,
+    ).toBe(false);
+    expect(
+      readingReportActionSchema.safeParse({ id: "r1", action: "approve", cost: -30000 }).success,
+    ).toBe(false);
+    expect(readingReportActionSchema.safeParse({ id: "r1", action: "apply" }).success).toBe(false);
   });
 });

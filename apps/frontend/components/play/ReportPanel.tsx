@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 
 export interface ReportablePrompt {
   text: string;
@@ -29,30 +29,32 @@ const MAX_REPORTS = 15;
 export function ReportPanel({
   themeId,
   prompts,
+  open,
+  onOpenChange,
 }: {
   themeId: string;
   prompts: ReportablePrompt[];
+  /** モーダルの開閉は呼び出し側が持つ。開いている間は結果画面のショートカットを止める必要があるため */
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
 }) {
-  const [open, setOpen] = useState(false);
   const [selNo, setSelNo] = useState<number | null>(null);
   const [surface, setSurface] = useState("");
   const [kana, setKana] = useState("");
   const [drafts, setDrafts] = useState<Draft[]>([]);
   const [status, setStatus] = useState<"idle" | "sending" | "done" | "error">("idle");
 
-  if (!open) {
-    return (
-      <div className="mt-10 text-center">
-        <button
-          type="button"
-          onClick={() => setOpen(true)}
-          className="rounded-md border border-kinari/20 px-6 py-2 text-sm tracking-widest text-kinari/70 transition-colors hover:border-kin hover:text-kinari"
-        >
-          読み違いを報告する
-        </button>
-      </div>
-    );
-  }
+  // Esc で閉じる。モーダルが開いている間だけ窓で拾う
+  useEffect(() => {
+    if (!open) return;
+    const onKey = (event: KeyboardEvent) => {
+      if (event.key !== "Escape") return;
+      event.preventDefault();
+      onOpenChange(false);
+    };
+    globalThis.addEventListener("keydown", onKey);
+    return () => globalThis.removeEventListener("keydown", onKey);
+  }, [open, onOpenChange]);
 
   const takeSelection = () => {
     const sel = globalThis.getSelection()?.toString().trim() ?? "";
@@ -103,114 +105,147 @@ export function ReportPanel({
   };
 
   return (
-    <div className="mt-10 rounded-md border border-kinari/15 bg-kinari/5 p-5 text-left">
-      <p className="text-center text-xs tracking-[0.3em] text-kinari/50">読み違いの報告</p>
-
-      {status === "done" && (
-        <p className="mt-3 text-center text-sm text-kinari">
-          報告を受け付けました。ありがとうございます。
-        </p>
-      )}
-      {status === "error" && (
-        <p className="mt-3 text-center text-sm text-shu">
-          送信に失敗しました���もう一度お試しください。
-        </p>
-      )}
-
-      {/* そのプレイで出題されたお題一覧 */}
-      <ol className="mt-4 max-h-48 space-y-1 overflow-y-auto">
-        {prompts.map((p, i) => (
-          <li key={i}>
-            <button
-              type="button"
-              onClick={() => setSelNo(i + 1)}
-              className={`w-full rounded px-3 py-1.5 text-left text-sm transition-colors ${
-                selNo === i + 1
-                  ? "border border-kin bg-kin/15 text-kinari"
-                  : "border border-transparent text-kinari/70 hover:border-kinari/25"
-              }`}
-            >
-              <span className="mr-2 font-mono text-xs text-kinari/40">{i + 1}</span>
-              {p.text}
-            </button>
-          </li>
-        ))}
-      </ol>
-
-      {selNo !== null && (
-        <div className="mt-4 border-t border-kinari/15 pt-4">
-          <p className="text-sm text-kinari/60">
-            誤っている部分をドラッグで選択するか、表層を入力してください
-          </p>
-          <p
-            className="mt-2 select-text rounded border border-kinari/15 bg-kinari/5 px-3 py-2 text-base leading-relaxed text-kinari"
-            onMouseUp={takeSelection}
+    <>
+      <div className="mt-10 text-center">
+        <button
+          type="button"
+          onClick={() => onOpenChange(true)}
+          className="rounded-md border border-kinari/20 px-6 py-2 text-sm tracking-widest text-kinari/70 transition-colors hover:border-kin hover:text-kinari"
+        >
+          読み違いを報告する
+        </button>
+      </div>
+      {open && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-sumi/85 p-4"
+          onClick={() => onOpenChange(false)}
+        >
+          <div
+            role="dialog"
+            aria-modal="true"
+            aria-label="読み違いの報告"
+            className="max-h-[85dvh] w-full max-w-2xl overflow-y-auto rounded-lg border border-kin/60 bg-sumi p-6 text-left"
+            onClick={(event) => event.stopPropagation()}
           >
-            {prompts[selNo - 1]?.text}
-          </p>
-          <p className="mt-1 font-mono text-xs text-kinari/45">
-            生成された読み: {prompts[selNo - 1]?.readingKana}
-          </p>
-          <div className="mt-3 grid gap-2 sm:grid-cols-[1fr_1fr_auto]">
-            <input
-              type="text"
-              value={surface}
-              onChange={(e) => setSurface(e.target.value)}
-              placeholder="誤った表層（例: かき氷）"
-              maxLength={30}
-              className="rounded border border-kinari/25 bg-transparent px-3 py-2 text-sm text-kinari placeholder:text-kinari/30"
-            />
-            <input
-              type="text"
-              value={kana}
-              onChange={(e) => setKana(e.target.value)}
-              placeholder="正しい読み（例: かきごおり）"
-              maxLength={60}
-              className="rounded border border-kinari/25 bg-transparent px-3 py-2 text-sm text-kinari placeholder:text-kinari/30"
-            />
-            <button
-              type="button"
-              onClick={addDraft}
-              disabled={!surface || !kana || drafts.length >= MAX_REPORTS}
-              className="rounded border border-kin px-4 py-2 text-sm text-kin transition-colors hover:bg-kin/10 disabled:opacity-30"
-            >
-              追加
-            </button>
-          </div>
-        </div>
-      )}
+            <div className="flex items-center justify-between">
+              <p className="text-xs tracking-[0.3em] text-kinari/50">読み違いの報告</p>
+              <button
+                type="button"
+                onClick={() => onOpenChange(false)}
+                className="rounded px-2 py-1 text-sm text-kinari/60 transition-colors hover:text-kinari"
+              >
+                閉じる
+              </button>
+            </div>
 
-      {drafts.length > 0 && (
-        <div className="mt-4 border-t border-kinari/15 pt-3">
-          <ul className="space-y-1">
-            {drafts.map((d, i) => (
-              <li key={i} className="flex items-center gap-2 text-sm text-kinari/80">
-                <span className="font-mono text-xs text-kinari/40">#{d.sentenceNo}</span>
-                <span className="text-kinari">{d.surface}</span>
-                <span className="text-kinari/50">→</span>
-                <span className="text-kinari">{d.expectedKana}</span>
-                <button
-                  type="button"
-                  onClick={() => setDrafts(drafts.filter((_, j) => j !== i))}
-                  className="ml-auto text-xs text-kinari/40 hover:text-shu"
+            {status === "done" && (
+              <p className="mt-3 text-center text-sm text-kinari">
+                報告を受け付けました。ありがとうございます。
+              </p>
+            )}
+            {status === "error" && (
+              <p className="mt-3 text-center text-sm text-shu">
+                送信に失敗しました���もう一度お試しください。
+              </p>
+            )}
+
+            {/* そのプレイで出題されたお題一覧 */}
+            <ol className="mt-4 max-h-48 space-y-1 overflow-y-auto">
+              {prompts.map((p, i) => (
+                <li key={i}>
+                  <button
+                    type="button"
+                    onClick={() => setSelNo(i + 1)}
+                    className={`w-full rounded px-3 py-1.5 text-left text-sm transition-colors ${
+                      selNo === i + 1
+                        ? "border border-kin bg-kin/15 text-kinari"
+                        : "border border-transparent text-kinari/70 hover:border-kinari/25"
+                    }`}
+                  >
+                    <span className="mr-2 font-mono text-xs text-kinari/40">{i + 1}</span>
+                    {p.text}
+                  </button>
+                </li>
+              ))}
+            </ol>
+
+            {selNo !== null && (
+              <div className="mt-4 border-t border-kinari/15 pt-4">
+                <p className="text-sm text-kinari/60">
+                  誤っている部分をドラッグで選択するか、表層を入力してください
+                </p>
+                <p
+                  className="mt-2 select-text rounded border border-kinari/15 bg-kinari/5 px-3 py-2 text-base leading-relaxed text-kinari"
+                  onMouseUp={takeSelection}
                 >
-                  消す
-                </button>
-              </li>
-            ))}
-          </ul>
-          <div className="mt-3 text-center">
-            <button
-              type="button"
-              onClick={submit}
-              disabled={status === "sending"}
-              className="rounded-md border border-shu bg-shu/15 px-6 py-2 text-sm tracking-widest text-kinari transition-colors hover:bg-shu/25 disabled:opacity-40"
-            >
-              {status === "sending" ? "送信中…" : `${drafts.length}件を報告する`}
-            </button>
+                  {prompts[selNo - 1]?.text}
+                </p>
+                <p className="mt-1 font-mono text-xs text-kinari/45">
+                  生成された読み: {prompts[selNo - 1]?.readingKana}
+                </p>
+                <div className="mt-3 grid gap-2 sm:grid-cols-[1fr_1fr_auto]">
+                  <input
+                    type="text"
+                    value={surface}
+                    onChange={(e) => setSurface(e.target.value)}
+                    placeholder="誤った表層（例: かき氷）"
+                    maxLength={30}
+                    className="rounded border border-kinari/25 bg-transparent px-3 py-2 text-sm text-kinari placeholder:text-kinari/30"
+                  />
+                  <input
+                    type="text"
+                    value={kana}
+                    onChange={(e) => setKana(e.target.value)}
+                    placeholder="正しい読み（例: かきごおり）"
+                    maxLength={60}
+                    className="rounded border border-kinari/25 bg-transparent px-3 py-2 text-sm text-kinari placeholder:text-kinari/30"
+                  />
+                  <button
+                    type="button"
+                    onClick={addDraft}
+                    disabled={!surface || !kana || drafts.length >= MAX_REPORTS}
+                    className="rounded border border-kin px-4 py-2 text-sm text-kin transition-colors hover:bg-kin/10 disabled:opacity-30"
+                  >
+                    追加
+                  </button>
+                </div>
+              </div>
+            )}
+
+            {drafts.length > 0 && (
+              <div className="mt-4 border-t border-kinari/15 pt-3">
+                <ul className="space-y-1">
+                  {drafts.map((d, i) => (
+                    <li key={i} className="flex items-center gap-2 text-sm text-kinari/80">
+                      <span className="font-mono text-xs text-kinari/40">#{d.sentenceNo}</span>
+                      <span className="text-kinari">{d.surface}</span>
+                      <span className="text-kinari/50">→</span>
+                      <span className="text-kinari">{d.expectedKana}</span>
+                      <button
+                        type="button"
+                        onClick={() => setDrafts(drafts.filter((_, j) => j !== i))}
+                        className="ml-auto text-xs text-kinari/40 hover:text-shu"
+                      >
+                        消す
+                      </button>
+                    </li>
+                  ))}
+                </ul>
+                <div className="mt-3 text-center">
+                  <button
+                    type="button"
+                    onClick={submit}
+                    disabled={status === "sending"}
+                    className="rounded-md border border-shu bg-shu/15 px-6 py-2 text-sm tracking-widest text-kinari transition-colors hover:bg-shu/25 disabled:opacity-40"
+                  >
+                    {status === "sending" ? "送信中…" : `${drafts.length}件を報告する`}
+                  </button>
+                </div>
+              </div>
+            )}
           </div>
         </div>
       )}
-    </div>
+    </>
   );
 }

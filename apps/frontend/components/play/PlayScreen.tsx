@@ -191,6 +191,8 @@ export function PlayScreen({
   const surface = useRef<HTMLDivElement>(null);
   // 生成中の待ち。attempt を増やすと load が走り直す
   const [attempt, setAttempt] = useState(0);
+  // 報告モーダルが開いている間は結果画面のショートカット（R）を止める
+  const [reportOpen, setReportOpen] = useState(false);
   const waitingSince = useRef<number | null>(null);
   const retryTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -343,6 +345,11 @@ export function PlayScreen({
   useEffect(() => {
     if (phase.name !== "result") return;
     const onKey = (event: KeyboardEvent) => {
+      // 報告モーダルが開いている間は何も拾わない
+      if (reportOpen) return;
+      // input 等にフォーカスがあるときのキーはショートカットにしない（フォーム入力を奪わない）
+      const target = event.target as HTMLElement | null;
+      if (target?.closest("input, textarea, select, [contenteditable=true]")) return;
       // **修飾キーとの同時押しは拾わない。** `Cmd+R` / `Ctrl+R` のリロードを奪う
       if (event.ctrlKey || event.metaKey || event.altKey) return;
       // key と code の両方を見る。配列やIMEの状態によって key が空になることがある
@@ -352,7 +359,7 @@ export function PlayScreen({
     };
     globalThis.addEventListener("keydown", onKey);
     return () => globalThis.removeEventListener("keydown", onKey);
-  }, [phase.name]);
+  }, [phase.name, reportOpen]);
 
   /**
    * 枯渇からの復帰。**ログインユーザーだけが使える**（クォータを1消費する）。
@@ -621,6 +628,8 @@ export function PlayScreen({
         form={form}
         shareUrl={shareUrl}
         prompts={phase.session.prompts}
+        reportOpen={reportOpen}
+        onReportOpenChange={setReportOpen}
       />
     );
   }

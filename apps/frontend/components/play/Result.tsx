@@ -39,6 +39,8 @@ export function Result({
   form,
   shareUrl,
   prompts,
+  reportOpen,
+  onReportOpenChange,
 }: {
   /** ランキングの登録に使う。名前ではなくIDで送る（`kind` を落とすと別のプールになる） */
   themeId: string;
@@ -66,6 +68,9 @@ export function Result({
   shareUrl: string;
   /** このプレイで出題されたお題。読み違い報告の一覧に使う */
   prompts: ReportablePrompt[];
+  /** 報告モーダルの開閉。開いている間は結果画面のショートカットを止めるため PlayScreen が持つ */
+  reportOpen: boolean;
+  onReportOpenChange: (open: boolean) => void;
 }) {
   const missed = topMissedKeys(missedKeys, MISSED_KEY_LIMIT);
   const items = [
@@ -130,7 +135,12 @@ export function Result({
           </div>
         )}
 
-        <ReportPanel themeId={themeId} prompts={prompts} />
+        <ReportPanel
+          themeId={themeId}
+          prompts={prompts}
+          open={reportOpen}
+          onOpenChange={onReportOpenChange}
+        />
 
         <RankingRegister
           themeId={themeId}

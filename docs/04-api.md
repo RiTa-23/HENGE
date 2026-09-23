@@ -30,6 +30,7 @@
 | PATCH | `/api/admin/prompts/[id]` | 管理者 | お題本文の編集（読み・打鍵数はサーバーで取り直す） |
 | DELETE | `/api/admin/prompts/[id]` | 管理者 | お題の削除（連番は詰め直さない） |
 | GET | `/api/admin/users` | 管理者 | ユーザー一覧（閲覧のみ） |
+| GET | `/api/admin/check` | 常に200 | `{ isAdmin }` を返す。ヘッダーの「管理」導線を出すかの判定用 |
 
 テーマと含む文字は同じエンドポイントで`kind`により分岐する。DB上も同じテーブルのため。
 
@@ -158,6 +159,8 @@
 ### /api/admin/*
 
 管理者判定は `ADMIN_EMAILS`（カンマ区切り）で行う。**判定はNext.js側だけ**で、Honoの `/admin/*` は認可を持たない。
+
+`/api/admin/check` はこの判定の結果だけを `{ isAdmin }` で返すプローブ（他の `/api/admin/*` と違い、弾かず常に200）。ヘッダーの「管理」リンクは `AdminLink` がログイン中にこれを呼んで出し分ける。env が未設定なら誰にも `true` は返らない。
 
 ```jsonc
 // GET /api/admin/themes?limit=&cursor=

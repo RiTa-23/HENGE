@@ -1,25 +1,10 @@
 import type { Metadata } from "next";
 import { AdminThemeList } from "@/components/admin/AdminThemeList";
-import { Logo } from "@/components/Logo";
-import { requireAdminPage } from "@/lib/api/admin-page";
-import { betaBadgeVisible } from "@/lib/beta/beta";
 
 export const metadata: Metadata = { robots: { index: false, follow: false } };
 export const dynamic = "force-dynamic";
 
-/** 管理: テーマ。ヘッダー等からリンクせず、直接URLでのみ来る */
-export default async function AdminThemesPage() {
-  await requireAdminPage();
-  // 管理画面でもサイトがベータ運用中であることは示す（運営にも見せる）
-  const beta = await betaBadgeVisible();
-
-  return (
-    <main className="mx-auto w-full max-w-4xl px-6 py-12">
-      <div className="flex items-center justify-between border-b border-kin/40 pb-5">
-        <Logo beta={beta} />
-        <span className="text-sm tracking-[0.25em] text-kinari/50">管理 / テーマ</span>
-      </div>
-      <AdminThemeList />
-    </main>
-  );
+/** 管理: テーマ。ガードと枠は `admin/layout.tsx` が持つ */
+export default function AdminThemesPage() {
+  return <AdminThemeList />;
 }

@@ -1,3 +1,4 @@
+import { AdminLink } from "@/components/AdminLink";
 import { DisplayNameGate } from "@/components/DisplayNameGate";
 import { Logo } from "@/components/Logo";
 import { LoginButton } from "@/components/LoginButton";
@@ -6,7 +7,8 @@ import { NAV_LINKS } from "@/components/nav-links";
 import { betaBadgeVisible } from "@/lib/beta/beta";
 
 /**
- * 共通ヘッダー。**管理画面へのリンクは置かない**（直接URLでのみアクセスする）。
+ * 共通ヘッダー。**「管理」は管理者ログイン中だけ出る**（`AdminLink` が
+ * `/api/admin/check` で判定する）。
  *
  * 2つのモード（テーマ／最適化）は排他なので、両方をここから辿れるようにする。
  * ベータ運用の間はロゴの横に「ベータ版」を出す（運営にも見せる。lib/beta/beta.ts）。
@@ -30,6 +32,7 @@ export async function SiteHeader() {
               {link.label}
             </a>
           ))}
+          <AdminLink className="hover:text-kinari" />
           <LoginButton />
         </nav>
         <MobileNav />

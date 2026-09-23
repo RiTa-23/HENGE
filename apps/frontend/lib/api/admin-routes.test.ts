@@ -45,6 +45,9 @@ describe("/api/admin/* のルート構造", () => {
     const callBackend = source.indexOf("await backendClient()");
 
     expect(guard).toBeGreaterThanOrEqual(0);
+    // Hono を呼ばないルート（check のような判定プローブ）に順序の検査は
+    // 適用しない。ガード自体は上のテストで全ルートに要求している
+    if (callBackend === -1) return;
     expect(callBackend).toBeGreaterThan(guard);
   });
 });

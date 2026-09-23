@@ -14,7 +14,7 @@ interface AdminReport {
   userId: string | null;
   status: "pending" | "approved" | "rejected" | "applied";
   cost: number | null;
-  createdAt: string;
+  createdAt: number;
 }
 
 type Status = AdminReport["status"];
@@ -138,7 +138,7 @@ export function AdminReportList() {
           {reports.map((r) => (
             <li key={r.id} className="rounded-md border border-kinari/15 p-4 text-sm">
               <div className="flex items-center gap-2 font-mono text-xs text-kinari/40">
-                <span>{new Date(r.createdAt).toLocaleString("ja-JP")}</span>
+                <span>{new Date(r.createdAt * 1000).toLocaleString("ja-JP")}</span>
                 <span>{r.userId === null ? "匿名" : `user:${r.userId.slice(0, 8)}`}</span>
                 <span className="ml-auto">
                   {r.themeId.slice(0, 8)}・文 {r.sentenceNo}

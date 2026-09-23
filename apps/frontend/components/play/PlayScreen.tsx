@@ -195,6 +195,18 @@ export function PlayScreen({
   const [reportOpen, setReportOpen] = useState(false);
   const waitingSince = useRef<number | null>(null);
   const retryTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  /**
+   * お題が無いときの自動生成を試みたか。**枯渇1連続につき1回まで。**
+   * 生成しても在庫が積めない場合（0件受理など）に、枯渇 → 生成 → 枯渇の
+   * ループでクォータを際限なく消費しないための上限
+   */
+  const autoRegenTried = useRef(false);
+  /**
+   * ログイン中かの最新値。`load` の deps にセッションオブジェクトを入れると、
+   * その作り直しで `attempt > 0` の load が再走してお題を二重に消費する。
+   * ref 経由で値だけを見る
+   */
+  const loggedIn = useRef(false);
 
   /**
    * 1問目を出して打ち始める。**開始の合図が消えた瞬間に呼ぶ。**
@@ -256,12 +268,25 @@ export function PlayScreen({
         }
       }
 
+      /**
+       * **お題が無いときは、その場で作ってから始める。** 枯渇専用の画面を
+       * 挟まない。ログイン中だけ（生成はクォータを消費する）。直前に自動
+       * 生成を試みた直後の枯渇では画面に落とす（`autoRegenTried`）
+       */
+      if (code === "THEME_EXHAUSTED" && loggedIn.current && !autoRegenTried.current) {
+        autoRegenTried.current = true;
+        void regenerate();
+        return;
+      }
+
       waitingSince.current = null;
       setPhase({ name: "error", code, message, neuronsRemaining });
       return;
     }
 
     waitingSince.current = null;
+    // 取れたら枯渇の連続が途切れたので、自動生成の上限も振り出しに戻す
+    autoRegenTried.current = false;
 
     const session = body as SessionResponse;
     // **返された時点で消費が確定する。** 中断しても巻き戻さない
@@ -278,6 +303,10 @@ export function PlayScreen({
   }, [load, attempt]);
 
   useEffect(() => setMuted(readMuted()), []);
+
+  useEffect(() => {
+    loggedIn.current = authSession != null;
+  }, [authSession]);
 
   const toggleSound = () => {
     const next = !muted;
@@ -462,7 +491,7 @@ export function PlayScreen({
 
   if (phase.name === "ready") {
     return (
-      <div className="flex min-h-dvh items-center justify-center p-6">
+      <div className="flex min-h-dvh flex-col items-center justify-center gap-10 p-6">
         <div className="w-full max-w-lg rounded-lg border border-kin/60 bg-kinari/5 px-10 py-16 text-center">
           {/* 開始前に出すのはテーマ名だけ。総数を出しても遊べる残り数とは違ううえ、
               10問ひと組は例外なく成り立つので添えても情報が増えない */}
@@ -490,15 +519,20 @@ export function PlayScreen({
           <div className="mt-8 flex justify-center">
             <SoundToggle muted={muted} onToggle={toggleSound} />
           </div>
+        </div>
 
-          <div className="mt-12 flex justify-center">
-            <a
-              href={backToList}
-              className="rounded-md border border-kinari/20 px-8 py-2.5 tracking-widest text-kinari/80 transition-colors hover:border-kin hover:text-kinari"
-            >
-              一覧に戻る
-            </a>
-          </div>
+        {/* 離脱の導線は枠の外に置く。枠の中は「開始」に関することだけ。
+            詳細へ戻るは結果画面と同じ形（枠の下・一覧の下）に揃える */}
+        <div className="flex flex-col items-center gap-4">
+          <a
+            href={backToList}
+            className="rounded-md border border-kinari/20 px-8 py-2.5 tracking-widest text-kinari/80 transition-colors hover:border-kin hover:text-kinari"
+          >
+            一覧に戻る
+          </a>
+          <a href={backToDetail} className="tracking-widest text-kinari/50 hover:text-kinari">
+            「{themeName}」へ戻る
+          </a>
         </div>
       </div>
     );
@@ -650,11 +684,19 @@ export function PlayScreen({
     >
       <header className="flex items-start justify-between border-b border-kin/40 pb-4">
         <Logo beta={beta} />
-        <div className="flex items-center gap-3">
-          <span className="rounded-full border border-kinari/15 bg-kinari/5 px-4 py-1 text-xs tracking-widest text-kinari/70">
-            {themeName}
-            <span className="ml-2 text-kinari/40">{formLabel(form)}</span>
-          </span>
+        <div className="flex items-center gap-5">
+          {/*
+            テーマ名と形式は**表示であって操作ではない**のでチップにしない。
+            打っている最中に見返る情報なので、操作ボタンより文字を大きく。
+            形式は識別色（`formColor`＝札と紋と同じ色）で出す
+          */}
+          <div className="flex items-baseline gap-2.5">
+            <span className="text-lg tracking-widest text-kinari">{themeName}</span>
+            <span className="flex items-center gap-1 text-sm tracking-widest">
+              <FormMark form={form} className={`size-3.5 ${formColor(form).text}`} />
+              <span className={formColor(form).text}>{formLabel(form)}</span>
+            </span>
+          </div>
           {/* 音の入/切も、やめるボタンと同じ理由でこの中に置く */}
           <SoundToggle muted={muted} onToggle={toggleSound} />
           {/*

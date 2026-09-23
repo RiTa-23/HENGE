@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useId, useRef, useState } from "react";
+import { AdminLink } from "@/components/AdminLink";
 import { LoginButton } from "@/components/LoginButton";
 import { NAV_LINKS } from "@/components/nav-links";
 
@@ -85,6 +86,9 @@ export function MobileNav() {
               </a>
             </li>
           ))}
+          <li>
+            <AdminLink className="block py-2 hover:text-kinari" />
+          </li>
         </ul>
         <div className="mt-3 border-t border-kinari/10 pt-4">
           <LoginButton />

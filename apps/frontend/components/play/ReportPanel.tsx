@@ -38,7 +38,7 @@ export function ReportPanel({
   open: boolean;
   onOpenChange: (open: boolean) => void;
 }) {
-  const [selNo, setSelNo] = useState<number | null>(null);
+  const [selectedNo, setSelectedNo] = useState<number | null>(null);
   const [surface, setSurface] = useState("");
   const [kana, setKana] = useState("");
   const [drafts, setDrafts] = useState<Draft[]>([]);
@@ -55,6 +55,9 @@ export function ReportPanel({
     globalThis.addEventListener("keydown", onKey);
     return () => globalThis.removeEventListener("keydown", onKey);
   }, [open, onOpenChange]);
+
+  // 長文などお題が1問だけのときはお題選択を飛ばして常に1問目を対象にする
+  const selNo = prompts.length === 1 ? 1 : selectedNo;
 
   const takeSelection = () => {
     const sel = globalThis.getSelection()?.toString().trim() ?? "";
@@ -149,25 +152,27 @@ export function ReportPanel({
               </p>
             )}
 
-            {/* そのプレイで出題されたお題一覧 */}
-            <ol className="mt-4 max-h-48 space-y-1 overflow-y-auto">
-              {prompts.map((p, i) => (
-                <li key={i}>
-                  <button
-                    type="button"
-                    onClick={() => setSelNo(i + 1)}
-                    className={`w-full rounded px-3 py-1.5 text-left text-sm transition-colors ${
-                      selNo === i + 1
-                        ? "border border-kin bg-kin/15 text-kinari"
-                        : "border border-transparent text-kinari/70 hover:border-kinari/25"
-                    }`}
-                  >
-                    <span className="mr-2 font-mono text-xs text-kinari/40">{i + 1}</span>
-                    {p.text}
-                  </button>
-                </li>
-              ))}
-            </ol>
+            {/* そのプレイで出題されたお題一覧（1問だけなら選択肢を出さない） */}
+            {prompts.length > 1 && (
+              <ol className="mt-4 max-h-48 space-y-1 overflow-y-auto">
+                {prompts.map((p, i) => (
+                  <li key={i}>
+                    <button
+                      type="button"
+                      onClick={() => setSelectedNo(i + 1)}
+                      className={`w-full rounded px-3 py-1.5 text-left text-sm transition-colors ${
+                        selNo === i + 1
+                          ? "border border-kin bg-kin/15 text-kinari"
+                          : "border border-transparent text-kinari/70 hover:border-kinari/25"
+                      }`}
+                    >
+                      <span className="mr-2 font-mono text-xs text-kinari/40">{i + 1}</span>
+                      {p.text}
+                    </button>
+                  </li>
+                ))}
+              </ol>
+            )}
 
             {selNo !== null && (
               <div className="mt-4 border-t border-kinari/15 pt-4">

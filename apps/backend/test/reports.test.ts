@@ -5,6 +5,7 @@ import {
   insertReadingReports,
   listReadingReports,
   markReadingReportsApplied,
+  submitReadingReports,
   updateReadingReportStatus,
 } from "../src/db/reports";
 import { readingReports, themes, user } from "../src/db/schema";
@@ -120,5 +121,58 @@ describe("reading_reports", () => {
     await db.delete(themes);
     const rows = await listReadingReports(db, { status: "pending", limit: 50, cursor: 0 });
     expect(rows).toHaveLength(0);
+  });
+
+  it("同一（表層, 読み）の既報告はスキップされる（文脈違いでも重複扱い）", async () => {
+    await insertReadingReports(db, [base]);
+    // 同じ表層+読みを別のお題文脈から報告しても、辞書の訂正単位としては重複
+    const dup = {
+      ...base,
+      themeId: "t1",
+      sentenceNo: 9,
+      promptText: "別の文のかき氷",
+      userId: "u1",
+    };
+    const res = await submitReadingReports(db, [dup]);
+    expect(res.ids).toHaveLength(0);
+    expect(res.skipped).toBe(1);
+    expect(await listReadingReports(db, { status: "pending", limit: 50, cursor: 0 })).toHaveLength(
+      1,
+    );
+  });
+
+  it("承認済み（カタカナで保存）の報告にも重複判定が効く", async () => {
+    const id = (await insertReadingReports(db, [base]))[0]!;
+    await updateReadingReportStatus(db, id, "approved", { expectedKana: "カキゴオリ" });
+    // ひらがなで来た再報告はカタカナ保存済みの訂正と同一とみなす
+    const res = await submitReadingReports(db, [base]);
+    expect(res.skipped).toBe(1);
+  });
+
+  it("applied の報告もブロックするが、rejected は再報告できる", async () => {
+    const id = (await insertReadingReports(db, [base]))[0]!;
+    await updateReadingReportStatus(db, id, "approved", { expectedKana: "カキゴオリ" });
+    await markReadingReportsApplied(db, [id]);
+    expect((await submitReadingReports(db, [base])).skipped).toBe(1);
+
+    // 却下済みは再報告できる（管理者の判断を残す）
+    const id2 = (await insertReadingReports(db, [{ ...base, surface: "夜空" }]))[0]!;
+    await updateReadingReportStatus(db, id2, "rejected");
+    const res = await submitReadingReports(db, [{ ...base, surface: "夜空" }]);
+    expect(res.skipped).toBe(0);
+    expect(res.ids).toHaveLength(1);
+  });
+
+  it("読みが違えば同じ表層でも別の訂正として挿入される", async () => {
+    await insertReadingReports(db, [base]);
+    const res = await submitReadingReports(db, [{ ...base, expectedKana: "かきごおり2" }]);
+    expect(res.ids).toHaveLength(1);
+    expect(res.skipped).toBe(0);
+  });
+
+  it("同一リクエスト内の重複もスキップされる", async () => {
+    const res = await submitReadingReports(db, [base, { ...base, sentenceNo: 4 }]);
+    expect(res.ids).toHaveLength(1);
+    expect(res.skipped).toBe(1);
   });
 });

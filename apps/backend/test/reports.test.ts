@@ -183,7 +183,7 @@ describe("reading_reports", () => {
 
   it("承認済み（カタカナで保存）の報告にも重複判定が効く", async () => {
     const id = (await insertReadingReports(db, [base]))[0]!;
-    await updateReadingReportStatus(db, id, "approved", { expectedKana: "カキゴオリ" });
+    await updateReadingReportStatus(db, id, "approved", "pending", { expectedKana: "カキゴオリ" });
     // ひらがなで来た再報告はカタカナ保存済みの訂正と同一とみなす
     const res = await submitReadingReports(db, [base]);
     expect(res.skipped).toBe(1);
@@ -191,13 +191,13 @@ describe("reading_reports", () => {
 
   it("applied の報告もブロックするが、rejected は再報告できる", async () => {
     const id = (await insertReadingReports(db, [base]))[0]!;
-    await updateReadingReportStatus(db, id, "approved", { expectedKana: "カキゴオリ" });
+    await updateReadingReportStatus(db, id, "approved", "pending", { expectedKana: "カキゴオリ" });
     await markReadingReportsApplied(db, [id]);
     expect((await submitReadingReports(db, [base])).skipped).toBe(1);
 
     // 却下済みは再報告できる（管理者の判断を残す）
     const id2 = (await insertReadingReports(db, [{ ...base, surface: "夜空" }]))[0]!;
-    await updateReadingReportStatus(db, id2, "rejected");
+    await updateReadingReportStatus(db, id2, "rejected", "pending");
     const res = await submitReadingReports(db, [{ ...base, surface: "夜空" }]);
     expect(res.skipped).toBe(0);
     expect(res.ids).toHaveLength(1);

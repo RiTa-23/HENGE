@@ -18,6 +18,13 @@ export interface TypingProgress {
   /** 確定したかなを「実際に打たれた文字列」で連結したもの。表示の左側になる */
   readonly settled: string;
   /**
+   * 確定したかなを「実際に打たれたローマ字列」で1単位ずつ持つもの。
+   * `settled` をかな単位に切り戻すと（`shi` と `si` で文字数が違う）切れ目を
+   * 計算できないため、打鍵時に積んでおく。長文の表示列（かな1単位に対して
+   * そのローマ字列を真下に置く）で使う。
+   */
+  readonly typedUnits: readonly string[];
+  /**
    * ミスした表示位置（ローマ字列の先頭からの通し番号）。撒菱をここに置く。
    * **同じ位置で何度ミスしても1つ**にするため Set で持つ。
    */
@@ -50,6 +57,7 @@ export function startTyping(units: RomanCandidates): TypingProgress {
     input: "",
     matches: first === undefined ? [] : first.slice(),
     settled: "",
+    typedUnits: [],
     misses: new Set(),
     missCount: 0,
     missedKeys: new Map(),
@@ -68,6 +76,7 @@ function confirmUnit(p: TypingProgress, typed: string): TypingProgress {
     input: "",
     matches: next === undefined ? [] : next.slice(),
     settled: p.settled + typed,
+    typedUnits: [...p.typedUnits, typed],
     finished: next === undefined,
   };
 }
@@ -138,4 +147,20 @@ export function romanDisplay(p: TypingProgress): { text: string; cursor: number 
     .map((unit) => shortest(unit))
     .join("");
   return { text: p.settled + current + future, cursor: cursorOf(p) };
+}
+
+/**
+ * かな1単位ごとの表示用ローマ字列。
+ *
+ * 確定済みは**実際に打たれた経路**、未確定は最短候補。つなげると
+ * `romanDisplay().text` と同じになる。長文では「かな1単位」と「そのローマ字列」を
+ * 縦に1列にまとめるため、単位ごとに切り分けた配列が必要（連結文字列からは
+ * 単位の切れ目を計算できない。`shi` と `si` で文字数が違う）。
+ */
+export function romanSegments(p: TypingProgress): readonly string[] {
+  return [
+    ...p.typedUnits,
+    p.matches.length === 0 ? "" : shortest(p.matches),
+    ...p.units.slice(p.unitIndex + 1).map((unit) => shortest(unit)),
+  ];
 }

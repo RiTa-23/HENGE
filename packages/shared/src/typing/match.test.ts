@@ -1,6 +1,6 @@
 import { describe, expect, test } from "bun:test";
 import { buildRomanCandidates } from "./build";
-import { pressKey, romanDisplay, startTyping, type TypingProgress } from "./match";
+import { pressKey, romanDisplay, romanSegments, startTyping, type TypingProgress } from "./match";
 
 /** 読み仮名に対してローマ字を順に打ち込む */
 function type(kana: string, keys: string): TypingProgress {
@@ -204,6 +204,39 @@ describe("表示用のローマ字列と苦無の位置", () => {
 
   test("苦無はミスしても進まない", () => {
     expect(romanDisplay(type("しち", "shq")).cursor).toBe(2);
+  });
+});
+
+describe("かな1単位ごとの表示用ローマ字列", () => {
+  test("未確定のかなは最短候補で1単位ずつ返す", () => {
+    const progress = startTyping(buildRomanCandidates("しち"));
+
+    expect(romanSegments(progress)).toEqual(["si", "ti"]);
+  });
+
+  test("確定済みは実際に打たれた経路で返す（最短候補で畳まない）", () => {
+    // 「し」を si で確定した場合、si で返る（shi に直すと切れ目がずれる）
+    expect(romanSegments(type("しち", "si"))).toEqual(["si", "ti"]);
+    expect(romanSegments(type("しち", "shi"))).toEqual(["shi", "ti"]);
+  });
+
+  test("つなげると romanDisplay().text と同じになる", () => {
+    const progress = type("しゃしん", "sha");
+
+    expect(romanSegments(progress).join("")).toBe(romanDisplay(progress).text);
+    // ん は文末なので最短候補は nn
+    expect(romanSegments(progress)).toEqual(["sha", "si", "nn"]);
+  });
+
+  test("ミスの通し番号と切れ目が対応する（苦無が指す文字が保たれる）", () => {
+    // shq: s・h は受理、q はミス。苦無は si の「i」…ではなく shi 表示なら「i」の位置
+    const progress = type("しち", "shq");
+    const segments = romanSegments(progress);
+    const cursor = romanDisplay(progress).cursor;
+
+    expect(segments).toEqual(["shi", "ti"]);
+    expect(segments.join("")[cursor]).toBe("i");
+    expect(cursor).toBe(progress.settled.length + progress.input.length);
   });
 });
 

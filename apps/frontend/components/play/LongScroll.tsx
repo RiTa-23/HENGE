@@ -1,7 +1,7 @@
 "use client";
 
 import type { TypingProgress } from "@henge/shared";
-import { romanDisplay } from "@henge/shared";
+import { romanSegments } from "@henge/shared";
 import { useLayoutEffect, useRef } from "react";
 import { Makibishi } from "./Makibishi";
 import "./ninja.css";
@@ -20,7 +20,7 @@ function kanaClass(index: number, unitIndex: number): string {
 const ANCHOR_RATIO = 0.3;
 
 /**
- * 読み・ローマ字の行を**横にスライドさせる**。
+ * かな1単位とそのローマ字列を1列にまとめた**単位列を横にスライドさせる**。
  *
  * 長文は1行に収まらないが、折り返すと「いまどこを打っているか」を目で探すことになる。
  * 1行のまま `overflow: hidden` の窓に入れ、現在位置が窓の3割の位置に来るように
@@ -55,15 +55,34 @@ interface LongScrollProps {
  *
  * 本文（漢字かな混じり）には色を付けない。表記と読みの対応を持っていないため、
  * 進捗に合わせて色を変えると必ずずれる（短文の `Scroll` と同じ）。進捗は下の
- * 読み・ローマ字の行で示し、どちらも横スライドで現在位置を見せる。苦無・撒菱は
- * 短文と同じ置き方（ローマ字1文字ごとの真下／真上）。
+ * 読み・ローマ字の行で示す。
+ *
+ * 読み行とローマ字行は**1本のトラックにまとめた単位列**で作る。かな1単位の真下に
+ * そのローマ字列が来るように縦に積むと、2行が別々にスライドする構造が消えて
+ * 絶対にずれない（別々に測って動かすと、ローマ字が1〜5文字で可変なぶん列は
+ * 初期表示から崩れる）。列の幅は**ローマ字3文字ぶんで固定**する。列幅をローマ字列に
+ * 任せると幅が1〜3文字で変わり、かな行の間隔が不揃いになる。固定幅ならかな行も
+ * 等間隔になり、ローマ字列は1単位ずつのかたまりとして読める。幅は最短候補の
+ * 最長（`xya` など3文字）が収まるように取る。打ち方次第では5文字以上の経路
+ * （分解入力）が入るが、その場合は隣の桁にはみ出すだけにする。スライドは
+ * 単位の位置で動かす。苦無・撒菱は短文と同じ置き方（ローマ字1文字の真下／真上）。
  *
  * `.scroll` の作りは短文・一覧・詳細と同じ（別の物体に見せない）。
  */
 export function LongScroll({ text, kanaUnits, progress }: LongScrollProps) {
-  const { text: roman, cursor } = romanDisplay(progress);
-  const kana = useSlide(progress.unitIndex);
-  const romanLine = useSlide(cursor);
+  const segments = romanSegments(progress);
+  const slide = useSlide(progress.unitIndex);
+
+  // 撒菱・苦無はローマ字1文字ごとの通し番号で紐づく。列ごとに区切っても
+  // 文字列そのものは `romanDisplay().text` と同じなので、先頭からの通し番号で数える
+  let letterCount = 0;
+  const columns = segments.map((segment, unitIndex) => {
+    const start = letterCount;
+    letterCount += segment.length;
+    return { segment, unitIndex, start };
+  });
+  // 苦無（キャレット）の位置＝確定済みの文字数＋打ち込み中の文字数（cursorOf と同じ）
+  const cursor = progress.settled.length + progress.input.length;
 
   return (
     <div className="scroll scroll--long mx-auto w-full max-w-4xl">
@@ -78,46 +97,49 @@ export function LongScroll({ text, kanaUnits, progress }: LongScrollProps) {
         {/* 金は細い線まで。本文と打鍵の行を分ける折り目 */}
         <hr className="my-6 border-0 border-t border-kin/40" />
 
-        {/* 読み仮名の行。1行のまま横にずらす */}
-        <div ref={kana.window} className="overflow-hidden">
-          <p
-            ref={kana.track}
-            className="flex font-mincho text-lg tracking-wide whitespace-nowrap transition-transform duration-150 ease-out motion-reduce:transition-none"
-          >
-            {kanaUnits.map((unit, index) => (
-              <span key={index} className={kanaClass(index, progress.unitIndex)}>
-                {unit}
-              </span>
-            ))}
-          </p>
-        </div>
-
-        {/* ローマ字の行。上に撒菱、下に苦無が出るぶんの余白を窓の中に取る
+        {/* 読み仮名とローマ字を1列にまとめた単位列。1行のまま横にずらす。
+            撒菱はローマ字の真上、苦無は真下に出るぶんの余白を列の中に取る
             （窓は overflow: hidden なので、外に出した余白では切れる） */}
-        <div ref={romanLine.window} className="mt-2 overflow-hidden pt-7 pb-11">
+        <div ref={slide.window} className="overflow-hidden">
           <p
-            ref={romanLine.track}
+            ref={slide.track}
             className="flex font-mono text-xl tracking-[0.22em] whitespace-nowrap transition-transform duration-150 ease-out motion-reduce:transition-none"
           >
-            {[...roman].map((letter, index) => (
-              <span
-                key={index}
-                className={
-                  index < cursor
-                    ? "relative text-kinari/70"
-                    : index === cursor
-                      ? "relative text-kinari"
-                      : "relative text-kinari/30"
-                }
-              >
-                {letter}
-                {progress.misses.has(index) && <Makibishi />}
-                {index === cursor && (
-                  <span className="kunai" aria-hidden="true">
-                    <span className="kunai__blade" />
-                    <span className="kunai__ring" />
-                  </span>
-                )}
+            {columns.map(({ segment, unitIndex, start }) => (
+              <span key={unitIndex} className="flex w-[2.75em] shrink-0 flex-col items-center">
+                <span
+                  className={`font-mincho text-lg tracking-wide ${kanaClass(unitIndex, progress.unitIndex)}`}
+                >
+                  {kanaUnits[unitIndex]}
+                </span>
+                <span className="mb-11 mt-9 flex me-[-0.22em]">
+                  {/* 字間（tracking）は1文字ごとに末尾にも付く。列の最後の1文字ぶんを
+                      打ち消さないと、かなが右寄りに置かれてしまう */}
+                  {[...segment].map((letter, offset) => {
+                    const index = start + offset;
+                    return (
+                      <span
+                        key={offset}
+                        className={
+                          index < cursor
+                            ? "relative text-kinari/70"
+                            : index === cursor
+                              ? "relative text-kinari"
+                              : "relative text-kinari/30"
+                        }
+                      >
+                        {letter}
+                        {progress.misses.has(index) && <Makibishi />}
+                        {index === cursor && (
+                          <span className="kunai" aria-hidden="true">
+                            <span className="kunai__blade" />
+                            <span className="kunai__ring" />
+                          </span>
+                        )}
+                      </span>
+                    );
+                  })}
+                </span>
               </span>
             ))}
           </p>

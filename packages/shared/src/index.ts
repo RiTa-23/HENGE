@@ -18,6 +18,7 @@ export {
   pressKey,
   type RomanCandidates,
   romanDisplay,
+  romanSegments,
   splitKanaUnits,
   startTyping,
   SYMBOLS,

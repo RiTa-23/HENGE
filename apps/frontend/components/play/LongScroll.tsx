@@ -60,8 +60,11 @@ interface LongScrollProps {
  * 読み行とローマ字行は**1本のトラックにまとめた単位列**で作る。かな1単位の真下に
  * そのローマ字列が来るように縦に積むと、2行が別々にスライドする構造が消えて
  * 絶対にずれない（別々に測って動かすと、ローマ字が1〜5文字で可変なぶん列は
- * 初期表示から崩れる）。スライドは単位の位置で動かす。苦無・撒菱は短文と同じ置き方
- * （ローマ字1文字の真下／真上）。
+ * 初期表示から崩れる）。列の幅は**ローマ字4文字ぶんで固定**する。列幅をローマ字列に
+ * 任せると幅が1〜4文字で変わり、かな行の間隔が不揃いになる。固定幅ならかな行も
+ * 等間隔になり、ローマ字列は1単位ずつのかたまりとして読める。幅は最長の表示列
+ * （「ちゅう」= `chuu` の4文字）が収まるように取る。スライドは単位の位置で動かす。
+ * 苦無・撒菱は短文と同じ置き方（ローマ字1文字の真下／真上）。
  *
  * `.scroll` の作りは短文・一覧・詳細と同じ（別の物体に見せない）。
  */
@@ -102,7 +105,7 @@ export function LongScroll({ text, kanaUnits, progress }: LongScrollProps) {
             className="flex font-mono text-xl tracking-[0.22em] whitespace-nowrap transition-transform duration-150 ease-out motion-reduce:transition-none"
           >
             {columns.map(({ segment, unitIndex, start }) => (
-              <span key={unitIndex} className="flex flex-col items-center">
+              <span key={unitIndex} className="flex w-[3.3em] shrink-0 flex-col items-center">
                 <span
                   className={`font-mincho text-lg tracking-wide ${kanaClass(unitIndex, progress.unitIndex)}`}
                 >

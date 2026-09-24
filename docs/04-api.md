@@ -199,9 +199,13 @@
 // 報告一覧。status は pending/approved/rejected/applied。
 // 管理画面は pending、辞書リポジトリの自動PRワークフローは approved を取る
 // PATCH /api/admin/reading-reports
-// 承認/却下。承認時は expectedKana をカタカナ正規化値・cost を確定する
+// 報告の状態遷移。approve: pending→approved（expectedKana をカタカナ正規化値・cost を確定）、
+// reject: pending|approved→rejected（辞書PRがまだ無ければ承認済みも取り消せる）、
+// reopen: approved|rejected→pending（確定済み cost はリセット）、edit: pending の読みだけ更新
 { "id": "...", "action": "approve", "expectedKana": "カキゴオリ", "cost": -20000 }
 { "id": "...", "action": "reject" }
+{ "id": "...", "action": "reopen" }
+{ "id": "...", "action": "edit", "expectedKana": "カキゴオリ" }
 // GET /api/admin/reading-reports と POST /api/admin/reading-reports/applied は
 //   Authorization: Bearer <REPORTS_SYNC_TOKEN> でも通る（辞書リポの自動PRワークフロー用。
 //   未設定なら機械アクセス不可）。POST applied は approved→applied に閉じる通知

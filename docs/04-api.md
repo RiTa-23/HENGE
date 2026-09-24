@@ -137,12 +137,13 @@
       "reportedKana": "かきこおりのみせがこんでいた",
       "expectedKana": "かきごおり" } ] }
 
-// レスポンス
-{ "inserted": 1, "ids": ["01H..."] }
+// レスポンス。skipped は既報告と重複して挿入されなかった件数
+{ "inserted": 1, "skipped": 0, "ids": ["01H..."] }
 ```
 
 - **認証は必須ではない。** 匿名ユーザーの報告は `user_id` NULL で受け付ける（報告は利用者の進捗データではないので不変条件10の対象外。ログインしていれば user_id が残る）
 - `expectedKana` はかな文字のみ（ひらがな・カタカナ）。非かな・超長文は `VALIDATION_ERROR`
+- **重複はスキップされる。** `(surface, expectedKana)`（かなはひらがな正規化）が既存報告（pending / approved / applied）と一致する行は挿入せず `skipped` に数える。rejected は再報告できる。同一リクエスト内の重複も同様にスキップ
 - 承認→user-lex.csv追記PRの流れは `docs/03-data-model.md` の `reading_reports` を参照
 
 ### GET /api/me

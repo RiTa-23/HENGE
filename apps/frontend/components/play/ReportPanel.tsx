@@ -43,6 +43,7 @@ export function ReportPanel({
   const [kana, setKana] = useState("");
   const [drafts, setDrafts] = useState<Draft[]>([]);
   const [status, setStatus] = useState<"idle" | "sending" | "done" | "error">("idle");
+  const [skipped, setSkipped] = useState(0);
 
   // Esc で閉じる。モーダルが開いている間だけ窓で拾う
   useEffect(() => {
@@ -100,8 +101,14 @@ export function ReportPanel({
           })),
         }),
       });
-      setStatus(res.ok ? "done" : "error");
-      if (res.ok) setDrafts([]);
+      if (res.ok) {
+        const body = (await res.json()) as { inserted: number; skipped?: number };
+        setSkipped(body.skipped ?? 0);
+        setStatus("done");
+        setDrafts([]);
+      } else {
+        setStatus("error");
+      }
     } catch {
       setStatus("error");
     }
@@ -144,6 +151,11 @@ export function ReportPanel({
             {status === "done" && (
               <p className="mt-3 text-center text-sm text-kinari">
                 報告を受け付けました。ありがとうございます。
+                {skipped > 0 && (
+                  <span className="mt-1 block text-xs text-kinari/60">
+                    うち{skipped}件はすでに報告済みのためスキップされました
+                  </span>
+                )}
               </p>
             )}
             {status === "error" && (

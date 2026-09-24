@@ -1,10 +1,10 @@
 import { Hono } from "hono";
 import { createDb } from "../db/client";
 import {
-  insertReadingReports,
   listReadingReports,
   markReadingReportsApplied,
   REPORT_LIST_LIMIT_DEFAULT,
+  submitReadingReports,
   updateReadingReportStatus,
   type ReportStatus,
 } from "../db/reports";
@@ -34,8 +34,8 @@ export const reportRoutes = new Hono<{ Bindings: Env }>()
       }[]
     >();
     const db = createDb(c.env.DB);
-    const ids = await insertReadingReports(db, rows);
-    return c.json({ inserted: ids.length, ids });
+    const { ids, skipped } = await submitReadingReports(db, rows);
+    return c.json({ inserted: ids.length, skipped, ids });
   })
   /**
    * 報告一覧。管理画面（pending）と自動PRワークフロー（approved）の両方が使う。

@@ -73,7 +73,7 @@ export function AdminReportList() {
 
   const act = async (
     report: AdminReport,
-    action: "approve" | "reject",
+    action: "approve" | "reject" | "reopen" | "edit",
     kana?: string,
     cost?: string,
   ) => {
@@ -97,16 +97,23 @@ export function AdminReportList() {
     await load(status);
   };
 
-  const approve = (report: AdminReport) => {
+  /** 入力された読みを検証してから action に流す。edit と approve で共用 */
+  const withKana = (report: AdminReport, fn: (kana: string) => void) => {
     const e = edits[report.id];
     const kana = toKatakana((e?.kana ?? report.expectedKana).trim());
     if (!KATAKANA_RE.test(kana)) {
-      setError("読みはカタカ���で入力してください");
+      setError("読みはカタカナで入力してください");
       return;
     }
     setError(null);
-    void act(report, "approve", kana, e?.cost ?? "");
+    fn(kana);
   };
+
+  const approve = (report: AdminReport) =>
+    withKana(report, (kana) => void act(report, "approve", kana, edits[report.id]?.cost ?? ""));
+
+  const saveKana = (report: AdminReport) =>
+    withKana(report, (kana) => void act(report, "edit", kana));
 
   return (
     <div className="mt-10">
@@ -194,6 +201,14 @@ export function AdminReportList() {
                   <button
                     type="button"
                     disabled={busy === r.id}
+                    onClick={() => saveKana(r)}
+                    className="rounded border border-kinari/25 px-4 py-1 text-sm text-kinari/60 transition-colors hover:border-kin hover:text-kinari disabled:opacity-40"
+                  >
+                    読みを保存
+                  </button>
+                  <button
+                    type="button"
+                    disabled={busy === r.id}
                     onClick={() => approve(r)}
                     className="rounded border border-kin px-4 py-1 text-sm text-kin transition-colors hover:bg-kin/10 disabled:opacity-40"
                   >
@@ -210,9 +225,39 @@ export function AdminReportList() {
                 </div>
               )}
               {r.status === "approved" && (
-                <p className="mt-2 text-xs text-kinari/50">
-                  cost: {r.cost === null ? "自動推定" : r.cost}
-                </p>
+                <div className="mt-3 flex items-center gap-2 border-t border-kinari/10 pt-3">
+                  <p className="text-xs text-kinari/50">
+                    cost: {r.cost === null ? "自動推定" : r.cost}
+                  </p>
+                  <button
+                    type="button"
+                    disabled={busy === r.id}
+                    onClick={() => void act(r, "reopen")}
+                    className="ml-auto rounded border border-kinari/25 px-4 py-1 text-sm text-kinari/60 transition-colors hover:border-kin hover:text-kinari disabled:opacity-40"
+                  >
+                    承認待ちに戻す
+                  </button>
+                  <button
+                    type="button"
+                    disabled={busy === r.id}
+                    onClick={() => void act(r, "reject")}
+                    className="rounded border border-kinari/25 px-4 py-1 text-sm text-kinari/60 transition-colors hover:border-shu hover:text-shu disabled:opacity-40"
+                  >
+                    却下
+                  </button>
+                </div>
+              )}
+              {r.status === "rejected" && (
+                <div className="mt-3 flex justify-end border-t border-kinari/10 pt-3">
+                  <button
+                    type="button"
+                    disabled={busy === r.id}
+                    onClick={() => void act(r, "reopen")}
+                    className="rounded border border-kinari/25 px-4 py-1 text-sm text-kinari/60 transition-colors hover:border-kin hover:text-kinari disabled:opacity-40"
+                  >
+                    承認待ちに戻す
+                  </button>
+                </div>
               )}
             </li>
           ))}

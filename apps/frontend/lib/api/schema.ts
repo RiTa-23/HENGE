@@ -171,19 +171,29 @@ export const readingReportBatchSchema = z.object({
   reports: z.array(readingReportSchema).min(1).max(15),
 });
 
-/** 管理画面の報告承認/却下 */
-export const readingReportActionSchema = z.object({
-  id: z.string().min(1),
-  action: z.enum(["approve", "reject"]),
-  /** 承認時に確定する読み（カタカナ正規化済み。省略時は申告値を使う） */
-  expectedKana: z
-    .string()
-    .trim()
-    .regex(/^[ァ-ヶー]+$/, "読みはカタカナにしてください")
-    .optional(),
-  /** 承認時に確定する user-lex コスト値。省略時はワークフローの自動推定 */
-  cost: z.number().int().min(-20000).max(20000).optional(),
-});
+/**
+ * 管理画面の報告操作。approve: pending→approved、reject: pending|approved→rejected、
+ * reopen: approved|rejected→pending、edit: pending の読みだけ更新（承認しない）。
+ * 遷移元の可否はバックエンド側で強制する。
+ */
+export const readingReportActionSchema = z
+  .object({
+    id: z.string().min(1),
+    action: z.enum(["approve", "reject", "reopen", "edit"]),
+    /** 承認・編集時に確定する読み（カタカナ正規化済み。approve で省略時は申告値を使う） */
+    expectedKana: z
+      .string()
+      .trim()
+      .regex(/^[ァ-ヶー]+$/, "読みはカタカナにしてください")
+      .optional(),
+    /** 承認時に確定する user-lex コスト値。省略時はワークフローの自動推定 */
+    cost: z.number().int().min(-20000).max(20000).optional(),
+  })
+  .superRefine((value, ctx) => {
+    if (value.action === "edit" && value.expectedKana === undefined) {
+      ctx.addIssue({ code: "custom", message: "edit には expectedKana が必要です" });
+    }
+  });
 
 /** ワークフローからの適用完了通知（辞書PRマージ後に approved → applied） */
 export const readingReportAppliedSchema = z.object({

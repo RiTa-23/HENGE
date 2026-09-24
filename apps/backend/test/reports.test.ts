@@ -81,7 +81,7 @@ describe("reading_reports", () => {
 
   it("approve は status を approved にし、pending 一覧から消える", async () => {
     const id = (await insertReadingReports(db, [base]))[0]!;
-    const ok = await updateReadingReportStatus(db, id, "approved", {
+    const ok = await updateReadingReportStatus(db, id, "approved", "pending", {
       expectedKana: "カキゴオリ",
       cost: -20000,
     });
@@ -101,15 +101,55 @@ describe("reading_reports", () => {
 
   it("処理済みの報告を二度承認しようとしても弾かれる", async () => {
     const id = (await insertReadingReports(db, [base]))[0]!;
-    expect(await updateReadingReportStatus(db, id, "rejected")).toBe(true);
-    expect(await updateReadingReportStatus(db, id, "approved")).toBe(false);
+    expect(await updateReadingReportStatus(db, id, "rejected", ["pending", "approved"])).toBe(true);
+    expect(await updateReadingReportStatus(db, id, "approved", "pending")).toBe(false);
+  });
+
+  it("approved は rejected に戻せる（辞書PR前の取り消し）", async () => {
+    const id = (await insertReadingReports(db, [base]))[0]!;
+    await updateReadingReportStatus(db, id, "approved", "pending");
+    expect(await updateReadingReportStatus(db, id, "rejected", ["pending", "approved"])).toBe(true);
+    expect(await listReadingReports(db, { status: "rejected", limit: 50, cursor: 0 })).toHaveLength(
+      1,
+    );
+  });
+
+  it("reopen は approved/rejected を pending に戻し、確定済み cost を消せる", async () => {
+    const id = (await insertReadingReports(db, [base]))[0]!;
+    await updateReadingReportStatus(db, id, "approved", "pending", { cost: -20000 });
+    expect(
+      await updateReadingReportStatus(db, id, "pending", ["approved", "rejected"], { cost: null }),
+    ).toBe(true);
+    const rows = await listReadingReports(db, { status: "pending", limit: 50, cursor: 0 });
+    expect(rows).toHaveLength(1);
+    expect(rows[0]?.cost).toBeNull();
+    // pending には進めない（applied には戻れない）
+    expect(await updateReadingReportStatus(db, id, "pending", ["approved", "rejected"])).toBe(
+      false,
+    );
+  });
+
+  it("edit は pending のまま expectedKana だけ更新する", async () => {
+    const id = (await insertReadingReports(db, [base]))[0]!;
+    expect(
+      await updateReadingReportStatus(db, id, "pending", "pending", {
+        expectedKana: "カキゴオリ",
+      }),
+    ).toBe(true);
+    const rows = await listReadingReports(db, { status: "pending", limit: 50, cursor: 0 });
+    expect(rows[0]?.expectedKana).toBe("カキゴオリ");
+    // approved 以降は edit できない
+    await updateReadingReportStatus(db, id, "approved", "pending");
+    expect(
+      await updateReadingReportStatus(db, id, "pending", "pending", { expectedKana: "ナニ" }),
+    ).toBe(false);
   });
 
   it("applied は approved からのみ進む", async () => {
     const id = (await insertReadingReports(db, [base]))[0]!;
     // pending のまま applied にしようとしても変化しない
     expect(await markReadingReportsApplied(db, [id])).toBe(0);
-    await updateReadingReportStatus(db, id, "approved");
+    await updateReadingReportStatus(db, id, "approved", "pending");
     expect(await markReadingReportsApplied(db, [id])).toBe(1);
     const rows = await listReadingReports(db, { status: "applied", limit: 50, cursor: 0 });
     expect(rows).toHaveLength(1);

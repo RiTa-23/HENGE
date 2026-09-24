@@ -282,6 +282,18 @@ describe("readingReportActionSchema", () => {
     expect(readingReportActionSchema.safeParse({ id: "r1", action: "reject" }).success).toBe(true);
   });
 
+  test("reopen は追加フィールドなしで通り、edit は expectedKana が必須", () => {
+    expect(readingReportActionSchema.safeParse({ id: "r1", action: "reopen" }).success).toBe(true);
+    expect(readingReportActionSchema.safeParse({ id: "r1", action: "edit" }).success).toBe(false);
+    expect(
+      readingReportActionSchema.safeParse({
+        id: "r1",
+        action: "edit",
+        expectedKana: "カキゴオリ",
+      }).success,
+    ).toBe(true);
+  });
+
   test("ひらがなの承認読み・範囲外コスト・未知actionは弾く", () => {
     expect(
       readingReportActionSchema.safeParse({

@@ -203,7 +203,7 @@ CREATE INDEX reading_reports_status ON reading_reports (status, created_at DESC)
 ```
 
 - **`prompts` へのFKを張らない。** お題が消えても報告内容は残す（`prompt_text` で自己完結）
-- 処理済みの報告を二度操作できない（`updateReadingReportStatus` は pending からのみ遷移）
+- 遷移元の状態を強制する（`updateReadingReportStatus` は `from` で許容状態を指定）。pending から approve/reject、approved|rejected から reopen で pending に戻せる。applied だけは終端で戻れない
 
 ## user（Better Auth 管理）に足した列
 

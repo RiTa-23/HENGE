@@ -1,5 +1,5 @@
 import { katakanaToHiragana } from "@henge/shared";
-import { and, desc, eq, ne } from "drizzle-orm";
+import { and, desc, eq, inArray, ne } from "drizzle-orm";
 import type { Db } from "./client";
 import { readingReports } from "./schema";
 
@@ -116,14 +116,16 @@ export async function listReadingReports(
 }
 
 /**
- * 承認/却下。承認時は expectedKana をカタカナ正規化した値とコスト値を確定する。
- * 存在しない id には false を返す。
+ * 報告の状態遷移。`from` に現状態の許容一覧を渡し、遷移元が合わなければ
+ * 何も書き換えず false を返す（処理済みの二重操作防止と同じ仕組み）。
+ * `cost` に null を渡すと確定済みコストを消せる（reopen 時のリセット用）。
  */
 export async function updateReadingReportStatus(
   db: Db,
   id: string,
-  next: Exclude<ReportStatus, "pending" | "applied">,
-  patch: { expectedKana?: string; cost?: number } = {},
+  next: ReportStatus,
+  from: ReportStatus | ReportStatus[],
+  patch: { expectedKana?: string; cost?: number | null } = {},
 ): Promise<boolean> {
   const result = await db
     .update(readingReports)
@@ -132,7 +134,12 @@ export async function updateReadingReportStatus(
       ...(patch.expectedKana !== undefined ? { expectedKana: patch.expectedKana } : {}),
       ...(patch.cost !== undefined ? { cost: patch.cost } : {}),
     })
-    .where(and(eq(readingReports.id, id), eq(readingReports.status, "pending")));
+    .where(
+      and(
+        eq(readingReports.id, id),
+        inArray(readingReports.status, Array.isArray(from) ? from : [from]),
+      ),
+    );
   return (result.meta.changes ?? 0) > 0;
 }
 

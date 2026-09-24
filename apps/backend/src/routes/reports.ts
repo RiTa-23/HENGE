@@ -55,28 +55,55 @@ export const reportRoutes = new Hono<{ Bindings: Env }>()
     return c.json({ reports });
   })
   /**
-   * 承認/却下。承認時は expectedKana（カタカナ正規化済み）と cost を確定する。
-   * body: { id, action: "approve" | "reject", expectedKana?, cost? }
+   * 報告の状態遷移。body: { id, action, expectedKana?, cost? }
+   *
+   * - approve: pending → approved。expectedKana（カタカナ正規化済み）と cost を確定
+   * - reject:  pending|approved → rejected。承認済みでも辞書PRがまだ無ければ取り消せる
+   * - reopen:  approved|rejected → pending。確定済み cost はリセットする
+   * - edit:    pending のまま expectedKana だけ更新（運営の読み修正）
    */
   .patch("/admin/reading-reports", async (c) => {
     const body = await c.req.json<{
       id: string;
-      action: "approve" | "reject";
+      action: "approve" | "reject" | "reopen" | "edit";
       expectedKana?: string;
       cost?: number;
     }>();
-    if (body.action !== "approve" && body.action !== "reject") {
-      return fail(c, "VALIDATION_ERROR", "action は approve か reject です");
-    }
     const db = createDb(c.env.DB);
-    const ok = await updateReadingReportStatus(
-      db,
-      body.id,
-      body.action === "approve" ? "approved" : "rejected",
-      { expectedKana: body.expectedKana, cost: body.cost },
-    );
-    if (!ok) return fail(c, "NOT_FOUND", "対象の報告が見つからないか処理済みです");
-    return c.json({ id: body.id, status: body.action === "approve" ? "approved" : "rejected" });
+    let ok: boolean;
+    let status: ReportStatus;
+    switch (body.action) {
+      case "approve":
+        status = "approved";
+        ok = await updateReadingReportStatus(db, body.id, "approved", "pending", {
+          expectedKana: body.expectedKana,
+          cost: body.cost,
+        });
+        break;
+      case "reject":
+        status = "rejected";
+        ok = await updateReadingReportStatus(db, body.id, "rejected", ["pending", "approved"]);
+        break;
+      case "reopen":
+        status = "pending";
+        ok = await updateReadingReportStatus(db, body.id, "pending", ["approved", "rejected"], {
+          cost: null,
+        });
+        break;
+      case "edit":
+        status = "pending";
+        if (body.expectedKana === undefined) {
+          return fail(c, "VALIDATION_ERROR", "edit には expectedKana が必要です");
+        }
+        ok = await updateReadingReportStatus(db, body.id, "pending", "pending", {
+          expectedKana: body.expectedKana,
+        });
+        break;
+      default:
+        return fail(c, "VALIDATION_ERROR", "action は approve/reject/reopen/edit です");
+    }
+    if (!ok) return fail(c, "NOT_FOUND", "対象の報告が見つからないか遷移できない状態です");
+    return c.json({ id: body.id, status });
   })
   /**
    * 自動PRワークフローからの適用完了通知。body: { ids: string[] }

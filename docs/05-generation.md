@@ -265,7 +265,7 @@ Yahoo! JLP API は個人での商用利用が不可だったため撤去済み�
 
 ## モデルの切り替え
 
-`glm-4.7-flash` と `llama-3.2-3b-instruct` の両方を実装し、環境変数かパラメータで切り替えられるようにする。Phase 8で品質・速度・コストを実測して確定する。
+`MODELS`（`apps/backend/src/generation/model.ts`）に登録したモデルを、`GENERATION_MODEL`（`wrangler.jsonc` の vars）で切り替える。**既定は `@cf/qwen/qwen3-30b-a3b-fp8`**（登録に無い値は既定にフォールバック）。品質・速度・コストの実測（Phase 8）で確定済み。
 
 比較候補と実測値（テーマ「忍者」8件・2026-09-05）。**モデルIDは推測で書かず `wrangler ai models` で確認すること**（存在しないIDを渡すと実行時に `5007: No such model` で落ちる）。
 

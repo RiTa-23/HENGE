@@ -1,7 +1,8 @@
 "use client";
 
-import { isApiError } from "@henge/shared";
-import { useCallback, useEffect, useState } from "react";
+import { hiraganaToKatakana, isApiError } from "@henge/shared";
+import { useCallback, useEffect, useRef, useState } from "react";
+import { readJsonBody } from "@/lib/api/json";
 
 interface AdminReport {
   id: string;
@@ -35,8 +36,15 @@ const COST_CHOICES = [
 
 const KATAKANA_RE = /^[ァ-ヶー]+$/;
 
-function toKatakana(kana: string): string {
-  return kana.replace(/[ぁ-ん]/g, (c) => String.fromCodePoint(c.codePointAt(0)! + 0x60));
+/** 1回に読む件数。これより多いときは「さらに読む」で続きを引く */
+const PAGE_SIZE = 50;
+
+/**
+ * 1字だけの表層か。**承認すると、その字を含む熟語の読みまで変えやすい**
+ * （実例: 田→タ で 水田→みずた・田舎→たしゃ、向→ム で 方向→かたむ）。
+ */
+function isSingleChar(surface: string): boolean {
+  return [...surface].length === 1;
 }
 
 /**
@@ -49,26 +57,40 @@ function toKatakana(kana: string): string {
 export function AdminReportList() {
   const [status, setStatus] = useState<Status>("pending");
   const [reports, setReports] = useState<AdminReport[] | null>(null);
+  /** 続きがありそうか（直前のページが満杯だったか） */
+  const [hasMore, setHasMore] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState<string | null>(null);
   // 承認時に確認する読み・コストを報告ごとに保持
   const [edits, setEdits] = useState<Record<string, { kana: string; cost: string }>>({});
+  /**
+   * 最後に出した一覧の要求の番号。**タブを素早く切り替えたとき、前のタブの応答で
+   * 一覧を上書きしない**ために、返ってきた応答が最新の要求のものかを見る
+   */
+  const latestRequest = useRef(0);
 
-  const load = useCallback(async (s: Status) => {
-    const response = await fetch(`/api/admin/reading-reports?status=${s}&limit=100`);
-    const body: unknown = await response.json();
+  /** 先頭から読み直す（cursor=0）か、続きを足す（cursor=いまの件数） */
+  const load = useCallback(async (s: Status, cursor: number) => {
+    const request = ++latestRequest.current;
+    const response = await fetch(
+      `/api/admin/reading-reports?status=${s}&limit=${PAGE_SIZE}&cursor=${cursor}`,
+    );
+    const body = await readJsonBody(response);
+    if (request !== latestRequest.current) return;
     if (!response.ok) {
       setError(isApiError(body) ? body.error.message : "一覧を取得できませんでした");
       return;
     }
-    setReports((body as { reports: AdminReport[] }).reports);
-    setEdits({});
+    const page = (body as { reports: AdminReport[] }).reports;
+    setReports((current) => (cursor === 0 ? page : [...(current ?? []), ...page]));
+    setHasMore(page.length === PAGE_SIZE);
+    if (cursor === 0) setEdits({});
   }, []);
 
   useEffect(() => {
     setReports(null);
     setError(null);
-    void load(status);
+    void load(status, 0);
   }, [status, load]);
 
   const act = async (
@@ -78,29 +100,37 @@ export function AdminReportList() {
     cost?: string,
   ) => {
     setBusy(report.id);
-    const response = await fetch("/api/admin/reading-reports", {
-      method: "PATCH",
-      headers: { "content-type": "application/json" },
-      body: JSON.stringify({
-        id: report.id,
-        action,
-        ...(kana ? { expectedKana: kana } : {}),
-        ...(cost ? { cost: Number(cost) } : {}),
-      }),
-    });
-    setBusy(null);
-    if (!response.ok) {
-      const body: unknown = await response.json();
-      setError(isApiError(body) ? body.error.message : "更新できませんでした");
-      return;
+    try {
+      const response = await fetch("/api/admin/reading-reports", {
+        method: "PATCH",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({
+          id: report.id,
+          action,
+          ...(kana ? { expectedKana: kana } : {}),
+          ...(cost ? { cost: Number(cost) } : {}),
+        }),
+      });
+      if (!response.ok) {
+        const body = await readJsonBody(response);
+        setError(isApiError(body) ? body.error.message : "更新できませんでした");
+        return;
+      }
+      setError(null);
+      await load(status, 0);
+    } catch {
+      setError("更新できませんでした");
+    } finally {
+      // 通信が落ちてもボタンを押せないままにしない
+      setBusy(null);
     }
-    await load(status);
   };
 
   /** 入力された読みを検証してから action に流す。edit と approve で共用 */
   const withKana = (report: AdminReport, fn: (kana: string) => void) => {
     const e = edits[report.id];
-    const kana = toKatakana((e?.kana ?? report.expectedKana).trim());
+    // 保存はサーバーがカタカナに揃える。ここで揃えるのは入力の検査のため
+    const kana = hiraganaToKatakana((e?.kana ?? report.expectedKana).trim());
     if (!KATAKANA_RE.test(kana)) {
       setError("読みはカタカナで入力してください");
       return;
@@ -167,29 +197,37 @@ export function AdminReportList() {
                 </div>
               </dl>
 
+              {r.status === "pending" && isSingleChar(r.surface) && (
+                <p className="mt-2 text-xs text-shu">
+                  1字だけの表層です。承認すると、この字を含む熟語の読みまで変わることがあります
+                  （例: 田→タ で 水田→みずた）。前後を含めた表層で直せないか確かめてください。
+                </p>
+              )}
               {r.status === "pending" && (
                 <div className="mt-3 flex flex-wrap items-center gap-2 border-t border-kinari/10 pt-3">
                   <input
                     type="text"
                     defaultValue={r.expectedKana}
-                    onChange={(e) =>
-                      setEdits({
-                        ...edits,
-                        [r.id]: { kana: e.target.value, cost: edits[r.id]?.cost ?? "" },
-                      })
-                    }
+                    onChange={(e) => {
+                      const kana = e.target.value;
+                      setEdits((current) => ({
+                        ...current,
+                        [r.id]: { kana, cost: current[r.id]?.cost ?? "" },
+                      }));
+                    }}
                     maxLength={60}
                     className="min-w-40 flex-1 rounded border border-kinari/25 bg-transparent px-2 py-1 font-mono text-sm text-kinari"
                     aria-label="正しい読み（カタカナに正規化して登録）"
                   />
                   <select
                     value={edits[r.id]?.cost ?? ""}
-                    onChange={(e) =>
-                      setEdits({
-                        ...edits,
-                        [r.id]: { kana: edits[r.id]?.kana ?? r.expectedKana, cost: e.target.value },
-                      })
-                    }
+                    onChange={(e) => {
+                      const cost = e.target.value;
+                      setEdits((current) => ({
+                        ...current,
+                        [r.id]: { kana: current[r.id]?.kana ?? r.expectedKana, cost },
+                      }));
+                    }}
                     className="rounded border border-kinari/25 bg-transparent px-2 py-1 text-xs text-kinari/80"
                   >
                     {COST_CHOICES.map((c) => (
@@ -262,6 +300,17 @@ export function AdminReportList() {
             </li>
           ))}
         </ul>
+      )}
+      {reports !== null && hasMore && (
+        <div className="mt-6 text-center">
+          <button
+            type="button"
+            onClick={() => void load(status, reports.length)}
+            className="rounded border border-kinari/25 px-6 py-1.5 text-sm text-kinari/60 transition-colors hover:border-kin hover:text-kinari"
+          >
+            さらに読む
+          </button>
+        </div>
       )}
     </div>
   );

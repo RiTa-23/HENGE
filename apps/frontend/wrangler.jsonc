@@ -65,6 +65,14 @@
       "namespace_id": "1003",
       "simple": { "limit": 10, "period": 60 },
     },
+    {
+      // 読み違い報告（POST /api/reading-reports）用。**匿名でも送れる唯一の書き込み口**
+      // なので、キーは匿名ならIP。1回で最大15件まとめて送れるため、人が1分に
+      // 何度も送ることはない＝実質スクリプト連投にだけ効く
+      "name": "REPORT_RATE_LIMIT",
+      "namespace_id": "1004",
+      "simple": { "limit": 5, "period": 60 },
+    },
   ],
   "observability": { "enabled": true },
 }

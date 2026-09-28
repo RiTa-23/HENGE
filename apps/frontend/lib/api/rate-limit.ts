@@ -53,3 +53,21 @@ export async function limitRankingRegister(userId: string): Promise<Response | n
   const { success } = await env.RANKING_RATE_LIMIT.limit({ key: userId });
   return success ? null : errorResponse("RATE_LIMITED");
 }
+
+/**
+ * 読み違い報告（POST /api/reading-reports）の連投を弾く。
+ *
+ * **匿名でも送れる唯一の書き込み口**なので、キーはログイン中ならユーザーID、
+ * 匿名なら接続元IP（`cf-connecting-ip`）。IP をキーにすると共有回線の利用者を
+ * 巻き添えにしうるが、報告は1回で最大15件まとめて送れるので、人が1分に
+ * 何度も送ることはない（5回/60秒）。弾いたときは `RATE_LIMITED` を返す。
+ */
+export async function limitReadingReport(
+  userId: string | null,
+  request: Request,
+): Promise<Response | null> {
+  const { env } = await getCloudflareContext({ async: true });
+  const key = userId ?? `ip:${request.headers.get("cf-connecting-ip") ?? "unknown"}`;
+  const { success } = await env.REPORT_RATE_LIMIT.limit({ key });
+  return success ? null : errorResponse("RATE_LIMITED");
+}

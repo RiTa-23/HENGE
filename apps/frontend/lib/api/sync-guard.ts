@@ -1,6 +1,6 @@
 import { getCloudflareContext } from "@opennextjs/cloudflare";
 import { forbidNonAdmin } from "@/lib/api/admin";
-import { errorResponse } from "@/lib/api/error";
+import { sameSecret } from "@/lib/api/secret";
 
 /**
  * 報告の同期用認可。**管理画面と同じ `/api/admin/reading-reports` を使うが、
@@ -13,12 +13,8 @@ import { errorResponse } from "@/lib/api/error";
  */
 export async function forbidNonSyncOrAdmin(request: Request): Promise<Response | null> {
   const { env } = await getCloudflareContext({ async: true });
-  const token = (env as { REPORTS_SYNC_TOKEN?: string }).REPORTS_SYNC_TOKEN;
-  if (token !== undefined && token !== "") {
-    const auth = request.headers.get("authorization");
-    if (auth === `Bearer ${token}`) return null;
-  }
+  const token = env.REPORTS_SYNC_TOKEN;
+  const auth = request.headers.get("authorization");
+  if (token && auth !== null && (await sameSecret(auth, `Bearer ${token}`))) return null;
   return forbidNonAdmin(request);
 }
-
-export { errorResponse };

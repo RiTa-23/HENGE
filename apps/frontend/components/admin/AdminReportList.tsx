@@ -82,7 +82,13 @@ export function AdminReportList() {
       return;
     }
     const page = (body as { reports: AdminReport[] }).reports;
-    setReports((current) => (cursor === 0 ? page : [...(current ?? []), ...page]));
+    setReports((current) => {
+      if (cursor === 0) return page;
+      // オフセット方式なので、読むあいだに報告が増えると前のページの末尾がもう一度来る。
+      // 同じ id を2度並べない（key が重複する）
+      const shown = new Set((current ?? []).map((report) => report.id));
+      return [...(current ?? []), ...page.filter((report) => !shown.has(report.id))];
+    });
     setHasMore(page.length === PAGE_SIZE);
     if (cursor === 0) setEdits({});
   }, []);

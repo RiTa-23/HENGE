@@ -34,8 +34,8 @@ jobs:
       # bun test を直接呼ばない。対象ディレクトリの指定は package.json の
       # test スクリプトが持っており、素の bun test はリポジトリ全体を走査して
       # apps/backend の Workersテスト（cloudflare:test に依存）まで拾ってしまう
-      # apps/reading のユーザー辞書テストは辞書本体が要るので先に取得する
-      # （公開 Release からの無認証 fetch・約7MB）
+      # apps/reading の疎通テスト（取得したユーザー辞書を読み込めるか）は辞書本体が
+      # 要るので先に取得する（公開 Release からの無認証 fetch・約7MB）
       - name: Fetch reading dictionary (UniDic trim)
         run: bun run --cwd apps/reading dict:fetch
 

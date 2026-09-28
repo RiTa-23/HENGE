@@ -4,6 +4,13 @@ on:
   push:
     branches: [main]
   workflow_dispatch:
+    inputs:
+      reread:
+        # 辞書リポジトリ（unidic-cwj-trim）が user-lex.csv を更新したときに true で起動する。
+        # デプロイまで通ってから既存お題を再読みする（reread-prompts.yml）
+        description: "デプロイ後に既存お題を新しい辞書で再読みする"
+        type: boolean
+        default: false
 
 concurrency:
   group: deploy
@@ -154,6 +161,14 @@ jobs:
           workingDirectory: apps/frontend
           packageManager: bun
           command: deploy
+
+  # **再読みはデプロイが通ってから。** CI（辞書を読み込めるかの検査）より先に本番 D1 を
+  # 書き換えると、壊れた辞書で読みを上書きしたうえでデプロイだけが止まる。
+  reread:
+    needs: deploy
+    if: github.event_name == 'workflow_dispatch' && inputs.reread
+    uses: ./.github/workflows/reread-prompts.yml
+    secrets: inherit
 
 # D1のマイグレーションは上の migrate ジョブで自動適用する。
 # migrate.yml（手動トリガー）は調査と復旧のために残してある。

@@ -160,7 +160,7 @@ export function ReportPanel({
             )}
             {status === "error" && (
               <p className="mt-3 text-center text-sm text-shu">
-                送信に失敗しました���もう一度お試しください。
+                送信に失敗しました。もう一度お試しください。
               </p>
             )}
 

@@ -3,6 +3,5 @@
   "compilerOptions": {
     "types": ["./worker-configuration.d.ts"]
   },
-  // scripts/ は Bun で動かす手元のツールなので、Worker の型（workerd）では検査しない（backend と同じ）
   "include": ["src/**/*.ts", "worker-configuration.d.ts"]
 }

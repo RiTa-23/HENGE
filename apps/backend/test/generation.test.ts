@@ -17,7 +17,7 @@ import {
   resolveModel,
 } from "../src/generation/model";
 import { parseGeneratedBlocks, parseGeneratedLines } from "../src/generation/prompt";
-import { fromSingle, type GetReading } from "../src/reading/index";
+import { fromSingle, type GetReading } from "./fake-readings";
 
 describe("parseGeneratedLines", () => {
   it("1行1文に切る", () => {

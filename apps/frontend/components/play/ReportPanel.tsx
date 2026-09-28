@@ -181,12 +181,16 @@ export function ReportPanel({
                 )}
               </p>
             )}
-            {status === "error" && (
-              <p className="mt-3 text-center text-sm text-shu">
-                送信に失敗しました。もう一度お試しください。
-              </p>
+            {/* 理由が分かっているときはそれだけを出す（汎用の文言と2行並べない） */}
+            {problem !== null ? (
+              <p className="mt-3 text-center text-sm text-shu">{problem}</p>
+            ) : (
+              status === "error" && (
+                <p className="mt-3 text-center text-sm text-shu">
+                  送信に失敗しました。もう一度お試しください。
+                </p>
+              )
             )}
-            {problem !== null && <p className="mt-3 text-center text-sm text-shu">{problem}</p>}
 
             {/* そのプレイで出題されたお題一覧（1問だけなら選択肢を出さない） */}
             {prompts.length > 1 && (

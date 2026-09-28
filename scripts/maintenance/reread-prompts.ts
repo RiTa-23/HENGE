@@ -6,8 +6,13 @@
  * user-lex.csv を更新しても既存お題には反映されないので、辞書変更のたびに
  * このスクリプトで差分更新をかける。
  *
+ * **読みは生成時と同じ入口（`createGetReadings()`）から取る**（不変条件8）。
+ * 読み Worker を直接叩くと、打鍵テーブル外のかなを弾く処理などを二重に持つことになる。
+ * 新しい読みは**生成時と同じ基準で検査し、外れたら更新しない**（打鍵数の範囲・
+ * 最適化の字を含むか）。辞書の更新で読みが伸びて範囲を外れたお題を、黙って書き換えない。
+ *
  * 使い方（リポジトリルートから）:
- *   1. 読みWorkerを起動: bun run --cwd apps/reading dev --port 8787
+ *   1. 読みWorkerを起動: bun run --cwd apps/reading dev（ポート 8788）
  *   2. dry-run（差分レポートのみ）:
  *        bun scripts/maintenance/reread-prompts.ts --local --out /tmp/reread
  *   3. 適用:
@@ -18,46 +23,69 @@
  * オプション:
  *   --local / --remote   D1の参照先（どちらか必須。既定なし=誤爆防止）
  *   --apply              省略時はdry-run（差分TSVとSQLファイルを出すだけ）
- *   --worker-url URL     読みWorker（既定 http://localhost:8787）
+ *   --worker-url URL     読みWorker（既定 http://localhost:8788。apps/reading の dev と同じ）
  *   --db NAME            D1名（既定 henge-db）
  *   --out DIR            レポート・SQLの出力先（既定 /tmp/reread-prompts）
  *   --batch-size N       読みWorkerへの1リクエスト件数（既定40=MAX_TEXTS）
  */
-import { mkdirSync, writeFileSync } from "node:fs";
 import { spawnSync } from "node:child_process";
-import { buildRomanCandidates, countKeystrokes } from "../../packages/shared/src/index";
+import { mkdirSync, writeFileSync } from "node:fs";
+import { fileURLToPath } from "node:url";
+import { parseArgs } from "node:util";
+import {
+  countKeystrokes,
+  includesConstraint,
+  isKeystrokeCountInRange,
+  type PromptForm,
+} from "../../packages/shared/src/index";
+import { createGetReadings } from "../../apps/backend/src/reading/index";
 
-const args = process.argv.slice(2);
-function flag(name: string) {
-  return args.includes(`--${name}`);
-}
-function opt(name: string, fallback: string) {
-  const i = args.indexOf(`--${name}`);
-  return i >= 0 && args[i + 1] ? args[i + 1] : fallback;
-}
+const { values: options } = parseArgs({
+  options: {
+    local: { type: "boolean", default: false },
+    remote: { type: "boolean", default: false },
+    apply: { type: "boolean", default: false },
+    "worker-url": { type: "string", default: "http://localhost:8788" },
+    db: { type: "string", default: "henge-db" },
+    out: { type: "string", default: "/tmp/reread-prompts" },
+    "batch-size": { type: "string", default: "40" },
+  },
+});
 
-const local = flag("local");
-const remote = flag("remote");
-if (local === remote) {
+if (options.local === options.remote) {
   console.error("--local か --remote のどちらか片方を指定してください");
   process.exit(1);
 }
-const apply = flag("apply");
-const workerUrl = opt("worker-url", "http://localhost:8787");
-const db = opt("db", "henge-db");
-const outDir = opt("out", "/tmp/reread-prompts");
-const batchSize = Number(opt("batch-size", "40"));
+const workerUrl = options["worker-url"];
+const outDir = options.out;
+const batchSize = Number(options["batch-size"]);
 // apps/backend/package.json の dev スクリプトと揃える
 const persistTo = "../../.wrangler/state";
 
-const WRANGLER = new URL("../../node_modules/.bin/wrangler", import.meta.url).pathname;
+// **`URL#pathname` を使わない。** パスに日本語などが入ると %E3… のまま残り、別の場所を指す
+const WRANGLER = fileURLToPath(new URL("../../node_modules/.bin/wrangler", import.meta.url));
 // wrangler は apps/backend の wrangler.jsonc（DBバインディング定義）を読ませるため cwd を固定
-const WRANGLER_CWD = new URL("../../apps/backend", import.meta.url).pathname;
+const WRANGLER_CWD = fileURLToPath(new URL("../../apps/backend", import.meta.url));
+
+/**
+ * 読み Worker を Service Binding の代わりに HTTP で呼ぶ。本番の Hono と同じ
+ * `createGetReadings()` に渡すので、ホスト名を差し替えるだけでパスはそのまま使う
+ */
+const READING = {
+  fetch: (input: RequestInfo | URL, init?: RequestInit) => {
+    const url = new URL(input instanceof Request ? input.url : input);
+    return fetch(new URL(url.pathname + url.search, workerUrl), init);
+  },
+};
+const getReadings = createGetReadings({ READING } as unknown as Env);
 
 interface PromptRow {
   id: string;
   text: string;
   reading_kana: string;
+  form: PromptForm;
+  kind: "theme" | "constraint";
+  theme_name: string;
 }
 
 function d1Execute(extraArgs: string[]): string {
@@ -66,9 +94,9 @@ function d1Execute(extraArgs: string[]): string {
     [
       "d1",
       "execute",
-      db,
-      local ? "--local" : "--remote",
-      ...(local ? ["--persist-to", persistTo] : []),
+      options.db,
+      options.local ? "--local" : "--remote",
+      ...(options.local ? ["--persist-to", persistTo] : []),
       ...extraArgs,
       "--json",
     ],
@@ -88,21 +116,18 @@ function query(sql: string): PromptRow[] {
   return parsed[0]?.results ?? [];
 }
 
-async function readKana(texts: string[]): Promise<string[]> {
-  const res = await fetch(`${workerUrl}/readings`, {
-    method: "POST",
-    headers: { "content-type": "application/json" },
-    body: JSON.stringify({ texts }),
-  });
-  if (!res.ok) throw new Error(`readings failed: ${res.status}`);
-  const body = (await res.json()) as {
-    results: { kana?: string; error?: string; surface?: string }[];
-  };
-  return body.results.map((r) => r.kana ?? `<ERR:${r.error}>`);
-}
-
 function sqlEscape(s: string) {
   return `'${s.replaceAll("'", "''")}'`;
+}
+
+/** 新しい読みを生成時と同じ基準で検査する。通れば null、外れたら理由 */
+function rejection(row: PromptRow, keystrokeCount: number, kana: string): string | null {
+  if (!isKeystrokeCountInRange(keystrokeCount, row.form))
+    return `打鍵数が範囲外(${keystrokeCount})`;
+  if (row.kind === "constraint" && !includesConstraint(kana, row.theme_name)) {
+    return `「${row.theme_name}」を含まなくなる`;
+  }
+  return null;
 }
 
 mkdirSync(outDir, { recursive: true });
@@ -111,50 +136,63 @@ mkdirSync(outDir, { recursive: true });
 const PAGE = 1000;
 const changedSql: string[] = [];
 const reportLines: string[] = ["id\ttext\told_kana\tnew_kana"];
+const skippedLines: string[] = ["id\ttext\told_kana\tnew_kana\treason"];
 let fetched = 0;
-let changed = 0;
-let errors = 0;
 
 for (let offset = 0; ; offset += PAGE) {
   const rows = query(
-    `SELECT id, text, reading_kana FROM prompts ORDER BY rowid LIMIT ${PAGE} OFFSET ${offset}`,
+    "SELECT p.id, p.text, p.reading_kana, p.form, t.kind, t.name AS theme_name" +
+      " FROM prompts p JOIN themes t ON t.id = p.theme_id" +
+      ` ORDER BY p.rowid LIMIT ${PAGE} OFFSET ${offset}`,
   );
   if (rows.length === 0) break;
   fetched += rows.length;
   for (let i = 0; i < rows.length; i += batchSize) {
     const chunk = rows.slice(i, i + batchSize);
-    const kanas = await readKana(chunk.map((r) => r.text));
+    // 読み Worker には1バッチずつ順に送る（ローカルの1プロセスに並列で積まない）
+    // oxlint-disable-next-line no-await-in-loop
+    const outcomes = await getReadings(chunk.map((row) => row.text));
     for (const [j, row] of chunk.entries()) {
-      const newKana = kanas[j];
-      if (newKana.startsWith("<ERR:")) {
-        errors++;
+      const outcome = outcomes[j];
+      if (outcome === undefined) throw new Error("読み取得の応答と要求がずれている");
+      if (!outcome.ok) {
+        skippedLines.push(
+          `${row.id}\t${row.text}\t${row.reading_kana}\t\t読みが引けない(${outcome.surface})`,
+        );
         continue;
       }
-      if (newKana !== row.reading_kana) {
-        changed++;
-        const roman = buildRomanCandidates(newKana);
-        changedSql.push(
-          `UPDATE prompts SET reading_kana = ${sqlEscape(newKana)},` +
-            ` reading_roman_json = ${sqlEscape(JSON.stringify(roman))},` +
-            ` keystroke_count = ${countKeystrokes(roman)}` +
-            ` WHERE id = ${sqlEscape(row.id)};`,
-        );
-        reportLines.push(`${row.id}\t${row.text}\t${row.reading_kana}\t${newKana}`);
+      const { kana, roman } = outcome.reading;
+      if (kana === row.reading_kana) continue;
+      const keystrokeCount = countKeystrokes(roman);
+      const reason = rejection(row, keystrokeCount, kana);
+      if (reason !== null) {
+        skippedLines.push(`${row.id}\t${row.text}\t${row.reading_kana}\t${kana}\t${reason}`);
+        continue;
       }
+      changedSql.push(
+        `UPDATE prompts SET reading_kana = ${sqlEscape(kana)},` +
+          ` reading_roman_json = ${sqlEscape(JSON.stringify(roman))},` +
+          ` keystroke_count = ${keystrokeCount}` +
+          ` WHERE id = ${sqlEscape(row.id)};`,
+      );
+      reportLines.push(`${row.id}\t${row.text}\t${row.reading_kana}\t${kana}`);
     }
   }
-  console.log(`progress: ${fetched} 走査 / ${changed} 件差分 / ${errors} 件エラー`);
+  console.log(
+    `progress: ${fetched} 走査 / ${changedSql.length} 件差分 / ${skippedLines.length - 1} 件見送り`,
+  );
   if (rows.length < PAGE) break;
 }
 
 writeFileSync(`${outDir}/changes.tsv`, reportLines.join("\n") + "\n");
+writeFileSync(`${outDir}/skipped.tsv`, skippedLines.join("\n") + "\n");
 writeFileSync(`${outDir}/updates.sql`, changedSql.join("\n") + "\n");
 console.log(
-  `完了: ${fetched}件走査, ${changed}件差分 → ${outDir}/changes.tsv + updates.sql` +
-    (errors ? ` （エラー${errors}件はスキップ）` : ""),
+  `完了: ${fetched}件走査, ${changedSql.length}件差分 → ${outDir}/changes.tsv + updates.sql` +
+    (skippedLines.length > 1 ? `（見送り${skippedLines.length - 1}件 → skipped.tsv）` : ""),
 );
 
-if (apply && changed > 0) {
+if (options.apply && changedSql.length > 0) {
   d1Execute(["--file", `${outDir}/updates.sql`]);
-  console.log(`適用完了: ${changed}件 UPDATE`);
+  console.log(`適用完了: ${changedSql.length}件 UPDATE`);
 }

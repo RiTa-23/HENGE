@@ -42,4 +42,16 @@ describe("createVibratoReadings", () => {
 
     await expect(readings(["忍者"])).rejects.toThrow(ReadingError);
   });
+
+  it("件数が合わない応答は ReadingError（お題単位の却下と取り違えない）", async () => {
+    const readings = createVibratoReadings(stubReadingWorker([{ kana: "にんじゃ" }]));
+
+    await expect(readings(["忍者", "手裏剣"])).rejects.toThrow(ReadingError);
+  });
+
+  it("入力が空なら読み Worker を呼ばない", async () => {
+    const worker = stubReadingWorker([]);
+    expect(await createVibratoReadings(worker)([])).toEqual([]);
+    expect(worker.fetch).not.toHaveBeenCalled();
+  });
 });

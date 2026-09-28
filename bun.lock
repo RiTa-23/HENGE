@@ -19,6 +19,7 @@
       "name": "@henge/backend",
       "version": "0.0.0",
       "dependencies": {
+        "@henge/reading": "workspace:*",
         "@henge/shared": "workspace:*",
         "drizzle-orm": "^0.45.2",
         "hono": "^4.13.5",

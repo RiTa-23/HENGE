@@ -11,6 +11,7 @@ export {
   buildRomanCandidates,
   countKeystrokes,
   countKeystrokesFromKana,
+  hiraganaToKatakana,
   isImeKey,
   KANA_TABLE,
   katakanaToHiragana,

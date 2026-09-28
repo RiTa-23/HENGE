@@ -1,4 +1,4 @@
-import { env } from "cloudflare:test";
+import { env, SELF } from "cloudflare:test";
 import { beforeEach, describe, expect, it } from "vitest";
 import { createDb } from "../src/db/client";
 import {
@@ -214,5 +214,57 @@ describe("reading_reports", () => {
     const res = await submitReadingReports(db, [base, { ...base, sentenceNo: 4 }]);
     expect(res.ids).toHaveLength(1);
     expect(res.skipped).toBe(1);
+  });
+});
+
+async function patchReport(body: Record<string, unknown>) {
+  return SELF.fetch("http://backend/admin/reading-reports", {
+    method: "PATCH",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(body),
+  });
+}
+
+describe("PATCH /admin/reading-reports（読みの正規化）", () => {
+  it("approve で読みを省くと、申告値（ひらがな）をカタカナにして確定する", async () => {
+    const id = (await insertReadingReports(db, [base]))[0]!;
+    const res = await patchReport({ id, action: "approve" });
+    expect(res.status).toBe(200);
+    const [row] = await listReadingReports(db, { status: "approved", limit: 50, cursor: 0 });
+    expect(row?.expectedKana).toBe("カキゴオリ");
+  });
+
+  it("approve・edit にひらがなで渡しても、カタカナで保存する", async () => {
+    const id = (await insertReadingReports(db, [base]))[0]!;
+    await patchReport({ id, action: "edit", expectedKana: "かきごーり" });
+    let [row] = await listReadingReports(db, { status: "pending", limit: 50, cursor: 0 });
+    expect(row?.expectedKana).toBe("カキゴーリ");
+
+    await patchReport({ id, action: "approve", expectedKana: "ゔぁ" });
+    [row] = await listReadingReports(db, { status: "approved", limit: 50, cursor: 0 });
+    expect(row?.expectedKana).toBe("ヴァ");
+  });
+
+  it("存在しない報告の approve は NOT_FOUND", async () => {
+    const res = await patchReport({ id: "missing", action: "approve" });
+    expect(res.status).toBe(404);
+  });
+});
+
+describe("markReadingReportsApplied（まとめて閉じる）", () => {
+  it("D1 のバインド変数の上限を超える件数でも1回で閉じる", async () => {
+    const rows = Array.from({ length: 120 }, (_, i) => ({ ...base, sentenceNo: (i % 100) + 1 }));
+    const batches = await Promise.all(
+      Array.from({ length: rows.length / 15 }, (_, i) =>
+        insertReadingReports(db, rows.slice(i * 15, (i + 1) * 15)),
+      ),
+    );
+    const ids = batches.flat();
+    await Promise.all(ids.map((id) => updateReadingReportStatus(db, id, "approved", "pending")));
+    // 重複した id を混ぜても二重に数えない
+    expect(await markReadingReportsApplied(db, [...ids, ids[0]!])).toBe(120);
+    expect(await listReadingReports(db, { status: "applied", limit: 200, cursor: 0 })).toHaveLength(
+      120,
+    );
   });
 });

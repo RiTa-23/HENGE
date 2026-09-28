@@ -294,14 +294,23 @@ describe("readingReportActionSchema", () => {
     ).toBe(true);
   });
 
-  test("ひらがなの承認読み・範囲外コスト・未知actionは弾く", () => {
+  test("ひらがなの承認読みも通す（カタカナへの正規化は Hono 側）", () => {
     expect(
       readingReportActionSchema.safeParse({
         id: "r1",
         action: "approve",
         expectedKana: "かきごおり",
       }).success,
-    ).toBe(false);
+    ).toBe(true);
+  });
+
+  test("かな以外の承認読み・範囲外コスト・未知actionは弾く", () => {
+    for (const bad of ["kaki", "かき氷", ""]) {
+      expect(
+        readingReportActionSchema.safeParse({ id: "r1", action: "approve", expectedKana: bad })
+          .success,
+      ).toBe(false);
+    }
     expect(
       readingReportActionSchema.safeParse({ id: "r1", action: "approve", cost: -30000 }).success,
     ).toBe(false);

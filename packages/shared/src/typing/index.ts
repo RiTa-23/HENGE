@@ -1,4 +1,4 @@
-export { katakanaToHiragana } from "./kana";
+export { hiraganaToKatakana, katakanaToHiragana } from "./kana";
 export {
   buildRomanCandidates,
   type RomanCandidates,

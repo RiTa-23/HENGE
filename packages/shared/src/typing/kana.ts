@@ -10,3 +10,13 @@
 export function katakanaToHiragana(text: string): string {
   return text.replace(/[ァ-ヶ]/g, (char) => String.fromCharCode(char.charCodeAt(0) - 0x60));
 }
+
+/**
+ * ひらがなをカタカナに変換する。`katakanaToHiragana` の逆。
+ *
+ * 辞書（user-lex.csv）の読みの列はカタカナなので、読み違い報告の承認で
+ * 申告された読みをここで揃える。ゔ（U+3094）は ヴ に、長音符はそのまま。
+ */
+export function hiraganaToKatakana(text: string): string {
+  return text.replace(/[ぁ-ゖ]/g, (char) => String.fromCharCode(char.charCodeAt(0) + 0x60));
+}

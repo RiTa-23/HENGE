@@ -180,11 +180,16 @@ export const readingReportActionSchema = z
   .object({
     id: z.string().min(1),
     action: z.enum(["approve", "reject", "reopen", "edit"]),
-    /** 承認・編集時に確定する読み（カタカナ正規化済み。approve で省略時は申告値を使う） */
+    /**
+     * 承認・編集時に確定する読み。ひらがなでもよい（**カタカナへの正規化は Hono 側で行う**。
+     * 画面にだけ任せると API から直接承認したときに揃わない）。approve で省略時は申告値を使う
+     */
     expectedKana: z
       .string()
       .trim()
-      .regex(/^[ァ-ヶー]+$/, "読みはカタカナにしてください")
+      .min(1)
+      .max(60)
+      .regex(/^[ぁ-ゔァ-ヶー]+$/, "読みはかなで入力してください")
       .optional(),
     /** 承認時に確定する user-lex コスト値。省略時はワークフローの自動推定 */
     cost: z.number().int().min(-20000).max(20000).optional(),

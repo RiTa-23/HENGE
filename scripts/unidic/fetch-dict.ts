@@ -17,6 +17,7 @@
 import { createHash } from "node:crypto";
 import { existsSync } from "node:fs";
 import { mkdir } from "node:fs/promises";
+import { fileURLToPath } from "node:url";
 
 const RELEASE = "unidic-cwj-trim-v1";
 const BASE = `https://github.com/RiTa-23/unidic-cwj-trim/releases/download/${RELEASE}`;
@@ -29,14 +30,16 @@ const FILES = [
     "aae2f56b6f88a2a6a2671a072248220166b708a1a4a8d2ffbff610d6c0d06d9f",
   ],
   // user-lex.csv は誤読修正のたびに更新されるアセットなので sha は固定しない。
-  // 取り込まれた内容は apps/reading のテスト（誤読回帰・非破壊）が取得後に検査する
+  // 中身（誤読が直るか・複合語を壊さないか）は辞書リポジトリの CI が PR の時点で検査する。
+  // HENGE 側は apps/reading のテストで「読み込めるか」だけを見る
   ["user-lex.csv", "user-lex.csv", null],
   ["COPYING.unidic", "COPYING.unidic", null],
   ["LICENSE-BSD.unidic", "LICENSE-BSD.unidic", null],
   ["AUTHORS.unidic", "AUTHORS.unidic", null],
 ] as const;
 
-const assetsDir = new URL("../../apps/reading/assets/", import.meta.url).pathname;
+// `URL#pathname` を使わない。パスに日本語などが入ると %E3… のまま残り、別のディレクトリに書く
+const assetsDir = fileURLToPath(new URL("../../apps/reading/assets/", import.meta.url));
 await mkdir(assetsDir, { recursive: true });
 
 // `--if-missing`: 揃っていればネットワークに出ずに終わる。

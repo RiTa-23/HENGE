@@ -5,6 +5,7 @@ import {
   insertReadingReports,
   listReadingReports,
   markReadingReportsApplied,
+  ReportThemeNotFoundError,
   submitReadingReports,
   updateReadingReportStatus,
 } from "../src/db/reports";
@@ -214,5 +215,21 @@ describe("reading_reports", () => {
     const res = await submitReadingReports(db, [base, { ...base, sentenceNo: 4 }]);
     expect(res.ids).toHaveLength(1);
     expect(res.skipped).toBe(1);
+  });
+
+  it("存在しないテーマへの報告は1件も入れずに ReportThemeNotFoundError", async () => {
+    await expect(
+      submitReadingReports(db, [base, { ...base, themeId: "missing", surface: "夜空" }]),
+    ).rejects.toBeInstanceOf(ReportThemeNotFoundError);
+    expect(await listReadingReports(db, { status: "pending", limit: 50, cursor: 0 })).toHaveLength(
+      0,
+    );
+  });
+
+  it("別の表層の既報告は重複判定に巻き込まない", async () => {
+    await insertReadingReports(db, [{ ...base, surface: "夜空", expectedKana: "かきごおり" }]);
+    const res = await submitReadingReports(db, [base]);
+    expect(res.ids).toHaveLength(1);
+    expect(res.skipped).toBe(0);
   });
 });

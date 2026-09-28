@@ -257,6 +257,28 @@ describe("readingReportBatchSchema", () => {
     ).toBe(true);
   });
 
+  test("ゔ を含む読みも通す", () => {
+    expect(
+      readingReportBatchSchema.safeParse({ reports: [{ ...ok, expectedKana: "ゔぁいおりん" }] })
+        .success,
+    ).toBe(true);
+  });
+
+  test("表層にカンマ・改行があれば弾く（user-lex.csv の列が崩れる）", () => {
+    for (const surface of ["かき,氷", "かき\n氷"]) {
+      const promptText = `${surface}の店`;
+      expect(
+        readingReportBatchSchema.safeParse({ reports: [{ ...ok, promptText, surface }] }).success,
+      ).toBe(false);
+    }
+  });
+
+  test("お題文に含まれない表層は弾き、理由を返す", () => {
+    const result = readingReportBatchSchema.safeParse({ reports: [{ ...ok, surface: "花火" }] });
+    expect(result.success).toBe(false);
+    expect(result.error?.issues[0]?.message).toBe("表層はお題文の中から選んでください");
+  });
+
   test("空配列・超過件数・欠落フィールドは弾く", () => {
     expect(readingReportBatchSchema.safeParse({ reports: [] }).success).toBe(false);
     expect(

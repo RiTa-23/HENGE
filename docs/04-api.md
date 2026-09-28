@@ -143,6 +143,9 @@
 
 - **認証は必須ではない。** 匿名ユーザーの報告は `user_id` NULL で受け付ける（報告は利用者の進捗データではないので不変条件10の対象外。ログインしていれば user_id が残る）
 - `expectedKana` はかな文字のみ（ひらがな・カタカナ）。非かな・超長文は `VALIDATION_ERROR`
+- **`surface` はカンマ・改行を含まず、`promptText` に含まれていること。** 承認された報告は辞書リポジトリで user-lex.csv（カンマ区切り13列）の1行になり、お題文を解析し直して読みを確かめる。カンマ入りは列が崩れ、お題文に無い表層は確かめようがない。弾いた理由は `VALIDATION_ERROR` の message にそのまま載せる
+- **連投は `REPORT_RATE_LIMIT` で弾く**（下の「Rate Limiting」）。匿名でも書ける唯一の口なので、入力検証より先に判定する
+- `themeId` のテーマが無ければ `NOT_FOUND`。1件でも無ければ1件も挿入しない
 - **重複はスキップされる。** `(surface, expectedKana)`（かなはひらがな正規化）が既存報告（pending / approved / applied）と一致する行は挿入せず `skipped` に数える。rejected は再報告できる。同一リクエスト内の重複も同様にスキップ
 - 承認→user-lex.csv追記PRの流れは `docs/03-data-model.md` の `reading_reports` を参照
 
@@ -324,8 +327,10 @@ Cloudflare の Rate Limiting binding（`GENERATION_RATE_LIMIT`、Next.js Worker 
 | `GENERATION_RATE_LIMIT` | `POST /api/themes` / `POST /api/prompts/regenerate` | ユーザーID | 5回 / 60秒 | `RATE_LIMITED`(429) |
 | `REFILL_RATE_LIMIT` | `POST /api/sessions/start`（ログイン時のみ） | ユーザーID | 10回 / 60秒 | **`allowRefill: false`。429は返さない** |
 | `RANKING_RATE_LIMIT` | `POST /api/rankings` | ユーザーID | 10回 / 60秒 | `RATE_LIMITED`(429) |
+| `REPORT_RATE_LIMIT` | `POST /api/reading-reports` | ユーザーID、匿名は接続元IP | 5回 / 60秒 | `RATE_LIMITED`(429) |
 
 - キーをIPにしないのは、共有回線の背後にいる別のユーザーを巻き添えにする理由が無いため。匿名の `sessions/start` は補充をキックしないので判定自体を行わない
+- **例外は読み違い報告。** 匿名でも送れる書き込み口で、ユーザーIDが無いのでIPで数える。1回で最大15件まとめて送れるため、共有回線でも人の操作で上限に届くことはまず無い
 - 同期生成では**クォータ判定より先に判定する。** 弾かれたリクエストで `GET /usage/:userId` を引くのは無駄で、連打を弾く目的にも反する
 - `period` は 10 か 60 しか指定できない
 

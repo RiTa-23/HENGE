@@ -1,7 +1,8 @@
 import { katakanaToHiragana } from "@henge/shared";
 import { and, desc, eq, inArray, ne } from "drizzle-orm";
+import { asBatch, chunk } from "./batch";
 import type { Db } from "./client";
-import { readingReports } from "./schema";
+import { readingReports, themes } from "./schema";
 
 export type ReportStatus = "pending" | "approved" | "rejected" | "applied";
 
@@ -25,25 +26,24 @@ export interface ReadingReportRow extends ReadingReportInput {
 
 export const REPORT_LIST_LIMIT_DEFAULT = 50;
 
-// D1 は1文あたり100個までしかバインド変数を受け付けない。
-// 列8項目 × 行数で超過するため、INSERT はこの件数ごとに分ける。
+/**
+ * 1つの INSERT 文に載せる報告の数。
+ *
+ * **D1のバインド変数の上限は1クエリにつき100個。** 報告1件で**9個**使う
+ * （id / theme_id / sentence_no / prompt_text / surface / reported_kana /
+ * expected_kana / user_id と、既定値を JS 側で持つ status。created_at は SQL の
+ * 既定値なのでバインドしない）。10件で90個。列を足すときはここを見直すこと。
+ */
 const REPORT_INSERT_CHUNK = 10;
 
-/** 報告を挿入する。複数件はチャンクごとのバッチで。 */
+/** 報告を挿入する。分割しても1つのバッチに収める（途中までだけ入ることがない）。 */
 export async function insertReadingReports(db: Db, rows: ReadingReportInput[]): Promise<string[]> {
-  const values = rows.map((row) => ({
-    id: crypto.randomUUID(),
-    themeId: row.themeId,
-    sentenceNo: row.sentenceNo,
-    promptText: row.promptText,
-    surface: row.surface,
-    reportedKana: row.reportedKana,
-    expectedKana: row.expectedKana,
-    userId: row.userId,
-  }));
-  for (let i = 0; i < values.length; i += REPORT_INSERT_CHUNK) {
-    await db.insert(readingReports).values(values.slice(i, i + REPORT_INSERT_CHUNK));
-  }
+  if (rows.length === 0) return [];
+  const values = rows.map((row) => ({ id: crypto.randomUUID(), ...row }));
+  const inserts = chunk(values, REPORT_INSERT_CHUNK).map((part) =>
+    db.insert(readingReports).values(part),
+  );
+  await db.batch(asBatch(inserts));
   return values.map((v) => v.id);
 }
 
@@ -56,15 +56,27 @@ const reportKey = (surface: string, expectedKana: string) =>
   `${surface}\t${katakanaToHiragana(expectedKana)}`;
 
 /**
- * すでにキューにある訂正のキー集合（pending / approved / applied）。
+ * 送られてきた表層について、すでにキューにある訂正のキー集合（pending / approved / applied）。
  * rejected は含めない — 却下された訂正の再報告は管理者が毎回判断できるよう残す。
+ *
+ * **全件を読まない。** 報告は匿名でも送れるので、1リクエストごとにテーブル全体を
+ * 読むと、連投がそのまま D1 の読み取り量になる。1回の報告は最大15件なので、
+ * 表層の `IN (...)` はバインド変数の上限に収まる。
  */
-async function listReportedKeys(db: Db): Promise<Set<string>> {
+async function listReportedKeys(db: Db, surfaces: string[]): Promise<Set<string>> {
   const rows = await db
     .select({ surface: readingReports.surface, expectedKana: readingReports.expectedKana })
     .from(readingReports)
-    .where(ne(readingReports.status, "rejected"));
+    .where(and(inArray(readingReports.surface, surfaces), ne(readingReports.status, "rejected")));
   return new Set(rows.map((r) => reportKey(r.surface, r.expectedKana)));
+}
+
+/** 報告先のテーマが無い。FK 違反の500にせず、呼び出し側で 404 にする */
+export class ReportThemeNotFoundError extends Error {
+  constructor() {
+    super("報告先のテーマが見つかりません");
+    this.name = "ReportThemeNotFoundError";
+  }
 }
 
 /**
@@ -75,7 +87,11 @@ export async function submitReadingReports(
   db: Db,
   rows: ReadingReportInput[],
 ): Promise<{ ids: string[]; skipped: number }> {
-  const seen = await listReportedKeys(db);
+  const themeIds = [...new Set(rows.map((row) => row.themeId))];
+  const found = await db.select({ id: themes.id }).from(themes).where(inArray(themes.id, themeIds));
+  if (found.length !== themeIds.length) throw new ReportThemeNotFoundError();
+
+  const seen = await listReportedKeys(db, [...new Set(rows.map((row) => row.surface))]);
   const fresh: ReadingReportInput[] = [];
   let skipped = 0;
   for (const row of rows) {

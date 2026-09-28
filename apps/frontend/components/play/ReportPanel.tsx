@@ -1,6 +1,8 @@
 "use client";
 
+import { isApiError } from "@henge/shared";
 import { useEffect, useState } from "react";
+import { readJsonBody } from "@/lib/api/json";
 
 export interface ReportablePrompt {
   text: string;
@@ -16,6 +18,17 @@ interface Draft {
 }
 
 const MAX_REPORTS = 15;
+
+/** サーバー（`readingReportSchema`）と同じ条件。送る前に弾いて、1件の誤りで全件を失わせない */
+const KANA_RE = /^[ぁ-ゔァ-ヶー]+$/;
+
+/** 追加しようとした1件の誤り。問題なければ null */
+function draftProblem(promptText: string, surface: string, kana: string): string | null {
+  if (/[,\r\n\t]/.test(surface)) return "表層にカンマや改行は使えません";
+  if (!promptText.includes(surface)) return "表層はお題文の中から選んでください";
+  if (!KANA_RE.test(kana)) return "読みはひらがなかカタカナで入力してください";
+  return null;
+}
 
 /**
  * リザルト画面の読み違い報告パネル。
@@ -44,6 +57,8 @@ export function ReportPanel({
   const [drafts, setDrafts] = useState<Draft[]>([]);
   const [status, setStatus] = useState<"idle" | "sending" | "done" | "error">("idle");
   const [skipped, setSkipped] = useState(0);
+  /** 追加時の入力の誤り、または送信失敗の理由（サーバーの文言） */
+  const [problem, setProblem] = useState<string | null>(null);
 
   // Esc で閉じる。モーダルが開いている間だけ窓で拾う
   useEffect(() => {
@@ -69,14 +84,19 @@ export function ReportPanel({
     if (selNo === null || !surface || !kana) return;
     const prompt = prompts[selNo - 1];
     if (prompt === undefined) return;
-    setDrafts([
-      ...drafts,
+    const trimmedSurface = surface.trim();
+    const trimmedKana = kana.trim();
+    const found = draftProblem(prompt.text, trimmedSurface, trimmedKana);
+    setProblem(found);
+    if (found !== null) return;
+    setDrafts((current) => [
+      ...current,
       {
         sentenceNo: selNo,
         promptText: prompt.text,
-        surface,
+        surface: trimmedSurface,
         reportedKana: prompt.readingKana,
-        expectedKana: kana,
+        expectedKana: trimmedKana,
       },
     ]);
     setSurface("");
@@ -86,6 +106,7 @@ export function ReportPanel({
   const submit = async () => {
     if (drafts.length === 0) return;
     setStatus("sending");
+    setProblem(null);
     try {
       const res = await fetch("/api/reading-reports", {
         method: "POST",
@@ -107,6 +128,8 @@ export function ReportPanel({
         setStatus("done");
         setDrafts([]);
       } else {
+        const body = await readJsonBody(res);
+        if (isApiError(body)) setProblem(body.error.message);
         setStatus("error");
       }
     } catch {
@@ -163,6 +186,7 @@ export function ReportPanel({
                 送信に失敗しました。もう一度お試しください。
               </p>
             )}
+            {problem !== null && <p className="mt-3 text-center text-sm text-shu">{problem}</p>}
 
             {/* そのプレイで出題されたお題一覧（1問だけなら選択肢を出さない） */}
             {prompts.length > 1 && (
@@ -240,7 +264,7 @@ export function ReportPanel({
                       <span className="text-kinari">{d.expectedKana}</span>
                       <button
                         type="button"
-                        onClick={() => setDrafts(drafts.filter((_, j) => j !== i))}
+                        onClick={() => setDrafts((current) => current.filter((_, j) => j !== i))}
                         className="ml-auto text-xs text-kinari/40 hover:text-shu"
                       >
                         消す

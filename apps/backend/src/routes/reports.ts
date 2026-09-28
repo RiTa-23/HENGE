@@ -4,6 +4,7 @@ import {
   listReadingReports,
   markReadingReportsApplied,
   REPORT_LIST_LIMIT_DEFAULT,
+  ReportThemeNotFoundError,
   submitReadingReports,
   updateReadingReportStatus,
   type ReportStatus,
@@ -34,8 +35,13 @@ export const reportRoutes = new Hono<{ Bindings: Env }>()
       }[]
     >();
     const db = createDb(c.env.DB);
-    const { ids, skipped } = await submitReadingReports(db, rows);
-    return c.json({ inserted: ids.length, skipped, ids });
+    try {
+      const { ids, skipped } = await submitReadingReports(db, rows);
+      return c.json({ inserted: ids.length, skipped, ids });
+    } catch (error) {
+      if (error instanceof ReportThemeNotFoundError) return fail(c, "NOT_FOUND", error.message);
+      throw error;
+    }
   })
   /**
    * 報告一覧。管理画面（pending）と自動PRワークフロー（approved）の両方が使う。

@@ -3,13 +3,30 @@ name: Reread prompts
 # 既存お題を新しいユーザー辞書で再読みし、差分を prod D1 に適用する。
 # prompts.reading_kana は生成時点で凍結されるので、辞書が変わるたびに走らせる。
 #
-# **Deploy のあとに走らせる。** 辞書リポジトリ（unidic-cwj-trim）は user-lex.csv を
-# 更新すると Deploy を `reread: true` で起動し、Deploy は CI（読み Worker のテストを含む）と
-# デプロイが通ってからこのワークフローを呼ぶ。CI より先に本番 D1 を書き換えない。
-# 手動でも起動できる（調査・やり直し用）。
+# **Deploy のあとに走らせる。** Deploy は CI（読み Worker のテストを含む）とデプロイが
+# 通ってから、**毎回**このワークフローを呼ぶ。CI より先に本番 D1 を書き換えない。
+#
+# **再読みするかは、取得した user-lex.csv のハッシュで決める。** 最後に再読みを終えた
+# csv のハッシュを Actions のキャッシュのキーとして残し、同じならすぐ終わる。
+# 辞書リポジトリからの起動（Deploy の `reread: true`）だけを合図にすると、その Deploy が
+# 待機中に次の push の Deploy に置き換えられたとき（同じ concurrency グループで待機できる
+# のは1本だけ）、再読みが黙って消える。ハッシュで決めれば、次のどの Deploy でも拾い直せる。
+# キャッシュが消えても（7日間使われないと消える）、同じ辞書での再読みは差分0で終わるだけ。
+#
+# 手動でも起動できる（調査・やり直し用。既定でハッシュに関わらず走らせる）。
 on:
   workflow_call:
+    inputs:
+      force:
+        description: "user-lex.csv が前回の再読みから変わっていなくても走らせる"
+        type: boolean
+        default: false
   workflow_dispatch:
+    inputs:
+      force:
+        description: "user-lex.csv が前回の再読みから変わっていなくても走らせる"
+        type: boolean
+        default: true
 
 jobs:
   reread:
@@ -28,13 +45,33 @@ jobs:
         with:
           bun-version: "1.3.14"
 
-      - run: bun install --frozen-lockfile
-
+      # 取得スクリプトは node の組み込みしか使わないので、bun install の前に回せる
       - name: Fetch reading dictionary (UniDic trim)
         run: bun run --cwd apps/reading dict:fetch
 
+      - name: user-lex.csv のハッシュ
+        id: lex
+        run: echo "sha=$(sha256sum apps/reading/assets/user-lex.csv | cut -c1-64)" >> "$GITHUB_OUTPUT"
+
+      # 中身は要らない。キーがあるか（=この csv で再読みを終えたか）だけを見る
+      - name: この辞書で再読み済みか
+        id: done
+        uses: actions/cache/restore@v4
+        with:
+          path: .reread-done
+          key: reread-user-lex-${{ steps.lex.outputs.sha }}
+          lookup-only: true
+
+      - name: 再読み済みなので終える
+        if: steps.done.outputs.cache-hit == 'true' && !inputs.force
+        run: echo "user-lex.csv（${{ steps.lex.outputs.sha }}）では再読み済み。何もしない"
+
+      - if: steps.done.outputs.cache-hit != 'true' || inputs.force
+        run: bun install --frozen-lockfile
+
       # apps/reading の dev スクリプトと同じポート（8788）。再読みスクリプトの既定もこれに合わせてある
       - name: Start reading worker (wrangler dev)
+        if: steps.done.outputs.cache-hit != 'true' || inputs.force
         run: |
           (bun run --cwd apps/reading dev > /tmp/reading-dev.log 2>&1 &)
           for i in $(seq 1 60); do
@@ -44,10 +81,11 @@ jobs:
           curl -sf http://localhost:8788/health || (cat /tmp/reading-dev.log && exit 1)
 
       - name: Reread prompts and apply diffs to D1
+        if: steps.done.outputs.cache-hit != 'true' || inputs.force
         run: bun scripts/maintenance/reread-prompts.ts --remote --apply --out "$RUNNER_TEMP/reread"
 
       - name: Upload changes report
-        if: always()
+        if: always() && (steps.done.outputs.cache-hit != 'true' || inputs.force)
         uses: actions/upload-artifact@v4
         with:
           name: reread-changes-${{ github.run_id }}
@@ -57,3 +95,14 @@ jobs:
             ${{ runner.temp }}/reread/updates.sql
           retention-days: 30
           if-no-files-found: warn
+
+      # **適用が通ったときだけ**「この辞書で再読み済み」を残す。落ちたら次の Deploy でやり直す
+      - name: 再読み済みの印を残す
+        if: steps.done.outputs.cache-hit != 'true'
+        run: echo "${{ steps.lex.outputs.sha }}" > .reread-done
+
+      - if: steps.done.outputs.cache-hit != 'true'
+        uses: actions/cache/save@v4
+        with:
+          path: .reread-done
+          key: reread-user-lex-${{ steps.lex.outputs.sha }}

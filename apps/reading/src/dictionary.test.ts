@@ -1,5 +1,5 @@
 /// <reference types="bun" />
-import { describe, expect, test } from "bun:test";
+import { beforeAll, describe, expect, test } from "bun:test";
 import { existsSync, readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { initSync, Reader } from "@henge/reading-wasm";
@@ -32,15 +32,22 @@ function kanaOf(reader: Reader, text: string): string {
 const describeWithDict = existsSync(dictPath) && existsSync(userLexPath) ? describe : describe.skip;
 
 describeWithDict("実物の辞書での解析", () => {
-  initSync({
-    module: readFileSync(
-      fileURLToPath(
-        new URL("../../../packages/reading-wasm/pkg/reading_wasm_bg.wasm", import.meta.url),
+  let dictZst: Uint8Array;
+  let userCsv: string;
+
+  // **読み込みは beforeAll で。** bun は describe.skip でも本体の関数を実行するので、
+  // ここに直接書くと、辞書が無い環境で飛ばせずに ENOENT で落ちる
+  beforeAll(() => {
+    initSync({
+      module: readFileSync(
+        fileURLToPath(
+          new URL("../../../packages/reading-wasm/pkg/reading_wasm_bg.wasm", import.meta.url),
+        ),
       ),
-    ),
+    });
+    dictZst = new Uint8Array(readFileSync(dictPath));
+    userCsv = readFileSync(userLexPath, "utf8");
   });
-  const dictZst = new Uint8Array(readFileSync(dictPath));
-  const userCsv = readFileSync(userLexPath, "utf8");
 
   test("取得したユーザー辞書を重ねて Reader を作れる（本番の起動と同じ）", () => {
     expect(() => Reader.from_zstd(dictZst, userCsv)).not.toThrow();

@@ -123,7 +123,20 @@ export function AdminReportList() {
         return;
       }
       setError(null);
-      await load(status, 0);
+      // **先頭から読み直さない。** 「さらに読む」で開いた2ページ目以降で操作するたびに
+      // 一覧が先頭の50件に縮んで位置がずれる。結果は手元の一覧に写す:
+      // 状態が変わる操作はいまのタブから外れる。サーバー側でもこのタブの件数が同じだけ
+      // 減るので、続きの cursor（=手元の件数）はずれない。edit は読みだけ差し替える
+      if (action === "edit" && kana !== undefined) {
+        setReports((current) =>
+          (current ?? []).map((r) =>
+            r.id === report.id ? Object.assign({}, r, { expectedKana: kana }) : r,
+          ),
+        );
+      } else {
+        setReports((current) => (current ?? []).filter((r) => r.id !== report.id));
+      }
+      setEdits(({ [report.id]: _done, ...rest }) => rest);
     } catch {
       setError("更新できませんでした");
     } finally {

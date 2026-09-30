@@ -1,4 +1,5 @@
 import { and, desc, eq, sql } from "drizzle-orm";
+import { asBatch, chunk } from "./batch";
 import type { Db } from "./client";
 import { prompts, themes } from "./schema";
 import type { ValidPrompt } from "../generation/batch";
@@ -111,19 +112,6 @@ export async function recentPromptTexts(
  * 張り付くため、9件に下げて余白を作ってある。次に列を足すときもここを見直すこと。
  */
 const INSERT_CHUNK_SIZE = 9;
-
-type BatchStatement = Parameters<Db["batch"]>[0][number];
-
-/** db.batch は「1件以上」のタプルを要求するが、種類の違う文を混ぜると型が合わない */
-function asBatch(statements: unknown[]): [BatchStatement, ...BatchStatement[]] {
-  return statements as [BatchStatement, ...BatchStatement[]];
-}
-
-function chunk<T>(items: T[], size: number): T[][] {
-  const chunks: T[][] = [];
-  for (let i = 0; i < items.length; i += size) chunks.push(items.slice(i, i + size));
-  return chunks;
-}
 
 function toRows(
   themeId: string,

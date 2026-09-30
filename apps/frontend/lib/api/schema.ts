@@ -148,23 +148,43 @@ export const rankingRegisterSchema = z
   });
 
 /**
- * 読み違い報告の1件分。`expectedKana` はひらがなのみ（カタカナ入力は
- * ひらがなへ寄せてから送る UI 側の責務。ここでは厳しめにかな文字だけ許す）。
- * `surface` はお題文に含まれる表層で、長さは複合語程度まで。
+ * 読み違い報告の1件分。`expectedKana` はひらがなかカタカナ（承認時にサーバーが
+ * カタカナへ正規化する）。`surface` はお題文に含まれる表層で、長さは複合語程度まで。
+ *
+ * **表層にカンマ・改行を入れさせない。** 承認された報告は辞書リポジトリで
+ * user-lex.csv（カンマ区切り13列）の1行になる。カンマ入りの表層を承認すると
+ * 列数検査で自動PRのワークフローが毎回落ち続ける。
  */
-export const readingReportSchema = z.object({
-  themeId: z.string().min(1),
-  sentenceNo: z.number().int().min(1).max(100),
-  promptText: z.string().trim().min(1).max(400),
-  surface: z.string().trim().min(1).max(30),
-  reportedKana: z.string().trim().min(1).max(400),
-  expectedKana: z
-    .string()
-    .trim()
-    .min(1)
-    .max(60)
-    .regex(/^[ぁ-んァ-ヶー]+$/, "読みはひらがなかカタカナで入力してください"),
-});
+export const readingReportSchema = z
+  .object({
+    themeId: z.string().min(1),
+    sentenceNo: z.number().int().min(1).max(100),
+    promptText: z.string().trim().min(1).max(400),
+    surface: z
+      .string()
+      .trim()
+      .min(1)
+      .max(30)
+      .regex(/^[^,\r\n\t]+$/, "表層にカンマや改行は使えません"),
+    reportedKana: z.string().trim().min(1).max(400),
+    expectedKana: z
+      .string()
+      .trim()
+      .min(1)
+      .max(60)
+      .regex(/^[ぁ-ゔァ-ヶー]+$/, "読みはひらがなかカタカナで入力してください"),
+  })
+  .superRefine((value, ctx) => {
+    // 辞書リポジトリ側はお題文を解析し直して表層の読みを確かめる。
+    // お題文に無い表層はそこで必ず未解決になるので、受付の時点で弾く
+    if (!value.promptText.includes(value.surface)) {
+      ctx.addIssue({
+        code: "custom",
+        path: ["surface"],
+        message: "表層はお題文の中から選んでください",
+      });
+    }
+  });
 
 /** リザルト画面からのまとめて報告（複数お題・複数箇所を一度に送れる） */
 export const readingReportBatchSchema = z.object({

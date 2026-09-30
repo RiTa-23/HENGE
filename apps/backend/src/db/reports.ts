@@ -128,7 +128,13 @@ export async function listReadingReports(
     .where(eq(readingReports.status, status))
     .orderBy(desc(readingReports.createdAt), desc(readingReports.id))
     .limit(limit)
-    .offset(cursor) as Promise<ReadingReportRow[]>;
+    .offset(cursor);
+}
+
+/** 1件の報告。承認で申告値をそのまま確定するときに、いまの読みを引くため */
+export async function findReadingReport(db: Db, id: string): Promise<ReadingReportRow | undefined> {
+  const [row] = await db.select().from(readingReports).where(eq(readingReports.id, id)).limit(1);
+  return row;
 }
 
 /**
@@ -159,15 +165,28 @@ export async function updateReadingReportStatus(
   return (result.meta.changes ?? 0) > 0;
 }
 
-/** ワークフローがPRを出した後に呼ぶ。applied_at を刻む。 */
+/**
+ * `IN (...)` 1文に載せる id の数。D1のバインド変数は1文100個まで。
+ * status・applied_at のぶん（3個）を残して余白を取る。
+ */
+const APPLIED_CHUNK = 90;
+
+/**
+ * 辞書リポジトリで user-lex.csv に入った（=辞書PRがマージされた）報告を閉じる。applied_at を刻む。
+ *
+ * **id ごとに UPDATE を投げない。** 1回の実行で打てる D1 のクエリ数には上限がある
+ * （Free プランは50回）。`IN (...)` の1文にまとめ、上限を超える件数は分けて1つのバッチで送る。
+ */
 export async function markReadingReportsApplied(db: Db, ids: string[]): Promise<number> {
-  const results = await Promise.all(
-    ids.map((id) =>
-      db
-        .update(readingReports)
-        .set({ status: "applied", appliedAt: Math.floor(Date.now() / 1000) })
-        .where(and(eq(readingReports.id, id), eq(readingReports.status, "approved"))),
-    ),
+  const unique = [...new Set(ids)];
+  if (unique.length === 0) return 0;
+  const appliedAt = Math.floor(Date.now() / 1000);
+  const updates = chunk(unique, APPLIED_CHUNK).map((part) =>
+    db
+      .update(readingReports)
+      .set({ status: "applied", appliedAt })
+      .where(and(inArray(readingReports.id, part), eq(readingReports.status, "approved"))),
   );
+  const results = await db.batch(asBatch(updates));
   return results.reduce((n, r) => n + (r.meta.changes ?? 0), 0);
 }

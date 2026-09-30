@@ -202,16 +202,18 @@
 // 報告一覧。status は pending/approved/rejected/applied。
 // 管理画面は pending、辞書リポジトリの自動PRワークフローは approved を取る
 // PATCH /api/admin/reading-reports
-// 報告の状態遷移。approve: pending→approved（expectedKana をカタカナ正規化値・cost を確定）、
-// reject: pending|approved→rejected（辞書PRがまだ無ければ承認済みも取り消せる）、
-// reopen: approved|rejected→pending（確定済み cost はリセット）、edit: pending の読みだけ更新
+// 報告の状態遷移。approve: pending→approved（expectedKana・cost を確定。expectedKana を省けば申告値）、
+// reject: pending|approved→rejected、reopen: approved|rejected→pending（確定済み cost はリセット）、
+// edit: pending の読みだけ更新。expectedKana はひらがなでもよく、**Hono 側でカタカナに正規化して保存する**。
+// 承認済みを取り消すと、開いている辞書PRからも次の自動実行で外れる（docs/03-data-model.md）
 { "id": "...", "action": "approve", "expectedKana": "カキゴオリ", "cost": -20000 }
 { "id": "...", "action": "reject" }
 { "id": "...", "action": "reopen" }
 { "id": "...", "action": "edit", "expectedKana": "カキゴオリ" }
 // GET /api/admin/reading-reports と POST /api/admin/reading-reports/applied は
 //   Authorization: Bearer <REPORTS_SYNC_TOKEN> でも通る（辞書リポの自動PRワークフロー用。
-//   未設定なら機械アクセス不可）。POST applied は approved→applied に閉じる通知
+//   未設定なら機械アクセス不可。比較は一定時間で行う）。POST applied は approved→applied に閉じる通知。
+//   id ごとに UPDATE せず `IN (...)` の1文（90件ずつ・1バッチ）で閉じる
 { "ids": ["...", "..."] }
 // createdAt は認証テーブル（Better Auth）の列でミリ秒精度のため、themes と違い ISO 文字列で返る
 { "users": [{ "id": "...", "name": "Rita", "email": "...", "image": null,

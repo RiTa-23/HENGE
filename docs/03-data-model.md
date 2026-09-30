@@ -191,7 +191,7 @@ CREATE INDEX rankings_theme_form_score ON rankings (theme_id, form, score DESC);
 | `prompt_text` | TEXT | 報告時点のお題文。お題の編集・削除で報告が読めなくならないよう冗長に持つ |
 | `surface` | TEXT | 誤っている読みの部分（お題文中の表層） |
 | `reported_kana` | TEXT | 生成時に実際に出た（誤った）読み |
-| `expected_kana` | TEXT | ユーザー申告の正しい読み。承認時にカタカナ正規化値で上書きされる |
+| `expected_kana` | TEXT | ユーザー申告の正しい読み。承認・読み編集のたびに **Hono 側で**カタカナに正規化して上書きする（user-lex.csv の読みの列がカタカナのため） |
 | `user_id` | TEXT NULL | FK→`user.id` ON DELETE SET NULL。**匿名は NULL**（報告は進捗データではないので受け付ける） |
 | `status` | TEXT | `'pending'`/`'approved'`/`'rejected'`/`'applied'`。applied は approved からのみ進む |
 | `cost` | INTEGER NULL | 承認時に確定する user-lex コスト値。NULL はワークフローの自動推定 |
@@ -204,6 +204,7 @@ CREATE INDEX reading_reports_status ON reading_reports (status, created_at DESC)
 
 - **`prompts` へのFKを張らない。** お題が消えても報告内容は残す（`prompt_text` で自己完結）
 - 遷移元の状態を強制する（`updateReadingReportStatus` は `from` で許容状態を指定）。pending から approve/reject、approved|rejected から reopen で pending に戻せる。applied だけは終端で戻れない
+- **承認済みの取り消し（reject / reopen）は、開いている辞書PRにも効く。** 辞書リポジトリの自動PR（apply-reports）は実行のたびに approved の集合から PR を作り直すため、取り消した行は次の実行で PR から外れる。マージ済み（applied）の行は辞書リポジトリ側で消す
 
 ## user（Better Auth 管理）に足した列
 

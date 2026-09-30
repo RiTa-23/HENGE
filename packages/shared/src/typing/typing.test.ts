@@ -2,6 +2,7 @@ import { describe, expect, test } from "bun:test";
 import {
   buildRomanCandidates,
   countKeystrokesFromKana,
+  hiraganaToKatakana,
   katakanaToHiragana,
   UnsupportedKanaError,
 } from "./index";
@@ -210,6 +211,23 @@ describe("テーブルに無いかな", () => {
 
   test("漢字が残っていたら例外を投げる", () => {
     expect(() => buildRomanCandidates("手裏剣")).toThrow(UnsupportedKanaError);
+  });
+});
+
+describe("hiraganaToKatakana", () => {
+  test("ひらがなをカタカナに変換する（ゔ は ヴ）", () => {
+    expect(hiraganaToKatakana("かきごおり")).toBe("カキゴオリ");
+    expect(hiraganaToKatakana("ゔぁいおりん")).toBe("ヴァイオリン");
+  });
+
+  test("カタカナ・長音符・漢字はそのまま", () => {
+    expect(hiraganaToKatakana("スピード")).toBe("スピード");
+    expect(hiraganaToKatakana("すぴーど")).toBe("スピード");
+    expect(hiraganaToKatakana("手裏剣")).toBe("手裏剣");
+  });
+
+  test("katakanaToHiragana と往復できる", () => {
+    expect(katakanaToHiragana(hiraganaToKatakana("しゅりけん"))).toBe("しゅりけん");
   });
 });
 

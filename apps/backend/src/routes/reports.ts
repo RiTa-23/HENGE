@@ -1,6 +1,8 @@
+import { hiraganaToKatakana } from "@henge/shared";
 import { Hono } from "hono";
 import { createDb } from "../db/client";
 import {
+  findReadingReport,
   listReadingReports,
   markReadingReportsApplied,
   REPORT_LIST_LIMIT_DEFAULT,
@@ -63,10 +65,19 @@ export const reportRoutes = new Hono<{ Bindings: Env }>()
   /**
    * 報告の状態遷移。body: { id, action, expectedKana?, cost? }
    *
-   * - approve: pending → approved。expectedKana（カタカナ正規化済み）と cost を確定
-   * - reject:  pending|approved → rejected。承認済みでも辞書PRがまだ無ければ取り消せる
+   * - approve: pending → approved。expectedKana と cost を確定する。expectedKana を
+   *   省けば申告値を確定する
+   * - reject:  pending|approved → rejected
    * - reopen:  approved|rejected → pending。確定済み cost はリセットする
    * - edit:    pending のまま expectedKana だけ更新（運営の読み修正）
+   *
+   * **読みはここでカタカナに揃える。** user-lex.csv の読みの列はカタカナで、辞書リポジトリの
+   * 検証はカタカナ以外を弾く。正規化を画面にだけ任せると、API から直接承認したときに
+   * ひらがなのまま approved になり、自動PRのワークフローが毎回そこで止まる。
+   *
+   * 承認済みを reject / reopen すると、辞書リポジトリの自動PR（apply-reports）は次の実行で
+   * 承認済みの集合から PR を作り直すので、開いている PR からもその行が外れる。
+   * PR がマージされて applied に閉じた報告は取り消せない（辞書側で行を消す）。
    */
   .patch("/admin/reading-reports", async (c) => {
     const body = await c.req.json<{
@@ -79,13 +90,15 @@ export const reportRoutes = new Hono<{ Bindings: Env }>()
     let ok: boolean;
     let status: ReportStatus;
     switch (body.action) {
-      case "approve":
+      case "approve": {
         status = "approved";
+        const kana = body.expectedKana ?? (await findReadingReport(db, body.id))?.expectedKana;
         ok = await updateReadingReportStatus(db, body.id, "approved", "pending", {
-          expectedKana: body.expectedKana,
+          expectedKana: kana === undefined ? undefined : hiraganaToKatakana(kana),
           cost: body.cost,
         });
         break;
+      }
       case "reject":
         status = "rejected";
         ok = await updateReadingReportStatus(db, body.id, "rejected", ["pending", "approved"]);
@@ -102,7 +115,7 @@ export const reportRoutes = new Hono<{ Bindings: Env }>()
           return fail(c, "VALIDATION_ERROR", "edit には expectedKana が必要です");
         }
         ok = await updateReadingReportStatus(db, body.id, "pending", "pending", {
-          expectedKana: body.expectedKana,
+          expectedKana: hiraganaToKatakana(body.expectedKana),
         });
         break;
       default:

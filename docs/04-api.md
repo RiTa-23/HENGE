@@ -13,6 +13,8 @@
 
 **ただしクォータの加算はHono側で行う**（D1書き込みを伴うため）。判定はNext.js、記録はHono。
 
+**読み Worker の `POST /readings` だけは入力の形を見る**（`hono/validator`。`texts` が `string[]` で `MAX_TEXTS` 件以内か）。AGENTS.md の「Hono側では入力検証しない」は、公開APIの Zod 検証を Hono Worker で二重に持たないための決まりで、読み Worker はその対象外。呼び出し側（Hono Worker）は `hc<AppType>` で入力の型を受け取るため、validator が要る。外部非公開なのは変わらない。
+
 ## ①公開API
 
 | Method | Path | 認証 | 説明 |

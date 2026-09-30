@@ -15,13 +15,29 @@ export function AdminLink({ className }: { className?: string }) {
   const { data: session } = authClient.useSession();
   const [isAdmin, setIsAdmin] = useState(false);
 
+  // セッションのユーザーが変わったときだけ判定し直す（オブジェクトの作り直しでは引かない）
+  const userId = session?.user.id ?? null;
+
   useEffect(() => {
-    if (!session) return;
+    // **ログアウトしたら消す。** 判定を引かずに return するだけだと、直前の true が残る
+    if (userId === null) {
+      setIsAdmin(false);
+      return;
+    }
+    let active = true;
     fetch("/api/admin/check")
       .then((res) => (res.ok ? (res.json() as Promise<{ isAdmin?: boolean }>) : { isAdmin: false }))
-      .then((body) => setIsAdmin(body.isAdmin === true))
-      .catch(() => setIsAdmin(false));
-  }, [session]);
+      .then((body) => {
+        if (active) setIsAdmin(body.isAdmin === true);
+      })
+      .catch(() => {
+        if (active) setIsAdmin(false);
+      });
+    // ユーザーが切り替わった後に前のユーザーの判定が届いても反映しない
+    return () => {
+      active = false;
+    };
+  }, [userId]);
 
   if (!isAdmin) return null;
 

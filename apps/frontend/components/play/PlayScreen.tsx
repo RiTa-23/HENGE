@@ -233,6 +233,36 @@ export function PlayScreen({
     setPhase((current) => (current.name === "playing" ? { name: "ready" } : current));
   };
 
+  /**
+   * 枯渇からの復帰。**ログインユーザーだけが使える**（生成はニューロンを消費する）。
+   * 匿名は別テーマかログインへ誘導する（docs/04-api.md）。
+   *
+   * 呼ばれるのは2通り。枯渇の画面で本人が「お題を作る」を押したときと、ログイン中に
+   * 開始して枯渇していたとき（`load` が**枯渇1連続につき1回だけ**自動で呼ぶ。
+   * docs/07-ui.md）。どちらも本人が開始を選んだ操作の続きで、画面を開いただけでは走らない。
+   */
+  const regenerate = useCallback(async () => {
+    setPhase({ name: "preparing" });
+    const response = await fetch("/api/prompts/regenerate", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ themeId, form }),
+    });
+
+    if (response.ok) {
+      // 積み上がった在庫で引き直す
+      waitingSince.current = null;
+      setAttempt((count) => count + 1);
+      return;
+    }
+
+    const body: unknown = await readJsonBody(response);
+    const { code, message } = isApiError(body)
+      ? body.error
+      : { code: "UNKNOWN", message: "お題を作れませんでした" };
+    setPhase({ name: "error", code, message });
+  }, [themeId, form]);
+
   const load = useCallback(async () => {
     setPhase({ name: "loading" });
     const response = await fetch("/api/sessions/start", {
@@ -293,7 +323,7 @@ export function PlayScreen({
     writeOffset(themeId, form, session.nextOffset);
     // お題はまだ出さない。合図を挟んでから1問目を見せる
     setPhase({ name: "starting", session });
-  }, [themeId, form]);
+  }, [themeId, form, regenerate]);
 
   // **開始するまで sessions/start を呼ばない。** 呼んだ時点でオフセットの消費が
   // 確定し、条件次第では背景補充も走る（＝クォータを1消費する）。画面を開いた
@@ -389,34 +419,6 @@ export function PlayScreen({
     globalThis.addEventListener("keydown", onKey);
     return () => globalThis.removeEventListener("keydown", onKey);
   }, [phase.name, reportOpen]);
-
-  /**
-   * 枯渇からの復帰。**ログインユーザーだけが使える**（クォータを1消費する）。
-   * 匿名は別テーマかログインへ誘導する（docs/04-api.md）。
-   *
-   * 自動では走らせない。クォータを消費する行為なので、本人が選んだときだけ動かす。
-   */
-  const regenerate = async () => {
-    setPhase({ name: "preparing" });
-    const response = await fetch("/api/prompts/regenerate", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ themeId, form }),
-    });
-
-    if (response.ok) {
-      // 積み上がった在庫で引き直す
-      waitingSince.current = null;
-      setAttempt((count) => count + 1);
-      return;
-    }
-
-    const body: unknown = await readJsonBody(response);
-    const { code, message } = isApiError(body)
-      ? body.error
-      : { code: "UNKNOWN", message: "お題を作れませんでした" };
-    setPhase({ name: "error", code, message });
-  };
 
   /**
    * 打ち間違えたキーを赤くする。**連打されたら数え直す**（前の予約を捨てる）。

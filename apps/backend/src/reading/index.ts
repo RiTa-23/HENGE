@@ -1,14 +1,7 @@
 import { createVibratoReadings } from "./vibrato";
 import type { GetReadings } from "./types";
 
-export {
-  fromSingle,
-  ReadingError,
-  type GetReading,
-  type GetReadings,
-  type Reading,
-  type ReadingOutcome,
-} from "./types";
+export { ReadingError, type GetReadings, type Reading, type ReadingOutcome } from "./types";
 
 /**
  * 読み取得の実装は読み Worker（Vibrato + UniDic トリム辞書）の1つだけ。

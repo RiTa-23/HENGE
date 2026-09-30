@@ -2,6 +2,7 @@ import { initSync, Reader } from "@henge/reading-wasm";
 import wasmModule from "@henge/reading-wasm/reading_wasm_bg.wasm";
 import { katakanaToHiragana } from "@henge/shared";
 import { Hono } from "hono";
+import { validator } from "hono/validator";
 import { MAX_TEXTS, readingOf, type ReadingResult } from "./reading";
 
 /**
@@ -53,21 +54,31 @@ const routes = app
   /**
    * 複数の文の読みをまとめて返す。件数と順序は入力と同じ。
    * Service Binding の呼び出しもサブリクエストに数えられるので、1件ずつ呼ばせない。
+   *
+   * 入力の形は validator で見る。**呼び出し側（Hono Worker）は `hc<AppType>` で
+   * この形を型として受け取る**ので、手書きの型を二重に持たない。
    */
-  .post("/readings", async (c) => {
-    const body = await c.req.json<{ texts?: unknown }>();
-    const texts = body.texts;
-    if (!Array.isArray(texts) || texts.some((text) => typeof text !== "string")) {
-      return c.json({ error: "texts は string[]" }, 400);
-    }
-    if (texts.length > MAX_TEXTS) return c.json({ error: `texts は ${MAX_TEXTS} 件まで` }, 400);
-
-    const reader = await getReader(c.env);
-    const results: ReadingResult[] = (texts as string[]).map((text) =>
-      readingOf(reader.tokenize(text), katakanaToHiragana),
-    );
-    return c.json({ results });
-  });
+  .post(
+    "/readings",
+    validator("json", (value: { texts?: unknown }, c) => {
+      const { texts } = value;
+      if (!Array.isArray(texts) || texts.some((text) => typeof text !== "string")) {
+        return c.json({ error: "texts は string[]" }, 400);
+      }
+      if (texts.length > MAX_TEXTS) {
+        return c.json({ error: `texts は ${MAX_TEXTS} 件まで` }, 400);
+      }
+      return { texts: texts as string[] };
+    }),
+    async (c) => {
+      const { texts } = c.req.valid("json");
+      const reader = await getReader(c.env);
+      const results: ReadingResult[] = texts.map((text) =>
+        readingOf(reader.tokenize(text), katakanaToHiragana),
+      );
+      return c.json({ results }, 200);
+    },
+  );
 
 export type AppType = typeof routes;
 

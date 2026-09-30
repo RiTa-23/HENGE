@@ -4,12 +4,16 @@
   "private": true,
   "type": "module",
   "exports": {
-    ".": "./src/index.ts"
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./src/index.ts"
+    }
   },
   "scripts": {
     "dev": "wrangler dev --port 8788 --inspector-port 9230",
     "deploy": "wrangler deploy",
     "test": "bun test",
+    "build:types": "tsc -p tsconfig.build.json",
     "typecheck": "tsc --noEmit",
     "cf-typegen": "wrangler types",
     "dict:fetch": "bun ../../scripts/unidic/fetch-dict.ts"

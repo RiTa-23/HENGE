@@ -1,43 +1,37 @@
+import type { AppType as ReadingAppType } from "@henge/reading";
 import { buildRomanCandidates, UnsupportedKanaError } from "@henge/shared";
+import { hc } from "hono/client";
 import { type GetReadings, ReadingError, type ReadingOutcome } from "./types";
 
 /**
  * 読み Worker（apps/reading、Vibrato + UniDic トリム辞書）による読み取得。
  *
  * Service Binding は HTTP 方式（`Fetcher.fetch`）で呼ぶ。1回の POST でまとめて
- * 投げるので、1ラウンドあたりのサブリクエスト消費は1回（Yahoo は件数分）。
+ * 投げるので、1ラウンドあたりのサブリクエスト消費は1回。
+ * **応答の型は `hc<AppType>` で読み Worker から受け取る**（手書きの型を二重に持たない）。
  * ホスト名は Service Binding では見られないので、パスだけが意味を持つ。
  */
-const PATH = "https://reading/readings";
-
-interface ReadingsResponse {
-  results?: ({ kana: string } | { error: "UNKNOWN_READING"; surface: string })[];
-}
-
 export function createVibratoReadings(reading: Fetcher): GetReadings {
+  const client = hc<ReadingAppType>("https://reading", {
+    fetch: reading.fetch.bind(reading),
+  });
+
   return async (texts: string[]): Promise<ReadingOutcome[]> => {
     if (texts.length === 0) return [];
-    const res = await reading.fetch(PATH, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ texts }),
-    });
-
-    if (!res.ok) {
+    const res = await client.readings.$post({ json: { texts } });
+    if (res.status !== 200) {
       throw new ReadingError(`読み Worker が ${res.status} を返した`);
     }
 
-    const body = (await res.json()) as ReadingsResponse;
-    if (body.results === undefined || body.results.length !== texts.length) {
-      throw new ReadingError("読み Worker の応答に results が無い");
+    // 型は hc が保証するが、デプロイの順序がずれた（古い読み Worker が応答した）ときに
+    // 壊れた応答を「お題の却下」と取り違えないよう、形だけは実物で確かめる
+    const { results } = await res.json();
+    if (!Array.isArray(results) || results.length !== texts.length) {
+      throw new ReadingError("読み Worker の応答と要求の件数が合わない");
     }
 
-    // 長さは上で検証済みなので、入力と同じ index で応答を引ける
     return texts.map((text, i): ReadingOutcome => {
-      const result = body.results?.[i];
-      if (result === undefined) {
-        throw new ReadingError("読み Worker の応答と要求がずれている");
-      }
+      const result = results[i]!;
       if ("error" in result) {
         return { ok: false, error: "UNKNOWN_READING", surface: result.surface };
       }

@@ -5,61 +5,33 @@
 
 ## 成果物
 
-| ファイル | 語彙数 | zst | Wasm メモリ（実測delta） | sha256 |
-|---|---|---|---|---|
-| `unidic-cwj-v7800n-slim2.dic.zst`（推奨） | 539,835 | 6.9MB | +84.1MB | `aae2f56b6f88a2a6a2671a072248220166b708a1a4a8d2ffbff610d6c0d06d9f` |
-| `unidic-cwj-vmax2.dic.zst`（語彙最大化代替） | 588,931 | 7.4MB | +105.3MB | `42ff0759d6069b9c20231f3801843cc1d34668702c6af423787d9798316b9889` |
+| Release | ファイル | 語彙数 | zst | Wasm メモリ（実測delta） | sha256 |
+|---|---|---|---|---|---|
+| `unidic-cwj-trim-v2` | `unidic-cwj-v3.dic.zst`（使用中） | 539,203 | 6.0MB | +76.2MB | `a6ba1c111b139c4032a4bf808e9a97250341360ca8aa66ee96261d8e771da007` |
+| `unidic-cwj-trim-v1` | `unidic-cwj-v7800n-slim2.dic.zst`（旧） | 539,835 | 6.9MB | +84.1MB | `aae2f56b6f88a2a6a2671a072248220166b708a1a4a8d2ffbff610d6c0d06d9f` |
 
-ロード時ピーク = wasm delta + zstバッファ + ~12MB オーバーヘッド。推奨版は ~104MB
-（128MB 制限に余裕）。vmax2 は ~125MB で際どい。
+ロード時ピーク = wasm delta + zstバッファ + ~12MB オーバーヘッド。v3 は ~94MB。
 
-## ソースの取得
+v3 は v7800n-slim2 で熟語を割って読んでいた原因（compact bigram 接続表が MeCab の接続行列より
+全ペアで約5376低い・同形の動詞の行が重複除去で消えていた・頻出語が閾値で落ちていた）を直した辞書で、
+お題860件の実測で正解率 73% → 88%、UNKNOWN_READING 23件 → 0件。調査は辞書リポジトリの
+`reports/2026-10-reading-audit.md`。
 
-UniDic cwj-3.1.1（書籍コーパス BCCWJ 由来の短単位辞書、879,222エントリ）:
+## ビルド
 
-```bash
-curl -LO https://clrd.ninjal.ac.jp/unidic_archive/cwj/3.1.1/unidic-cwj-3.1.1-full.zip
-unzip unidic-cwj-3.1.1-full.zip -d unidic-cwj-3.1.1
-```
+**手順は辞書リポジトリ（RiTa-23/unidic-cwj-trim）の `scripts/build_dict.sh` に一本化した。**
+cwj-3.1.1 の配布物の取得と sha256 照合 → `measure/` の vibtest で bigram 接続表を生成 →
+`scripts/filter_lex_v3.py`（語彙の選定・語コスト +5376・特徴列の最小化）→ コンパイル → `zstd -19`。
+同じ手順を辞書リポジトリの `build-dict` ワークフローが CI で回し、Release に上げる。
+作り直すときは新しいタグに出し、このリポジトリの `fetch-dict.ts` のタグと sha256 を変える
+（同じタグの辞書を差し替えると sha256 の照合で取得が止まる）。
 
-`-full` 版を使うこと（`model.def`（392MBのbigram素性重み）が入っているのは full だけ）。
-個別ファイルは `.../unidic-cwj-3.1.1-full/<file>` からも取れる。
-
-## 1. 語彙フィルタ
-
-```bash
-python3 scripts/unidic/filter_lex_v2.py unidic-cwj-3.1.1/lex_3_1.csv lex_v7800n_slim2.csv
-# => 539,835行の13列CSV（surf,lid,rid,cost,pos1,*,*,*,*,*,*,読み,*）
-```
-
-フィルタ方針（閾値はスクリプト冒頭で変更可）:
-- 機能語（助詞・助動詞・代名詞・数詞・接尾辞等14類）は全保持
-- 動詞 <7800、形容詞 <7200、普通名詞 <6200（サ変可能 <7800）
-- 固有名詞: 一般・地名 <6800、人名 <6800（有名どころまで残す）
-- `(表層, 出現形正書法仮名)` で dedup
-- **特徴列の最小化**: pos1を1文字化・活用/原形/発音を `*` に。読み生成は
-  `features[7]`（=列11）だけ見るので出力は完全に同一（5,000文で実測0.00%差）だが
-  wasm メモリが約25MB減る
-
-読み列は **f[24]（出現形正書法仮名）** を使う。f[10] は語彙素読み（基本形、
-食べ→タベル）、f[13] は発音形（は→ワ、学生→ガクセー）なのでどちらも不適切。
-
-## 2. コンパイル（vibrato 0.5.2、cargo）
-
-接続は **compact connector（bigram方式）**。dense行列はcwjのID空間では辞書が
-膨らみすぎるので使わない。`model.def` から `vibrato::mecab::generate_bigram_info`
-（cost_factor=700.0）で bigram.{right,left,cost} を生成し、
-`SystemDictionaryBuilder::from_readers_with_bigram_info(..., dual_connector=false)`
-で `.dic` をビルドする。参考実装は別セッションの `vibtest/main.rs`。
-
-## 3. 圧縮
-
-```bash
-zstd -19 -f unidic.dic -o unidic.dic.zst
-```
-
-`--long=27` は付けないこと（ruzstd が128MBウィンドウバッファを wasm ヒープに確保し、
-実メモリが ~130-170MB 水増しされる）。
+- 接続は **compact connector（bigram方式）**。dense行列は cwj の ID 空間では辞書が膨らみすぎる
+- 読み列は **f[24]（出現形正書法仮名）**。f[10] は語彙素読み（基本形、食べ→タベル）、
+  f[13] は発音形（は→ワ、学生→ガクセー）なのでどちらも不適切
+- 特徴列は `,,,,,,,読み,` に縮めてある（読み Worker は index 7 しか見ない）。wasm メモリが約8MB減る
+- 圧縮に `--long=27` は付けないこと（ruzstd が128MBウィンドウバッファを wasm ヒープに確保し、
+  実メモリが ~130-170MB 水増しされる）
 
 ## 計測方法
 
@@ -88,6 +60,10 @@ Release の差し替え・HENGE の再デプロイ・既存お題の再読みは
 - `lid`/`rid` はシステム辞書の接続ID空間の有効値が要る。
   **同じ品詞・同じ活用形の既存エントリから流用する**（lex_3_1.csv や
   トリム済みCSVを `^表層,` で引くと見つかる）
+- **コストの基準（辞書 v3）**: 辞書 v3 は語コストに +5376 を足してあるので、csv の値は
+  **ずらす前の基準 +5376** で書く。以下の数値はずらす前の基準で、csv には -20000 → -14624、
+  3000 → 8376、7500 → 12876 のように書く。管理画面の承認値（-20000／3000）はずらす前の基準のままで、
+  辞書リポジトリの apply-reports が csv に書くときに足す
 - `cost`: 複合語・熟語（かき氷・屋台など）や明確に誤った語幹は
   **-20000**（強制勝ち）でよい。ただし **-20000 は既存の複合語を分解する**
   （例: `港` に付けると空港→そらみなと化）。単漢字・単一かな・
@@ -134,8 +110,9 @@ Release の差し替え・HENGE の再デプロイ・既存お題の再読みは
   デプロイを通したあとに、既存お題の再読み（`reread-prompts.yml`）を呼ぶ。
   再読みは生成時と同じ基準（打鍵数の範囲・最適化の字）で新しい読みを検査し、
   外れたお題は書き換えない（`skipped.tsv` に残る）
-- **再読みは Deploy のたびに呼ばれ、取得した user-lex.csv のハッシュで走るかを決める。**
-  その csv で再読みを終えていれば（Actions のキャッシュにキーがあれば）何もしない。
+- **再読みは Deploy のたびに呼ばれ、取得した辞書と user-lex.csv のハッシュで走るかを決める。**
+  その辞書と csv で再読みを終えていれば（Actions のキャッシュにキーがあれば）何もしない。
+  辞書だけを差し替えた（`fetch-dict.ts` のタグ・sha256 を変えた）ときも再読みが走る。
   `reread: true` の Deploy が、待機中に次の push の Deploy に置き換えられても
   （同じ concurrency グループで待機できるのは1本だけ）、次の Deploy が拾い直す
 

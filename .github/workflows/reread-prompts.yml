@@ -6,8 +6,10 @@ name: Reread prompts
 # **Deploy のあとに走らせる。** Deploy は CI（読み Worker のテストを含む）とデプロイが
 # 通ってから、**毎回**このワークフローを呼ぶ。CI より先に本番 D1 を書き換えない。
 #
-# **再読みするかは、取得した user-lex.csv のハッシュで決める。** 最後に再読みを終えた
-# csv のハッシュを Actions のキャッシュのキーとして残し、同じならすぐ終わる。
+# **再読みするかは、取得した辞書と user-lex.csv のハッシュで決める。** 最後に再読みを終えた
+# 辞書・csv のハッシュを Actions のキャッシュのキーとして残し、同じならすぐ終わる。
+# 辞書も入れるのは、システム辞書だけを差し替えたとき（fetch-dict.ts のタグ・sha256 の変更）にも
+# 再読みを走らせるため。user-lex.csv だけで決めると、辞書が変わっても再読みされない。
 # 辞書リポジトリからの起動（Deploy の `reread: true`）だけを合図にすると、その Deploy が
 # 待機中に次の push の Deploy に置き換えられたとき（同じ concurrency グループで待機できる
 # のは1本だけ）、再読みが黙って消える。ハッシュで決めれば、次のどの Deploy でも拾い直せる。
@@ -18,13 +20,13 @@ on:
   workflow_call:
     inputs:
       force:
-        description: "user-lex.csv が前回の再読みから変わっていなくても走らせる"
+        description: "辞書・user-lex.csv が前回の再読みから変わっていなくても走らせる"
         type: boolean
         default: false
   workflow_dispatch:
     inputs:
       force:
-        description: "user-lex.csv が前回の再読みから変わっていなくても走らせる"
+        description: "辞書・user-lex.csv が前回の再読みから変わっていなくても走らせる"
         type: boolean
         default: true
 
@@ -49,9 +51,9 @@ jobs:
       - name: Fetch reading dictionary (UniDic trim)
         run: bun run --cwd apps/reading dict:fetch
 
-      - name: user-lex.csv のハッシュ
+      - name: 辞書と user-lex.csv のハッシュ
         id: lex
-        run: echo "sha=$(sha256sum apps/reading/assets/user-lex.csv | cut -c1-64)" >> "$GITHUB_OUTPUT"
+        run: echo "sha=$(cat apps/reading/assets/unidic.dic.zst apps/reading/assets/user-lex.csv | sha256sum | cut -c1-64)" >> "$GITHUB_OUTPUT"
 
       # 中身は要らない。キーがあるか（=この csv で再読みを終えたか）だけを見る
       - name: この辞書で再読み済みか
@@ -59,12 +61,12 @@ jobs:
         uses: actions/cache/restore@v4
         with:
           path: .reread-done
-          key: reread-user-lex-${{ steps.lex.outputs.sha }}
+          key: reread-dict-${{ steps.lex.outputs.sha }}
           lookup-only: true
 
       - name: 再読み済みなので終える
         if: steps.done.outputs.cache-hit == 'true' && !inputs.force
-        run: echo "user-lex.csv（${{ steps.lex.outputs.sha }}）では再読み済み。何もしない"
+        run: echo "辞書と user-lex.csv（${{ steps.lex.outputs.sha }}）では再読み済み。何もしない"
 
       - if: steps.done.outputs.cache-hit != 'true' || inputs.force
         run: bun install --frozen-lockfile
@@ -105,4 +107,4 @@ jobs:
         uses: actions/cache/save@v4
         with:
           path: .reread-done
-          key: reread-user-lex-${{ steps.lex.outputs.sha }}
+          key: reread-dict-${{ steps.lex.outputs.sha }}

@@ -7,15 +7,20 @@
 
 | Release | ファイル | 語彙数 | zst | Wasm メモリ（実測delta） | sha256 |
 |---|---|---|---|---|---|
-| `unidic-cwj-trim-v2` | `unidic-cwj-v3.dic.zst`（使用中） | 539,203 | 6.0MB | +76.2MB | `a6ba1c111b139c4032a4bf808e9a97250341360ca8aa66ee96261d8e771da007` |
+| `unidic-cwj-trim-v3` | `unidic-cwj-v3.1.dic.zst`（使用中） | 571,399 | 6.2MB | +78.4MB | `768240c3c8bffd0e7b617090b59c7efcd746e79bce672aa79f684e208f354de6` |
+| `unidic-cwj-trim-v2` | `unidic-cwj-v3.dic.zst`（旧） | 539,203 | 6.0MB | +76.2MB | `a6ba1c111b139c4032a4bf808e9a97250341360ca8aa66ee96261d8e771da007` |
 | `unidic-cwj-trim-v1` | `unidic-cwj-v7800n-slim2.dic.zst`（旧） | 539,835 | 6.9MB | +84.1MB | `aae2f56b6f88a2a6a2671a072248220166b708a1a4a8d2ffbff610d6c0d06d9f` |
 
-ロード時ピーク = wasm delta + zstバッファ + ~12MB オーバーヘッド。v3 は ~94MB。
+ロード時ピーク = wasm delta + zstバッファ + ~12MB オーバーヘッド。v3.1 は ~97MB。
 
 v3 は v7800n-slim2 で熟語を割って読んでいた原因（compact bigram 接続表が MeCab の接続行列より
 全ペアで約5376低い・同形の動詞の行が重複除去で消えていた・頻出語が閾値で落ちていた）を直した辞書で、
 お題860件の実測で正解率 73% → 88%、UNKNOWN_READING 23件 → 0件。調査は辞書リポジトリの
 `reports/2026-10-reading-audit.md`。
+
+v3.1 は v3 に、動詞・形容詞の活用形が行ごとの閾値で一部だけ落ちていた穴（「合わない」→あわせわない、
+「溶く」→UNKNOWN_READING）を埋める規則を足したもの。新しいテーマの1004件を含めて実測し、
+修正前に読めていた件で外すようになったものは0件。調査は `reports/2026-10-reading-audit-r7.md`。
 
 ## ビルド
 

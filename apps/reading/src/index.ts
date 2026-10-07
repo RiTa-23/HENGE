@@ -8,7 +8,7 @@ import { MAX_TEXTS, readingOf, type ReadingResult } from "./reading";
 /**
  * 読み Worker。外部には公開しない。Hono Worker から Service Binding 経由でのみ呼ばれる。
  *
- * 辞書（UniDic cwj-3.1.1 トリム、zst 6.9MB → Wasm メモリ +84MB）を Wasm の中に持つので、
+ * 辞書（UniDic cwj-3.1.1 トリム v3、zst 6.0MB → Wasm メモリ +76MB）を Wasm の中に持つので、
  * Hono Worker とは分けてある。同居させると、プレイやランキングを捌くアイソレートにも
  * 辞書のメモリと起動が乗る。
  */

@@ -1,7 +1,7 @@
 /**
  * 辞書（UniDic cwj-3.1.1 の自前トリム版）を取得して `apps/reading/assets/` に置く。
  *
- * - 取得元は公開リポジトリ RiTa-23/unidic-cwj-trim の GitHub Release `unidic-cwj-trim-v3`。
+ * - 取得元は公開リポジトリ RiTa-23/unidic-cwj-trim の GitHub Release `unidic-cwj-trim-v4`。
  *   HENGE 本体が private 化されても辞書取得は無認証のまま動くよう、
  *   辞書アセットはあちらに置く。中身は `scripts/unidic/BUILD.md` の手順で自前ビルドしたもの
  * - sha256 を照合する。取得元が差し替わっても気づけるように
@@ -20,19 +20,19 @@ import { mkdir } from "node:fs/promises";
 import { fileURLToPath } from "node:url";
 
 /**
- * 辞書・ユーザー辞書・ライセンス文を**同じタグから**取る。辞書 v3.1（v3 タグ。v3 と同じく）は語コストに +5376 を
+ * 辞書・ユーザー辞書・ライセンス文を**同じタグから**取る。辞書 v3.2（v4 タグ。v3 以降と同じく）は語コストに +5376 を
  * 足してあり、user-lex.csv も同じ基準で書かれている。タグを揃えて取ることで、辞書とユーザー辞書が
  * 必ず同時に切り替わる（v1 の辞書に v2 の user-lex を重ねると、全行が相対的に強くなりすぎる）
  */
-const RELEASE = "unidic-cwj-trim-v3";
+const RELEASE = "unidic-cwj-trim-v4";
 const BASE = `https://github.com/RiTa-23/unidic-cwj-trim/releases/download/${RELEASE}`;
 
 /** [アセット名, assets内のファイル名, sha256] */
 const FILES = [
   [
-    "unidic-cwj-v3.1.dic.zst",
+    "unidic-cwj-v3.2.dic.zst",
     "unidic.dic.zst",
-    "768240c3c8bffd0e7b617090b59c7efcd746e79bce672aa79f684e208f354de6",
+    "f4775d178eb3aaaca9579cbcbd6c1d612a8072630d0733e7968e6c4317314e86",
   ],
   // user-lex.csv は誤読修正のたびに更新されるアセットなので sha は固定しない。
   // 中身（誤読が直るか・複合語を壊さないか）は辞書リポジトリの CI が PR の時点で検査する。

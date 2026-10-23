@@ -21,9 +21,9 @@
     "rebuild:roman": "bun run --cwd apps/backend scripts/rebuild-roman.ts"
   },
   "devDependencies": {
-    "@better-auth/cli": "~1.4.21",
     "@types/bun": "^1.4.0",
     "@types/node": "^24",
+    "auth": "~1.6.33",
     "concurrently": "^10.0.5",
     "oxfmt": "^0.66.0",
     "oxlint": "^1.81.0",

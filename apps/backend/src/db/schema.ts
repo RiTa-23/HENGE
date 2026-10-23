@@ -248,7 +248,7 @@ export const readingReports = sqliteTable(
 );
 
 /**
- * Better Auth 管理下のテーブル。@better-auth/cli generate が生成したものを
+ * Better Auth 管理下のテーブル。Better Auth の CLI（auth パッケージ）が生成したものを
  * packages/shared に置き、両Workerから参照する。
  *
  * 認証テーブルの書き込みは Next.js Worker（Better Auth）のみ。ここでの

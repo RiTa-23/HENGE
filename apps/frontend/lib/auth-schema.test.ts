@@ -5,7 +5,7 @@ import { getTableColumns } from "drizzle-orm";
 import { auth } from "./auth-cli.config";
 
 /**
- * `packages/shared/src/db/auth-schema.ts` は `@better-auth/cli generate` の出力で、
+ * `packages/shared/src/db/auth-schema.ts` は Better Auth の CLI（`auth` パッケージ）の `generate` の出力で、
  * 手では書かない。だからこそ **better-auth 本体と CLI の版がずれると壊れる**。
  *
  * 実際、better-auth 1.7 は account に issuer 列を足したが CLI は 1.4 のままで、

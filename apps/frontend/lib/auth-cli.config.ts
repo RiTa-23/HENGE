@@ -1,7 +1,7 @@
 import { createAuth } from "@/lib/auth";
 
 /**
- * `@better-auth/cli generate` に渡す設定。**アプリからは import しない。**
+ * Better Auth の CLI（`auth` パッケージ）の `generate` に渡す設定。**アプリからは import しない。**
  *
  * `packages/shared/src/db/auth-schema.ts` は CLI の出力で、手で書かない
  * （`docs/03-data-model.md`）。CLI は `auth` を export したファイルを要求するが、

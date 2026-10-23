@@ -1,6 +1,6 @@
 # データモデル
 
-D1（SQLite）+ Drizzle ORM。Better Auth管理下のテーブル（`user` / `session` / `account` / `verification`）の定義は `packages/shared/src/db/auth-schema.ts`（`@better-auth/cli generate` が出力したもの。手で書かない）。
+D1（SQLite）+ Drizzle ORM。Better Auth管理下のテーブル（`user` / `session` / `account` / `verification`）の定義は `packages/shared/src/db/auth-schema.ts`（Better Auth の CLI（`auth` パッケージ）の `better-auth generate` が出力したもの。手で書かない）。
 
 ## themes
 
@@ -231,9 +231,9 @@ Better Auth の4テーブルは CLI の出力をそのまま使うが、**`user`
 ## マイグレーション
 
 Drizzleのスキーマは `apps/backend/src/db/schema.ts`。Better Auth管理下のテーブルは
-`@better-auth/cli generate` が出力した `packages/shared/src/db/auth-schema.ts` を取り込む（手で書かない）。
+Better Auth の CLI（`auth` パッケージ）の `better-auth generate` が出力した `packages/shared/src/db/auth-schema.ts` を取り込む（手で書かない）。
 
-**`better-auth` は `@better-auth/cli` と同じ系列に固定する**（現在はどちらも1.4系）。本体だけ上げると、CLIが未対応の列（1.7で追加された `account.issuer` など）をスキーマが持たないまま動き、**OAuthのコールバックで初めて500になる**。ブラウザで最後まで通さないと気付けないため、`apps/frontend/lib/auth-schema.test.ts` で「better-auth が要求する列が揃っているか」を検査している。本体を上げるときはCLIも同時に上げ、スキーマを再生成すること。
+**`better-auth` は CLI（ルートの devDependency の `auth`）と同じ版に固定する**（現在はどちらも1.6.33）。CLI は以前 `@better-auth/cli` だったが、1.4.21 で更新が止まり（npm 上で非推奨）、後継の `auth` に移った。コマンド名は同じ `better-auth`。本体だけ上げると、CLIが未対応の列（1.7で追加された `account.issuer` など）をスキーマが持たないまま動き、**OAuthのコールバックで初めて500になる**。ブラウザで最後まで通さないと気付けないため、`apps/frontend/lib/auth-schema.test.ts` で「better-auth が要求する列が揃っているか」を検査している。本体を上げるときはCLIも同時に上げ、スキーマを再生成すること。
 両Workerから参照するため shared に置いている（アクセス権限の線引きは `docs/02-architecture.md`）。
 
 **再生成は `bun run auth:schema`（`apps/frontend`）。** CLI に渡す設定は `apps/frontend/lib/auth-cli.config.ts` で、本物の `createAuth` に中身の無い env を渡して同じ設定のインスタンスを作る（別の設定を書き写すと、列を足したときにそちらの更新を忘れて本番とずれる）。`additionalFields` を変えたのに再生成を忘れると `auth-schema.test.ts` が落ちる（照合にアプリと同じ設定を使っているため）。再生成のあとは通常どおり `bun run db:generate` でマイグレーションを作る。

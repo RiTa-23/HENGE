@@ -329,7 +329,7 @@ export const NG_WORDS: readonly string[] = [
   "鶯の谷渡り",
   "黄金水",
   "黒ギャル",
-  // 追加分（92語）
+  // 追加分（93語）
   "エログ",
   "エログロ",
   "エロゲー",
@@ -422,4 +422,5 @@ export const NG_WORDS: readonly string[] = [
   "裸",
   "裸体",
   "裸婦",
+  "でぶ",
 ];

@@ -9,6 +9,7 @@ import {
   setGenerationStatus,
 } from "../db/themes";
 import { recordUsage } from "../db/usage";
+import { loadConstraintVocabulary } from "../db/vocabularies";
 import { acceptsPartialBatch, generateBatch } from "../generation/batch";
 import { AiQuotaExceededError, AiUnavailableError } from "../generation/ai";
 import { resolveModel } from "../generation/model";
@@ -93,6 +94,7 @@ export const generateRoutes = new Hono<{ Bindings: Env }>()
         // 新規作成で作るのは短文のプールだけ（単語は別リクエストで作る）
         target: playSize("sentence"),
         existing: [],
+        vocabulary,
         model,
         getReadings: createGetReadings(c.env),
         waitUntil: (promise) => c.executionCtx.waitUntil(promise),
@@ -162,6 +164,8 @@ export const generateRoutes = new Hono<{ Bindings: Env }>()
         path: "regenerate",
         target: playSize(form),
         existing: await recentPromptTexts(db, theme.id, form, existingContextSize(form)),
+        vocabulary:
+          theme.kind === "constraint" ? await loadConstraintVocabulary(db, theme) : undefined,
         model,
         getReadings: createGetReadings(c.env),
         waitUntil: (promise) => c.executionCtx.waitUntil(promise),

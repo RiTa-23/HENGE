@@ -14,3 +14,6 @@ next-env.d.ts
 # 共通語彙リストの素材（scripts/vocabulary/README.md）。233MB あるので入れない
 lex_3_1.csv
 .venv/
+
+# apps/backend/scripts/compare-constraint-prompts.ts の既定の出力
+constraint-prompts.md

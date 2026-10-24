@@ -508,6 +508,36 @@ describe("POST /prompts/regenerate", () => {
     expect(await db.select().from(prompts)).toHaveLength(0);
   });
 
+  it("語彙の無い既存の最適化は、再生成のときに語彙を作って保存し、その語をモデルに渡す", async () => {
+    // 語彙を保存するようになる前に作られた最適化（本番の「ざ」）と同じ状態
+    await seedUser("u1");
+    await db
+      .insert(themes)
+      .values({ id: "c1", kind: "constraint", name: "ざ", normalizedName: "ざ" });
+    const heads = ["一", "二", "三", "四", "五", "六", "七", "八", "九", "十"];
+    stubGeneration([heads.map((n) => `${n}番の座席に座る。`)], "ざせきにすわる");
+
+    const { status } = await post("/prompts/regenerate", { themeId: "c1", userId: "u1" });
+    expect(status).toBe(200);
+
+    const [row] = await db
+      .select()
+      .from(constraintVocabularies)
+      .where(eq(constraintVocabularies.themeId, "c1"));
+    const saved = new Set(
+      (JSON.parse(row?.wordsJson ?? "[]") as [string, string][]).map(([t]) => t),
+    );
+    expect(saved.size).toBeGreaterThanOrEqual(CONSTRAINT_VOCABULARY_MIN);
+
+    const request = vi.mocked(env.AI.run).mock.calls[0]?.[1] as unknown as {
+      messages: { role: string; content: string }[];
+    };
+    const content = request.messages.find((m) => m.role === "user")?.content ?? "";
+    const passed = content.slice(content.indexOf("語の組:")).split("\n")[1]?.split("／") ?? [];
+    expect(passed).toHaveLength(2);
+    for (const word of passed) expect(saved.has(word)).toBe(true);
+  });
+
   it("単語も1件も作れなければ失敗として返す", async () => {
     await seedUser("u1");
     await db.insert(themes).values({

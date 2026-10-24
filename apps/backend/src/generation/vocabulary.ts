@@ -11,7 +11,7 @@ import { VOCABULARY_TSV } from "./vocabulary.generated";
  *
  * 共通リストは `scripts/vocabulary/build.py` が UniDic と wordfreq から作り、よく使われる
  * 順に並べてある。**最適化ごとの語彙は作成時にここから選んで D1 に保存する**
- * （`constraint_words`）ので、生成のたびにこのリストを探すことはない。
+ * （`constraint_vocabularies`）ので、生成のたびにこのリストを探すことはない。
  */
 
 /** これに届かない連接は、語彙が足りず自然なお題を作れないので作成を断る */

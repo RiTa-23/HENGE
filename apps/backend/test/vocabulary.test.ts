@@ -12,7 +12,7 @@ const rows = VOCABULARY_TSV.split("\n").map((line) => line.split("\t"));
 
 describe("共通語彙リスト（vocabulary.generated.ts）", () => {
   it("語数は上限まで（膨らむと Worker のメモリを気にし始めることになる）", () => {
-    // 2026-10-25 の生成で 30,765語。超えたら選び方を見直す
+    // 2026-10-25 の生成で 28,748語（excluded.tsv で 2,017語を外した後）。超えたら選び方を見直す
     expect(vocabularySize()).toBeLessThanOrEqual(50_000);
     expect(vocabularySize()).toBeGreaterThan(10_000);
   });
@@ -57,6 +57,25 @@ describe("共通語彙リスト（vocabulary.generated.ts）", () => {
     }
     // 同じ語彙素で品詞だけ違う普通の語は残す（持ち主は連体詞・接続詞）
     for (const word of ["同じ", "一方", "更に"]) expect(texts.has(word)).toBe(true);
+  });
+
+  /** scripts/vocabulary/excluded.tsv。規則では拾えない語を1語ずつ判定して外している */
+  it("手で外した語を含まず、俗語・固有名詞・暴力・硬い語は残す", () => {
+    const texts = new Set(rows.map(([text]) => text));
+    for (const word of [
+      "ザキ",
+      "財経",
+      "ハドロン",
+      "リバタリアニズム",
+      "アルディージャ",
+      "座薬",
+      "鐘楼",
+    ]) {
+      expect(texts.has(word)).toBe(false);
+    }
+    for (const word of ["ドキュン", "コテハン", "ドンペリ", "ポケモン", "斬首", "逡巡"]) {
+      expect(texts.has(word)).toBe(true);
+    }
   });
 });
 

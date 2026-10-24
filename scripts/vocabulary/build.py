@@ -20,7 +20,9 @@
 #      頻度は表記単位なので、別の語の頻度が付いて zipf の線を通ってしまう。「強い=じい」
 #      「生活=らいふ」のような珍しい読み、「ます」（升。助動詞の頻度）・「で」（助詞）・
 #      「だっ」（「だった」）・「行き」（「行く」の活用形）など
-#   6. zipf の高い順に並べる（最適化ごとの語彙は先頭から最大1000語を取る）
+#   6. 手で判定して外す語（excluded.tsv）を除く。語の断片・意味の取りにくい語・お題に向かない語・
+#      読み違いで、UniDic の品詞や頻度では拾えないもの
+#   7. zipf の高い順に並べる（最適化ごとの語彙は先頭から最大1000語を取る）
 import csv, math, re, sys
 from collections import defaultdict
 from pathlib import Path
@@ -31,6 +33,7 @@ csv.field_size_limit(sys.maxsize)
 
 ROOT = Path(__file__).resolve().parents[2]
 NG_WORDS_TS = ROOT / "packages/shared/src/generation/ng-words.ts"
+EXCLUDED_TSV = Path(__file__).resolve().parent / "excluded.tsv"
 DEFAULT_OUT = ROOT / "apps/backend/src/generation/vocabulary.generated.ts"
 
 ZIPF_MIN = 2.0
@@ -64,6 +67,16 @@ def load_ng_words():
     return words
 
 
+def load_excluded():
+    """excluded.tsv を (表記, 読み) の集合で読む。# で始まる行は注釈"""
+    pairs = set()
+    for line in EXCLUDED_TSV.read_text(encoding="utf-8").splitlines():
+        if not line or line.startswith("#"): continue
+        orth, reading, _ = line.split("\t")
+        pairs.add((orth, reading))
+    return pairs
+
+
 def ng_matcher(words):
     """packages/shared の containsNgWord と同じ照合。生成後の検査で必ず落ちる語を渡さないため"""
     parts = []
@@ -86,6 +99,7 @@ def main():
 
     ng = load_ng_words()
     ng_set, contains_ng = set(ng), ng_matcher(ng)
+    excluded = load_excluded()
 
     lemmas = defaultdict(dict)  # 語彙素 -> {表記: (語コスト, 読み)}
     owner = {}                  # 表層 -> (語コスト, 語彙素, 語彙素読み, 品詞大分類)。品詞・活用形を問わず最も安い行
@@ -123,6 +137,11 @@ def main():
         # 同じ表記・読みが別の語彙素から重なったら1件にする
         prev = words.get((orth, reading))
         if prev is None or z > prev: words[(orth, reading)] = z
+
+    # 手で外す語（手順6）。手順1〜5の変更で該当しなくなった行は、判定をやり直すべきなので知らせる
+    stale = excluded - words.keys()
+    if stale: print(f"excluded.tsv のうち {len(stale)} 行は該当する語がない: {sorted(stale)[:10]}", file=sys.stderr)
+    for k in excluded: words.pop(k, None)
 
     rows = sorted(words.items(), key=lambda kv: (-kv[1], kv[0][0], kv[0][1]))
     tsv = "\n".join(f"{t}\t{r}" for (t, r), _ in rows)

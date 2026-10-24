@@ -179,6 +179,9 @@ function longRules(count: number): string[] {
  *   おそれがあるので、選ぶ余地を残す。渡す語は1.5倍になる
  *
  * 1文に指定の音を含む語が2つ入るので、指定の音が文中に自然に2回以上入る。
+ *
+ * **2にする**（2026-10-24 の実測。docs/05-generation.md）。3語の案は「1語ずつ別の文にしてよい」と
+ * 読まれ、10呼び出し中4回、組を無視して1語ごとに1文を書いた。
  */
 export type WordsPerSentence = 2 | 3;
 export const CONSTRAINT_WORDS_PER_SENTENCE: WordsPerSentence = 2;

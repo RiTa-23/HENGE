@@ -254,10 +254,7 @@ export async function generateBatch(env: Env, input: GenerateBatchInput): Promis
 
     const validBefore = valid.length;
     const rejectedBefore = { ...rejected };
-    // **依頼した件数で切る。** モデルは組の数より多く書くことがあり（最適化で、20組に
-    // 60行を返した実測がある）、そのまま渡すと読み Worker の上限（`MAX_TEXTS`）を超えて
-    // 読み取得が断られ、ニューロンを使ったあとに生成ごと落ちる
-    await validateInto(texts.slice(0, requested), input, seen, openings, valid, rejected);
+    await validateInto(texts, requested, input, seen, openings, valid, rejected);
 
     if (logId !== undefined) {
       // ログは1リクエスト（＝1ラウンド）に紐づくため、採用数も却下数も
@@ -345,6 +342,8 @@ function openingOf(text: string): string {
 
 async function validateInto(
   texts: string[],
+  /** 読み取得に渡す上限。そのラウンドの依頼数 */
+  limit: number,
   input: GenerateBatchInput,
   seen: Set<string>,
   openings: Map<string, number>,
@@ -354,7 +353,15 @@ async function validateInto(
   const isWord = input.form === "word";
 
   // 重複・文字種・漢字の有無は、読み取得の前に無料で弾く（外部サブリクエストを使わない）
+  //
+  // **読み取得に渡すのは依頼した件数まで。** モデルは組の数より多く書くことがあり（最適化で、
+  // 20組に60行を返した実測がある）、そのまま渡すと読み Worker の上限（`MAX_TEXTS`）を超えて
+  // 読み取得が断られ、ニューロンを使ったあとに生成ごと落ちる。**生の出力行ではなく、無料の
+  // 検査を通った分で数える。** 先に切ると、前置きの1行（「〜を20個作成します。」の実測あり）が
+  // 枠を1つ使い、最後の正しい文が捨てられる。枠を超えた分は数えずに捨てる（seen にも入れない）
+  let accepted = 0;
   const candidates = texts.filter((text) => {
+    if (accepted >= limit) return false;
     if (seen.has(text)) {
       rejected.dup++;
       return false;
@@ -392,6 +399,7 @@ async function validateInto(
       return false;
     }
     openings.set(opening, used + 1);
+    accepted++;
     return true;
   });
 

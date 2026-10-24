@@ -375,7 +375,25 @@ describe("generateBatch", () => {
 
     expect(sizes[0]).toBe(N_REQUEST);
     for (const size of sizes) expect(size).toBeLessThanOrEqual(N_REQUEST);
-    expect(result.valid.length).toBeLessThanOrEqual(N_REQUEST);
+    // 枠を超えた行は数えずに捨てる（seen に入れない）ので、2ラウンド目で採られうる
+    expect(result.valid.length).toBeLessThanOrEqual(N_REQUEST * result.rounds);
+  });
+
+  it("前置きの行は件数に数えない（20文の前に前置きが1行あっても20文とも検査する）", async () => {
+    const sentences = Array.from(
+      { length: N_REQUEST },
+      (_, i) => `${String.fromCodePoint(0x4e00 + i)}は闇を走る。`,
+    );
+    // 実測で出た前置き。「〜個」の数字が文字種で落ちる
+    const preamble = "提供された語を使って自然な日本語の短文を20個作成します。";
+    const reading = fromSingle(async () => fakeReading("忍びは闇を走る。"));
+    const result = await generateBatch(
+      envWithAiResponses([[preamble, ...sentences]]),
+      input({ target: N_REQUEST, getReadings: reading }),
+    );
+
+    expect(result.rejected.charset).toBe(1);
+    expect(result.valid.map((p) => p.text)).toEqual(sentences);
   });
 
   it("打鍵数が範囲外なら keystroke で却下する", async () => {

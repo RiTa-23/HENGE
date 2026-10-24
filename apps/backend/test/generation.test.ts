@@ -339,6 +339,22 @@ describe("generateBatch", () => {
     expect(result.rejected.opening).toBe(0);
   });
 
+  it("NG 語の入ったお題は ng で却下する（テーマでも検査する）", async () => {
+    const result = await generateBatch(
+      envWithAiResponses([["夜道で痴漢に遭った。", "影が揺れた。"], []]),
+      input({ target: 1 }),
+    );
+    expect(result.valid.map((v) => v.text)).toEqual(["影が揺れた。"]);
+    expect(result.rejected.ng).toBe(1);
+  });
+
+  it("NG 語は単語でも見る", async () => {
+    const word = await generateBatch(envWithAiResponses([["ポルノ"]]), {
+      ...input({ form: "word", target: 1 }),
+    });
+    expect(word.rejected.ng).toBe(1);
+  });
+
   it("既存お題と重複するものは除外する", async () => {
     const result = await generateBatch(
       envWithAiResponses([["忍びは闇を走る。", "影が揺れた。"], []]),
@@ -365,11 +381,11 @@ describe("generateBatch", () => {
 
     expect(logs).toHaveLength(2);
     expect(logs[0]?.metadata?.counts).toBe(
-      "charset:1,kanji:0,opening:0,keystroke:0,constraint:0,punct:0,dup:0",
+      "charset:1,kanji:0,opening:0,keystroke:0,constraint:0,punct:0,ng:0,dup:0",
     );
     // 累積を渡していれば charset:2 になる
     expect(logs[1]?.metadata?.counts).toBe(
-      "charset:1,kanji:0,opening:0,keystroke:0,constraint:0,punct:0,dup:0",
+      "charset:1,kanji:0,opening:0,keystroke:0,constraint:0,punct:0,ng:0,dup:0",
     );
   });
 

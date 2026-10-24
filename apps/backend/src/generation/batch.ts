@@ -4,6 +4,7 @@
  */
 import {
   containsKanji,
+  containsNgWord,
   countConstraint,
   countKeystrokes,
   countSentenceEnds,
@@ -114,6 +115,11 @@ export interface RejectionCounts {
    */
   punct: number;
   /**
+   * NG 語（卑猥な語・差別語など。`NG_WORDS`）が入っていた。**最適化・テーマの全形式で見る。**
+   * 最適化では渡す語から外してあるが、モデルが文の中で書いてしまう語は防げない
+   */
+  ng: number;
+  /**
    * 既にプールにある（または同じ生成の中で重複した）ため落としたもの。
    *
    * **これが見えないと診断できない。** 重複は読み取得の前に無言で捨てていたので、
@@ -180,6 +186,7 @@ export async function generateBatch(env: Env, input: GenerateBatchInput): Promis
     keystroke: 0,
     constraint: 0,
     punct: 0,
+    ng: 0,
     dup: 0,
   };
   const seen = new Set(input.existing);
@@ -271,6 +278,7 @@ function subtract(after: RejectionCounts, before: RejectionCounts): RejectionCou
     keystroke: after.keystroke - before.keystroke,
     constraint: after.constraint - before.constraint,
     punct: after.punct - before.punct,
+    ng: after.ng - before.ng,
     dup: after.dup - before.dup,
   };
 }
@@ -301,6 +309,11 @@ async function validateInto(
     // 文の断片（「忍者、影」）が混ざる
     if (isWord ? !isTypableWord(text) : !isTypableText(text)) {
       rejected.charset++;
+      return false;
+    }
+    // **NG 語の入ったお題を出さない。** 読み取得の前に無料で弾く
+    if (containsNgWord(text)) {
+      rejected.ng++;
       return false;
     }
     // **表記がひらがなだけの文・語を通さない。** 打鍵は読み仮名に対して行うので

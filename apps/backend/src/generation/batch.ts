@@ -254,7 +254,10 @@ export async function generateBatch(env: Env, input: GenerateBatchInput): Promis
 
     const validBefore = valid.length;
     const rejectedBefore = { ...rejected };
-    await validateInto(texts, input, seen, openings, valid, rejected);
+    // **依頼した件数で切る。** モデルは組の数より多く書くことがあり（最適化で、20組に
+    // 60行を返した実測がある）、そのまま渡すと読み Worker の上限（`MAX_TEXTS`）を超えて
+    // 読み取得が断られ、ニューロンを使ったあとに生成ごと落ちる
+    await validateInto(texts.slice(0, requested), input, seen, openings, valid, rejected);
 
     if (logId !== undefined) {
       // ログは1リクエスト（＝1ラウンド）に紐づくため、採用数も却下数も

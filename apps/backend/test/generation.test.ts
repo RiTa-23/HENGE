@@ -357,6 +357,27 @@ describe("generateBatch", () => {
     expect(readingCalls).toBe(1); // 弾いた分は読み取得を呼ばない
   });
 
+  it("依頼した件数より多く返っても、読み取得には依頼した件数までしか渡さない（読み Worker の上限）", async () => {
+    const sizes: number[] = [];
+    // 書き出しの重なりで弾かれないよう、1文字目を変える
+    const lines = Array.from(
+      { length: 60 },
+      (_, i) => `${String.fromCodePoint(0x4e00 + i)}は闇を走る。`,
+    );
+    const reading = fromSingle(async () => fakeReading("忍びは闇を走る。"));
+    const result = await generateBatch(envWithAiResponses([lines, lines]), {
+      ...input({ target: 100 }),
+      getReadings: async (texts) => {
+        sizes.push(texts.length);
+        return reading(texts);
+      },
+    });
+
+    expect(sizes[0]).toBe(N_REQUEST);
+    for (const size of sizes) expect(size).toBeLessThanOrEqual(N_REQUEST);
+    expect(result.valid.length).toBeLessThanOrEqual(N_REQUEST);
+  });
+
   it("打鍵数が範囲外なら keystroke で却下する", async () => {
     const result = await generateBatch(
       envWithAiResponses([["影。", "忍びは闇を走る。"], []]),

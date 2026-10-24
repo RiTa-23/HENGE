@@ -13,6 +13,7 @@ import { acceptsPartialBatch, generateBatch } from "../generation/batch";
 import { AiQuotaExceededError, AiUnavailableError } from "../generation/ai";
 import { resolveModel } from "../generation/model";
 import { existingContextSize } from "../generation/prompt";
+import { CONSTRAINT_VOCABULARY_MIN, vocabularyFor } from "../generation/vocabulary";
 import { fail } from "../http/error";
 import { cacheThemeId, getCachedThemeId } from "../kv/themes";
 import { acquireThemeLock, releaseThemeLock } from "../kv/lock";
@@ -64,6 +65,17 @@ export const generateRoutes = new Hono<{ Bindings: Env }>()
     const existing = cached ?? (await findByNameDetail(db, body.kind, body.name));
     if (existing !== null) return c.json({ theme: existing, created: false });
 
+    // **最適化は、語彙が足りなければ AI を呼ぶ前に断る**（ニューロンを消費しない）。
+    // 渡せる語が少ないと、同じ語ばかりのお題になるか、モデルが語を作り始める
+    const vocabulary = body.kind === "constraint" ? vocabularyFor(body.name) : undefined;
+    if (vocabulary !== undefined && vocabulary.length < CONSTRAINT_VOCABULARY_MIN) {
+      return fail(
+        c,
+        "GENERATION_FAILED",
+        `「${body.name}」を含む語彙が足りず、お題を作れません。別の音を指定してください`,
+      );
+    }
+
     const themeId = crypto.randomUUID();
     const model = resolveModel(c.env.GENERATION_MODEL);
     // 応答に載せる合計。記録そのものはラウンドごとに済ませる（onNeurons）
@@ -105,6 +117,7 @@ export const generateRoutes = new Hono<{ Bindings: Env }>()
       { id: themeId, kind: body.kind, name: body.name, normalizedName, createdBy: body.userId },
       result.valid,
       model,
+      vocabulary,
     );
     await cacheThemeId(c.env.KV, body.kind, normalizedName, themeId);
 

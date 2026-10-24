@@ -111,6 +111,27 @@ export const prompts = sqliteTable(
 );
 
 /**
+ * 最適化練習（`kind: 'constraint'`）の語彙。**1つの最適化につき1行。**
+ *
+ * 作成時に共通語彙リスト（`generation/vocabulary.ts`）から、読みに指定の連接を含む語を
+ * よく使われる順に最大1000語選んで保存する。生成のたびにこの中からランダムに選び、
+ * 「この語を使って自然な短文を作る」形でモデルに渡す（docs/05-generation.md）。
+ *
+ * **1語1行にしない。** 1000語を1語1行で挿入すると、バインド変数の上限（1文100個）で
+ * 約31文に割れ、D1 の「1回の実行あたり50クエリ」（無料プラン）に近づく。生成時も
+ * `ORDER BY RANDOM()` が最大1000行を読む。1行の JSON なら挿入も読み取りも1回で済む。
+ *
+ * **テーマ行・お題10問と同じバッチで挿入する**（不変条件5と同じ理由）。
+ */
+export const constraintVocabularies = sqliteTable("constraint_vocabularies", {
+  themeId: text("theme_id")
+    .primaryKey()
+    .references(() => themes.id, { onDelete: "cascade" }),
+  /** `[表記, 読み][]` の JSON。よく使われる順。最大1000語で約20KB */
+  wordsJson: text("words_json").notNull(),
+});
+
+/**
  * ログインユーザーのみ。匿名ユーザーはlocalStorageで同等の値を保持する。
  */
 export const userThemeProgress = sqliteTable(

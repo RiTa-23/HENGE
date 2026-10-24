@@ -2,7 +2,14 @@ import { env } from "cloudflare:test";
 import { eq } from "drizzle-orm";
 import { beforeEach, describe, expect, it } from "vitest";
 import { createDb } from "../src/db/client";
-import { prompts, themes, user, userGenerationUsage, userThemeProgress } from "../src/db/schema";
+import {
+  constraintVocabularies,
+  prompts,
+  themes,
+  user,
+  userGenerationUsage,
+  userThemeProgress,
+} from "../src/db/schema";
 
 const db = createDb(env.DB);
 
@@ -53,6 +60,14 @@ describe("CASCADE削除", () => {
     await db.delete(themes).where(eq(themes.id, "t1"));
 
     expect(await db.select().from(prompts)).toHaveLength(0);
+  });
+
+  it("テーマを消すと constraint_vocabularies（最適化の語彙）も消える", async () => {
+    await seed();
+    await db.insert(constraintVocabularies).values({ themeId: "t1", wordsJson: "[]" });
+    await db.delete(themes).where(eq(themes.id, "t1"));
+
+    expect(await db.select().from(constraintVocabularies)).toHaveLength(0);
   });
 
   it("テーマを消すと user_theme_progress も消える", async () => {

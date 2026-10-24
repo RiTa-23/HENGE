@@ -2,10 +2,17 @@ import { env, SELF } from "cloudflare:test";
 import { eq } from "drizzle-orm";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { createDb } from "../src/db/client";
-import { prompts, themes, user, userGenerationUsage } from "../src/db/schema";
+import {
+  constraintVocabularies,
+  prompts,
+  themes,
+  user,
+  userGenerationUsage,
+} from "../src/db/schema";
 import { getUsage } from "../src/db/usage";
 import { themeIdKey, themeLockKey } from "../src/kv/keys";
 import { DEFAULT_MODEL, neuronsUsed } from "../src/generation/model";
+import { CONSTRAINT_VOCABULARY_MAX, CONSTRAINT_VOCABULARY_MIN } from "../src/generation/vocabulary";
 
 const db = createDb(env.DB);
 
@@ -314,6 +321,63 @@ describe("同期生成の消費記録（成否によらず実消費を加算す�
     await post("/prompts/regenerate", { themeId: "t1", userId: "u1" });
 
     expect((await getUsage(db, "u1")).neurons).toBeCloseTo(PER_ROUND * 2);
+  });
+});
+
+describe("POST /themes（最適化の語彙）", () => {
+  beforeEach(async () => {
+    await env.KV.delete(themeIdKey("constraint", "ざ"));
+    await env.KV.delete(themeIdKey("constraint", "を"));
+  });
+
+  it("最適化を作ると、語彙をテーマ行・お題と一緒に保存する", async () => {
+    await seedUser("u1");
+    const heads = ["一", "二", "三", "四", "五", "六", "七", "八", "九", "十"];
+    stubGeneration([heads.map((n) => `${n}番の座席に座る。`)], "ざせきにすわる");
+
+    const { status, body } = await post("/themes", {
+      kind: "constraint",
+      name: "ざ",
+      userId: "u1",
+    });
+    expect(status).toBe(200);
+    expect(body.created).toBe(true);
+
+    const themeId = (body.theme as { id: string }).id;
+    const [row] = await db
+      .select()
+      .from(constraintVocabularies)
+      .where(eq(constraintVocabularies.themeId, themeId));
+    const words = JSON.parse(row?.wordsJson ?? "[]") as [string, string][];
+    expect(words.length).toBeGreaterThanOrEqual(CONSTRAINT_VOCABULARY_MIN);
+    expect(words.length).toBeLessThanOrEqual(CONSTRAINT_VOCABULARY_MAX);
+    for (const [, reading] of words) expect(reading).toContain("ざ");
+  });
+
+  it("語彙が100語に届かない連接は、AI を呼ばずに断る（テーマ行も作らない）", async () => {
+    await seedUser("u1");
+    const run = vi.spyOn(env.AI, "run");
+
+    const { status, body } = await post("/themes", {
+      kind: "constraint",
+      name: "を",
+      userId: "u1",
+    });
+
+    expect(status).toBe(422);
+    expect((body.error as { code: string }).code).toBe("GENERATION_FAILED");
+    expect(run).not.toHaveBeenCalled();
+    expect(await db.select().from(themes)).toHaveLength(0);
+    expect(await getUsage(db, "u1")).toEqual({ count: 0, neurons: 0 });
+  });
+
+  it("テーマでは語彙を保存しない", async () => {
+    await seedUser("u1");
+    stubValidGeneration();
+
+    await post("/themes", { kind: "theme", name: "忍びの心得", userId: "u1" });
+
+    expect(await db.select().from(constraintVocabularies)).toHaveLength(0);
   });
 });
 

@@ -12,7 +12,11 @@ import {
 import { getUsage } from "../src/db/usage";
 import { themeIdKey, themeLockKey } from "../src/kv/keys";
 import { DEFAULT_MODEL, neuronsUsed } from "../src/generation/model";
-import { CONSTRAINT_VOCABULARY_MAX, CONSTRAINT_VOCABULARY_MIN } from "../src/generation/vocabulary";
+import {
+  CONSTRAINT_VOCABULARY_MAX,
+  CONSTRAINT_VOCABULARY_MIN,
+  vocabularyFor,
+} from "../src/generation/vocabulary";
 
 const db = createDb(env.DB);
 
@@ -536,6 +540,22 @@ describe("POST /prompts/regenerate", () => {
     const passed = content.slice(content.indexOf("語の組:")).split("\n")[1]?.split("／") ?? [];
     expect(passed).toHaveLength(2);
     for (const word of passed) expect(saved.has(word)).toBe(true);
+  });
+
+  it("語彙の無い既存の最適化でも、下限に届かない連接なら AI を呼ばずに失敗し、語彙も保存しない", async () => {
+    await seedUser("u1");
+    await db
+      .insert(themes)
+      .values({ id: "c1", kind: "constraint", name: "ぢ", normalizedName: "ぢ" });
+    expect(vocabularyFor("ぢ").length).toBeLessThan(CONSTRAINT_VOCABULARY_MIN);
+    const run = vi.spyOn(env.AI, "run");
+
+    const { status, body } = await post("/prompts/regenerate", { themeId: "c1", userId: "u1" });
+
+    expect((body.error as { code: string }).code).toBe("GENERATION_FAILED");
+    expect(status).toBe(422);
+    expect(run).not.toHaveBeenCalled();
+    expect(await db.select().from(constraintVocabularies)).toHaveLength(0);
   });
 
   it("単語も1件も作れなければ失敗として返す", async () => {

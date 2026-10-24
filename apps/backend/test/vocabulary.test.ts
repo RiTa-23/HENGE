@@ -12,7 +12,7 @@ const rows = VOCABULARY_TSV.split("\n").map((line) => line.split("\t"));
 
 describe("共通語彙リスト（vocabulary.generated.ts）", () => {
   it("語数は上限まで（膨らむと Worker のメモリを気にし始めることになる）", () => {
-    // 2026-10-24 の生成で 32,145語。超えたら選び方を見直す
+    // 2026-10-25 の生成で 30,765語。超えたら選び方を見直す
     expect(vocabularySize()).toBeLessThanOrEqual(50_000);
     expect(vocabularySize()).toBeGreaterThan(10_000);
   });
@@ -35,8 +35,28 @@ describe("共通語彙リスト（vocabulary.generated.ts）", () => {
     }
   });
 
-  it("1文字の漢字を含まない（読みが紛れて、狙いの読みで使われない）", () => {
-    for (const [text = ""] of rows) expect(text).not.toMatch(/^[一-鿿々]$/u);
+  it("1文字の語を含まない（漢字は読みが紛れ、かなは語の断片になる）", () => {
+    for (const [text = ""] of rows) expect([...text]).not.toHaveLength(1);
+  });
+
+  it("語の断片を含まない（「っ」で終わる語、ひらがなだけの2文字以下の語）", () => {
+    for (const [text = ""] of rows) {
+      expect(text).not.toMatch(/っ$/u);
+      expect(text).not.toMatch(/^[ぁ-ゖー]{1,2}$/u);
+    }
+  });
+
+  /**
+   * 頻度は表記単位で引くので、機能語と同じ字面の語には機能語の頻度が付いて上位に来る
+   * （以前は先頭が「で・と・だ・ます」だった）。表記の持ち主が別の語なら外している
+   */
+  it("機能語や、別の語の活用形と同じ字面の語を含まない", () => {
+    const texts = new Set(rows.map(([text]) => text));
+    for (const word of ["です", "ます", "だった", "ため", "より", "行き", "生き", "考え"]) {
+      expect(texts.has(word)).toBe(false);
+    }
+    // 同じ語彙素で品詞だけ違う普通の語は残す（持ち主は連体詞・接続詞）
+    for (const word of ["同じ", "一方", "更に"]) expect(texts.has(word)).toBe(true);
   });
 });
 

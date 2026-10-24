@@ -136,11 +136,13 @@ AIには渡さない（`INCLUDE_EXISTING_PROMPTS` は false）。
 
 | 段 | 中身 | 置き場所 |
 |---|---|---|
-| 共通語彙リスト | UniDic から選んだ普通の語の表記と読み。**全部の最適化で1本**（32,145語） | `apps/backend/src/generation/vocabulary.generated.ts`（`scripts/vocabulary/build.py` が作る） |
+| 共通語彙リスト | UniDic から選んだ普通の語の表記と読み。**全部の最適化で1本**（30,765語） | `apps/backend/src/generation/vocabulary.generated.ts`（`scripts/vocabulary/build.py` が作る） |
 | 最適化ごとの語彙 | 共通リストから、読みに指定の連接を含む語をよく使われる順に最大1000語 | D1 の `constraint_vocabularies`（作成時に保存。`docs/03-data-model.md`） |
 
 - **共通リストの選び方**は `scripts/vocabulary/README.md`。見出し（基本形）単位・固有名詞なし・zipf 2.0 以上・NG 語なし・
-  1文字の漢字なし・同じ表記は最も普通の読みだけ。読みの正解付きコーパスで、渡した語が狙いの読みで使われる割合は 0.99
+  1文字の語なし・語の断片なし・**その表記の最も普通の解析がその語であるものだけ**（頻度は表記単位で引くので、外さないと
+  「ます」（升）に助動詞の頻度が付いて上位に来る）。読みの正解付きコーパスで、渡した語が狙いの読みで使われる割合は 0.99
+  （「表記の持ち主に絞る」を入れる前の規則での実測）
 - **100語に届かない連接は作成を断る**（AI を呼ぶ前。`docs/04-api.md`）。拗音の大半・を・ぢ・ゔ・でき・ぬの・ぺん が該当する
 - 照合は検証と同じ `includesConstraint`。濁点・半濁点の違いは別の連接（「発表（はっぴょう）」は「ひょう」に当たらない）
 

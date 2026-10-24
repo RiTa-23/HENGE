@@ -12,6 +12,7 @@ import {
   katakanaToHiragana,
   UnsupportedKanaError,
 } from "@henge/shared";
+import { getPlatformProxy } from "wrangler";
 import { readingOf } from "../../reading/src/reading";
 import { generateBatch, type GenerateBatchInput } from "../src/generation/batch";
 import { DEFAULT_MODEL } from "../src/generation/model";
@@ -22,15 +23,20 @@ import { vocabularyFor } from "../src/generation/vocabulary";
 /**
  * 最適化の生成で、1文に渡す語の数（2語の組か、3語から2語以上を選ばせるか）を比べる（#262）。
  *
- * **本番と同じパイプライン（`generateBatch`）を通す。** AI だけを Workers AI の REST API に、
- * 読み取得だけを読み Worker と同じ辞書（ローカルの Vibrato）に差し替える。プロンプト・
- * 検証・却下の内訳は本番と同じものになる。
+ * **本番と同じパイプライン（`generateBatch`）を通す。** AI だけを wrangler の
+ * `getPlatformProxy()` 経由のリモートの Workers AI に、読み取得だけを読み Worker と同じ辞書
+ * （ローカルの Vibrato）に差し替える。プロンプト・検証・却下の内訳は本番と同じものになる。
+ * AI Gateway は通さない（本番のログに混ぜない）。
  *
  * 使い方（リポジトリのルートから）:
  *   bun scripts/unidic/fetch-dict.ts            # 読みの辞書（初回だけ）
- *   CLOUDFLARE_ACCOUNT_ID=... CLOUDFLARE_API_TOKEN=... \
- *     bun apps/backend/scripts/compare-constraint-prompts.ts --chars=ざ,き,で --runs=3
- *   --dry-run を付けると AI を呼ばずに、渡した語を並べただけの文で配線を確かめる
+ *   npx wrangler login                          # Workers AI を呼べるアカウントで（初回だけ）
+ *   bun run compare:constraint --chars=ざ,き,で --runs=3
+ *   --dry-run を付けると AI を呼ばずに（ログインも不要）、渡した語を並べただけの文で配線を確かめる
+ *
+ * **Bun では直接動かさない。** wrangler のリモートバインディングは Bun の `fetch()` では動かない
+ * （wrangler が明示的に断る）。`compare:constraint` は bun でバンドルし、Node で起動する。
+ * --dry-run だけなら `bun apps/backend/scripts/compare-constraint-prompts.ts` でも動く。
  *
  * 1回の生成は最大2ラウンドで、既定モデルなら約13ニューロン。既定（3文字×2案×3回）で
  * 約230ニューロンを使う（アカウント全体の無料枠は1日10,000）。
@@ -101,19 +107,24 @@ interface Call {
   output: string;
 }
 
-/** `env.AI` の代わり。REST API を呼び、依頼と応答を記録する */
-function restAi(calls: Call[], dryRun: boolean) {
-  const account = process.env.CLOUDFLARE_ACCOUNT_ID;
-  const token = process.env.CLOUDFLARE_API_TOKEN;
-  if (!dryRun && (account === undefined || token === undefined)) {
-    throw new Error("CLOUDFLARE_ACCOUNT_ID と CLOUDFLARE_API_TOKEN を渡す（--dry-run なら不要）");
-  }
+type AiBody = { messages: { role: string; content: string }[] };
+type RemoteRun = (
+  model: string,
+  body: AiBody,
+) => Promise<{ response?: unknown; choices?: { message?: { content?: string } }[] }>;
+
+/**
+ * `env.AI` の代わり。ログイン済みの wrangler の認証でリモートの AI バインディングを呼び、
+ * 依頼と応答を記録する。**AI Gateway は通さない**（第3引数を捨てる）。本番の Gateway ログに
+ * 測定の呼び出しを混ぜないため
+ */
+function proxiedAi(calls: Call[], remoteRun: RemoteRun | undefined) {
   return {
     aiGatewayLogId: undefined,
     gateway: () => ({ patchLog: async () => {} }),
-    async run(model: string, body: { messages: { role: string; content: string }[] }) {
+    async run(model: string, body: AiBody) {
       const prompt = body.messages.find((m) => m.role === "user")?.content ?? "";
-      if (dryRun) {
+      if (remoteRun === undefined) {
         // 語の組をそのまま「〜と〜を見た。」にする。配線の確認用
         const lines = prompt
           .slice(prompt.indexOf("語の組:") + 5)
@@ -126,43 +137,36 @@ function restAi(calls: Call[], dryRun: boolean) {
         calls.push({ prompt, output });
         return { response: output, usage: { prompt_tokens: 0, completion_tokens: 0 } };
       }
-      const res = await fetch(
-        `https://api.cloudflare.com/client/v4/accounts/${account}/ai/run/${model}`,
-        {
-          method: "POST",
-          headers: { authorization: `Bearer ${token}`, "content-type": "application/json" },
-          body: JSON.stringify(body),
-        },
-      );
-      const json = (await res.json()) as {
-        success: boolean;
-        errors?: unknown;
-        result?: {
-          response?: string;
-          choices?: { message?: { content?: string } }[];
-          usage?: unknown;
-        };
-      };
-      if (!json.success || json.result === undefined) {
-        throw new Error(`Workers AI が失敗した: ${JSON.stringify(json.errors)}`);
-      }
-      const output = json.result.response ?? json.result.choices?.[0]?.message?.content ?? "";
+      const result = await remoteRun(model, body);
+      const output =
+        typeof result.response === "string"
+          ? result.response
+          : (result.choices?.[0]?.message?.content ?? "");
       calls.push({ prompt, output });
-      return json.result;
+      return result;
     },
   };
 }
 
+/** 依頼で渡した語の組（1行が1組） */
+function groupsOf(call: Call): string[] {
+  return call.prompt
+    .slice(call.prompt.indexOf("語の組:") + 5)
+    .trim()
+    .split("\n")
+    .filter((line) => !line.startsWith("/"));
+}
+
+function outputLines(call: Call): string[] {
+  return call.output
+    .split("\n")
+    .map((l) => l.trim())
+    .filter((l) => l !== "");
+}
+
 /** 渡した語のうち、文の中に現れた割合。活用するので語幹（末尾1文字を落とした形）でも数える */
 function usedRatio(prompts: readonly Call[], texts: readonly string[]): number {
-  const words = prompts.flatMap((call) =>
-    call.prompt
-      .slice(call.prompt.indexOf("語の組:") + 5)
-      .trim()
-      .split("\n")
-      .filter((line) => !line.startsWith("/"))
-      .flatMap((line) => line.split("／")),
-  );
+  const words = prompts.flatMap((call) => groupsOf(call).flatMap((line) => line.split("／")));
   const all = texts.join("\n");
   const used = words.filter(
     (w) => all.includes(w) || (w.length >= 2 && all.includes(w.slice(0, -1))),
@@ -176,6 +180,14 @@ function pct(n: number, d: number): string {
 
 const options = parseArgs(process.argv.slice(2));
 const getReadings = localReadings();
+// D1 / KV / 読み Worker のバインディングも立ち上がるが使わない。使うのは AI だけ
+const proxy = options.dryRun
+  ? undefined
+  : await getPlatformProxy<Env>({
+      configPath: fileURLToPath(new URL("../wrangler.jsonc", import.meta.url)),
+    });
+const remoteRun =
+  proxy === undefined ? undefined : (proxy.env.AI.run.bind(proxy.env.AI) as unknown as RemoteRun);
 const report: string[] = ["# 最適化の生成: 1文に渡す語の数の比較", ""];
 const summary: string[] = [];
 
@@ -183,7 +195,12 @@ for (const char of options.chars) {
   const vocabulary = vocabularyFor(char);
   for (const wordsPerSentence of options.variants) {
     const stats = {
-      requested: 0,
+      calls: 0,
+      // 出力の行数が組の数と違う呼び出し。1語ごとに1文を書くなど、組と文の対応が失われている。
+      // **下限でしかない。** 1語ごとに書いても依頼の行数で止まると行数は合う。全文で確かめる
+      broken: 0,
+      lines: 0,
+      reached: 0,
       valid: 0,
       twice: 0,
       startsWith: 0,
@@ -195,7 +212,7 @@ for (const char of options.chars) {
 
     for (let run = 1; run <= options.runs; run++) {
       const calls: Call[] = [];
-      const env = { AI: restAi(calls, options.dryRun) } as unknown as Env;
+      const env = { AI: proxiedAi(calls, remoteRun) } as unknown as Env;
       const input: GenerateBatchInput = {
         kind: "constraint",
         form: "sentence",
@@ -212,7 +229,11 @@ for (const char of options.chars) {
       const result = await generateBatch(env, input);
       const valid = result.valid.map((p) => p.text);
 
-      stats.requested += calls.length * 20;
+      // 分母は実際の出力行数。モデルが組の数より多く書くことがあり、依頼数で割ると100%を超える
+      stats.calls += calls.length;
+      stats.broken += calls.filter((c) => outputLines(c).length !== groupsOf(c).length).length;
+      stats.lines += calls.reduce((n, c) => n + outputLines(c).length, 0);
+      if (result.reachedTarget) stats.reached += 1;
       stats.valid += valid.length;
       stats.twice += result.valid.filter((p) => countConstraint(p.readingKana, char) >= 2).length;
       stats.startsWith += result.valid.filter((p) => p.readingKana.startsWith(char)).length;
@@ -226,8 +247,8 @@ for (const char of options.chars) {
       for (const call of calls) {
         const accepted = new Set(valid);
         report.push("```", call.prompt.slice(call.prompt.indexOf("語の組:")), "```", "");
-        for (const line of call.output.split("\n").filter((l) => l.trim() !== "")) {
-          report.push(`- ${accepted.has(line.trim()) ? "○" : "×"} ${line.trim()}`);
+        for (const line of outputLines(call)) {
+          report.push(`- ${accepted.has(line) ? "○" : "×"} ${line}`);
         }
         report.push("");
       }
@@ -235,7 +256,9 @@ for (const char of options.chars) {
     summary.push(
       [
         `「${char}」${wordsPerSentence}語`,
-        `採用 ${stats.valid}/${stats.requested}（${pct(stats.valid, stats.requested)}）`,
+        `採用 ${stats.valid}/${stats.lines}行（${pct(stats.valid, stats.lines)}）`,
+        `10問に届いた ${stats.reached}/${options.runs}回`,
+        `形が崩れた ${stats.broken}/${stats.calls}呼び出し`,
         `2回以上 ${pct(stats.twice, stats.valid)}`,
         `文頭 ${pct(stats.startsWith, stats.valid)}`,
         `渡した語が現れた ${pct(stats.used, stats.valid)}`,
@@ -254,3 +277,4 @@ writeFileSync(
 );
 console.log(summary.join("\n"));
 console.log(`全文: ${options.out}`);
+await proxy?.dispose();

@@ -18,7 +18,8 @@
     "test:workers": "bun run --cwd apps/backend test:workers",
     "db:generate": "bun run --cwd apps/backend db:generate",
     "db:migrate:local": "bun run --cwd apps/backend db:migrate:local",
-    "rebuild:roman": "bun run --cwd apps/backend scripts/rebuild-roman.ts"
+    "rebuild:roman": "bun run --cwd apps/backend scripts/rebuild-roman.ts",
+    "compare:constraint": "bun build apps/backend/scripts/compare-constraint-prompts.ts --target=node --external=wrangler --outfile=apps/backend/scripts/.compare-constraint-prompts.mjs && node apps/backend/scripts/.compare-constraint-prompts.mjs"
   },
   "devDependencies": {
     "@types/bun": "^1.4.0",

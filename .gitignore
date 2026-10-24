@@ -15,5 +15,6 @@ next-env.d.ts
 lex_3_1.csv
 .venv/
 
-# apps/backend/scripts/compare-constraint-prompts.ts の既定の出力
+# apps/backend/scripts/compare-constraint-prompts.ts の既定の出力と、Node で動かすためのバンドル
 constraint-prompts.md
+.compare-constraint-prompts.mjs

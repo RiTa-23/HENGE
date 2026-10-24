@@ -4,6 +4,7 @@
  */
 import {
   containsKanji,
+  containsNgWord,
   countConstraint,
   countKeystrokes,
   countSentenceEnds,
@@ -19,6 +20,8 @@ import {
 import { type GetReadings, ReadingError } from "../reading/index";
 import { recordGenerationResult, requestPrompts } from "./ai";
 import type { ModelId } from "./model";
+import { CONSTRAINT_WORDS_PER_SENTENCE, type WordsPerSentence } from "./prompt";
+import type { VocabularyWord } from "./vocabulary";
 
 /**
  * 短文の1ラウンドあたりのリクエスト件数。
@@ -114,6 +117,11 @@ export interface RejectionCounts {
    */
   punct: number;
   /**
+   * NG 語（卑猥な語・差別語など。`NG_WORDS`）が入っていた。**最適化・テーマの全形式で見る。**
+   * 最適化では渡す語から外してあるが、モデルが文の中で書いてしまう語は防げない
+   */
+  ng: number;
+  /**
    * 既にプールにある（または同じ生成の中で重複した）ため落としたもの。
    *
    * **これが見えないと診断できない。** 重複は読み取得の前に無言で捨てていたので、
@@ -147,6 +155,16 @@ export interface GenerateBatchInput {
   /** 重複回避の文脈。既存お題の本文 */
   existing: string[];
   model: ModelId;
+  /**
+   * 最適化の語彙（`constraint_vocabularies`）。**最適化では必須。** 生成の最初にシャッフルし、
+   * ラウンドごとに続きの語を組にしてモデルに渡す（1回の生成の中で語が重ならない）。
+   * 空なら AI を呼ばずに終わる（作れるものが無いのにニューロンを使わない）
+   */
+  vocabulary?: VocabularyWord[];
+  /** 1文に渡す語の数。省略時は `CONSTRAINT_WORDS_PER_SENTENCE`（測定のときだけ指定する） */
+  wordsPerSentence?: WordsPerSentence;
+  /** シャッフルに使う乱数。テストで固定するときだけ渡す */
+  random?: () => number;
   getReadings: GetReadings;
   /** 検証結果のログ書き戻しを遅らせる。Honoハンドラからは c.executionCtx.waitUntil を渡す */
   waitUntil?: (promise: Promise<unknown>) => void;
@@ -180,6 +198,7 @@ export async function generateBatch(env: Env, input: GenerateBatchInput): Promis
     keystroke: 0,
     constraint: 0,
     punct: 0,
+    ng: 0,
     dup: 0,
   };
   const seen = new Set(input.existing);
@@ -192,6 +211,11 @@ export async function generateBatch(env: Env, input: GenerateBatchInput): Promis
   let neurons = 0;
 
   const requested = requestCount(input.form);
+  const wordsPerSentence = input.wordsPerSentence ?? CONSTRAINT_WORDS_PER_SENTENCE;
+  const words = input.kind === "constraint" ? shuffle(input.vocabulary ?? [], input.random) : [];
+  if (input.kind === "constraint" && words.length === 0) {
+    return { valid, rejected, rounds: 0, neurons: 0, reachedTarget: false };
+  }
 
   for (let round = 1; round <= MAX_ROUNDS; round++) {
     rounds = round;
@@ -207,6 +231,9 @@ export async function generateBatch(env: Env, input: GenerateBatchInput): Promis
       name: input.name,
       count: requested,
       existing: input.existing,
+      ...(input.kind === "constraint"
+        ? { wordGroups: wordGroupsFor(words, round, requested, wordsPerSentence), wordsPerSentence }
+        : {}),
       metadata: {
         themeId: input.themeId,
         kind: input.kind,
@@ -250,6 +277,38 @@ export async function generateBatch(env: Env, input: GenerateBatchInput): Promis
   return { valid, rejected, rounds, neurons, reachedTarget: valid.length >= input.target };
 }
 
+/** Fisher–Yates。元の配列は変えない */
+function shuffle<T>(items: readonly T[], random: () => number = Math.random): T[] {
+  const result = [...items];
+  for (let i = result.length - 1; i > 0; i--) {
+    const j = Math.floor(random() * (i + 1));
+    [result[i], result[j]] = [result[j] as T, result[i] as T];
+  }
+  return result;
+}
+
+/**
+ * そのラウンドでモデルに渡す語の組（表記）。シャッフル済みの語彙から、ラウンドごとに
+ * 続きの語を `perSentence` 語ずつ `count` 組取る。
+ *
+ * **語彙が足りなければ先頭に戻って使い回す**（最低100語なので、2語×20組×2ラウンド＝80語は
+ * 1回の生成の中で重ならない。3語の案では120語要るので、100語の最適化だと2ラウンド目で重なる）。
+ */
+export function wordGroupsFor(
+  words: readonly VocabularyWord[],
+  round: number,
+  count: number,
+  perSentence: number,
+): string[][] {
+  const start = (round - 1) * count * perSentence;
+  return Array.from({ length: count }, (_group, group) =>
+    Array.from(
+      { length: perSentence },
+      (_word, k) => words[(start + group * perSentence + k) % words.length]?.text ?? "",
+    ),
+  );
+}
+
 /**
  * そのラウンドで採用したお題のうち、指定文字を**2回以上**含むものの数。
  *
@@ -271,6 +330,7 @@ function subtract(after: RejectionCounts, before: RejectionCounts): RejectionCou
     keystroke: after.keystroke - before.keystroke,
     constraint: after.constraint - before.constraint,
     punct: after.punct - before.punct,
+    ng: after.ng - before.ng,
     dup: after.dup - before.dup,
   };
 }
@@ -301,6 +361,11 @@ async function validateInto(
     // 文の断片（「忍者、影」）が混ざる
     if (isWord ? !isTypableWord(text) : !isTypableText(text)) {
       rejected.charset++;
+      return false;
+    }
+    // **NG 語の入ったお題を出さない。** 読み取得の前に無料で弾く
+    if (containsNgWord(text)) {
+      rejected.ng++;
       return false;
     }
     // **表記がひらがなだけの文・語を通さない。** 打鍵は読み仮名に対して行うので

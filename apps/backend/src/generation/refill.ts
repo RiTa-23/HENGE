@@ -2,6 +2,7 @@ import { type PromptForm, stockTarget } from "@henge/shared";
 import type { Db } from "../db/client";
 import { appendPrompts, recentPromptTexts } from "../db/prompts";
 import { recordUsage } from "../db/usage";
+import { loadConstraintVocabulary } from "../db/vocabularies";
 import { promptCountOf, setGenerationStatus, type ThemeDetail } from "../db/themes";
 import { acquireThemeLock, releaseThemeLock } from "../kv/lock";
 import { createGetReadings } from "../reading/index";
@@ -54,6 +55,8 @@ async function refill(env: Env, input: RefillInput): Promise<void> {
       // 在庫水準まで戻すのに必要な件数
       target: nextOffset + stockTarget(form) - promptCountOf(theme.promptCounts, form),
       existing: await recentPromptTexts(db, theme.id, form, existingContextSize(form)),
+      vocabulary:
+        theme.kind === "constraint" ? await loadConstraintVocabulary(db, theme) : undefined,
       model,
       getReadings: createGetReadings(env),
       // **消費が確定した直後に記録する。** 補充は waitUntil の中で走り、

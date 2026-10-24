@@ -11,6 +11,7 @@
     "**/.wrangler/**",
     "**/worker-configuration.d.ts",
     "**/next-env.d.ts",
-    "packages/reading-wasm/pkg/**"
+    "packages/reading-wasm/pkg/**",
+    "apps/backend/src/generation/vocabulary.generated.ts"
   ]
 }

@@ -1,4 +1,4 @@
-import { buildGenerationPrompt, parseGeneratedOutput } from "./prompt";
+import { buildGenerationPrompt, parseGeneratedOutput, type WordsPerSentence } from "./prompt";
 import {
   DEFAULT_MAX_TOKENS,
   modelConfig,
@@ -127,6 +127,9 @@ export async function requestPrompts(
     name: string;
     count: number;
     existing: string[];
+    /** 最適化で1文ごとに渡す語の組（`buildGenerationPrompt`） */
+    wordGroups?: string[][];
+    wordsPerSentence?: WordsPerSentence;
     metadata: GenerationMetadata;
     /** モデルの設定を上書きする場合のみ指定する（検証用）。通常は MODELS から引く */
     promptSuffix?: string;

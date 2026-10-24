@@ -2,10 +2,17 @@ import { env, SELF } from "cloudflare:test";
 import { eq } from "drizzle-orm";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { createDb } from "../src/db/client";
-import { prompts, themes, user, userGenerationUsage } from "../src/db/schema";
+import {
+  constraintVocabularies,
+  prompts,
+  themes,
+  user,
+  userGenerationUsage,
+} from "../src/db/schema";
 import { getUsage } from "../src/db/usage";
 import { themeIdKey, themeLockKey } from "../src/kv/keys";
 import { DEFAULT_MODEL, neuronsUsed } from "../src/generation/model";
+import { CONSTRAINT_VOCABULARY_MAX, CONSTRAINT_VOCABULARY_MIN } from "../src/generation/vocabulary";
 
 const db = createDb(env.DB);
 
@@ -317,6 +324,63 @@ describe("同期生成の消費記録（成否によらず実消費を加算す�
   });
 });
 
+describe("POST /themes（最適化の語彙）", () => {
+  beforeEach(async () => {
+    await env.KV.delete(themeIdKey("constraint", "ざ"));
+    await env.KV.delete(themeIdKey("constraint", "を"));
+  });
+
+  it("最適化を作ると、語彙をテーマ行・お題と一緒に保存する", async () => {
+    await seedUser("u1");
+    const heads = ["一", "二", "三", "四", "五", "六", "七", "八", "九", "十"];
+    stubGeneration([heads.map((n) => `${n}番の座席に座る。`)], "ざせきにすわる");
+
+    const { status, body } = await post("/themes", {
+      kind: "constraint",
+      name: "ざ",
+      userId: "u1",
+    });
+    expect(status).toBe(200);
+    expect(body.created).toBe(true);
+
+    const themeId = (body.theme as { id: string }).id;
+    const [row] = await db
+      .select()
+      .from(constraintVocabularies)
+      .where(eq(constraintVocabularies.themeId, themeId));
+    const words = JSON.parse(row?.wordsJson ?? "[]") as [string, string][];
+    expect(words.length).toBeGreaterThanOrEqual(CONSTRAINT_VOCABULARY_MIN);
+    expect(words.length).toBeLessThanOrEqual(CONSTRAINT_VOCABULARY_MAX);
+    for (const [, reading] of words) expect(reading).toContain("ざ");
+  });
+
+  it("語彙が100語に届かない連接は、AI を呼ばずに断る（テーマ行も作らない）", async () => {
+    await seedUser("u1");
+    const run = vi.spyOn(env.AI, "run");
+
+    const { status, body } = await post("/themes", {
+      kind: "constraint",
+      name: "を",
+      userId: "u1",
+    });
+
+    expect(status).toBe(422);
+    expect((body.error as { code: string }).code).toBe("GENERATION_FAILED");
+    expect(run).not.toHaveBeenCalled();
+    expect(await db.select().from(themes)).toHaveLength(0);
+    expect(await getUsage(db, "u1")).toEqual({ count: 0, neurons: 0 });
+  });
+
+  it("テーマでは語彙を保存しない", async () => {
+    await seedUser("u1");
+    stubValidGeneration();
+
+    await post("/themes", { kind: "theme", name: "忍びの心得", userId: "u1" });
+
+    expect(await db.select().from(constraintVocabularies)).toHaveLength(0);
+  });
+});
+
 describe("POST /prompts/regenerate", () => {
   it("ロックが取れなければ GENERATION_IN_PROGRESS（クォータを消費しない）", async () => {
     await db.insert(themes).values({
@@ -442,6 +506,36 @@ describe("POST /prompts/regenerate", () => {
     // AI を呼んでいない（クォータを消費しない）
     expect(env.AI.run).not.toHaveBeenCalled();
     expect(await db.select().from(prompts)).toHaveLength(0);
+  });
+
+  it("語彙の無い既存の最適化は、再生成のときに語彙を作って保存し、その語をモデルに渡す", async () => {
+    // 語彙を保存するようになる前に作られた最適化（本番の「ざ」）と同じ状態
+    await seedUser("u1");
+    await db
+      .insert(themes)
+      .values({ id: "c1", kind: "constraint", name: "ざ", normalizedName: "ざ" });
+    const heads = ["一", "二", "三", "四", "五", "六", "七", "八", "九", "十"];
+    stubGeneration([heads.map((n) => `${n}番の座席に座る。`)], "ざせきにすわる");
+
+    const { status } = await post("/prompts/regenerate", { themeId: "c1", userId: "u1" });
+    expect(status).toBe(200);
+
+    const [row] = await db
+      .select()
+      .from(constraintVocabularies)
+      .where(eq(constraintVocabularies.themeId, "c1"));
+    const saved = new Set(
+      (JSON.parse(row?.wordsJson ?? "[]") as [string, string][]).map(([t]) => t),
+    );
+    expect(saved.size).toBeGreaterThanOrEqual(CONSTRAINT_VOCABULARY_MIN);
+
+    const request = vi.mocked(env.AI.run).mock.calls[0]?.[1] as unknown as {
+      messages: { role: string; content: string }[];
+    };
+    const content = request.messages.find((m) => m.role === "user")?.content ?? "";
+    const passed = content.slice(content.indexOf("語の組:")).split("\n")[1]?.split("／") ?? [];
+    expect(passed).toHaveLength(2);
+    for (const word of passed) expect(saved.has(word)).toBe(true);
   });
 
   it("単語も1件も作れなければ失敗として返す", async () => {

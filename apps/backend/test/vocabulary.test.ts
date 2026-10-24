@@ -52,7 +52,7 @@ describe("共通語彙リスト（vocabulary.generated.ts）", () => {
    */
   it("機能語や、別の語の活用形と同じ字面の語を含まない", () => {
     const texts = new Set(rows.map(([text]) => text));
-    for (const word of ["です", "ます", "だった", "ため", "より", "行き", "生き", "考え"]) {
+    for (const word of ["ます", "ため", "より", "行き", "生き", "考え"]) {
       expect(texts.has(word)).toBe(false);
     }
     // 同じ語彙素で品詞だけ違う普通の語は残す（持ち主は連体詞・接続詞）

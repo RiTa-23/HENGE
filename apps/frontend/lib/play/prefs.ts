@@ -8,8 +8,11 @@
  * 原因が画面から見えない。
  */
 
-/** localStorage が使えない環境（プライベートウィンドウ等）でも落とさない */
-function storage(): Storage | null {
+/**
+ * localStorage が使えない環境（プライベートウィンドウ等）でも落とさない。
+ * 最適化の運指（`lib/practice/fingering.ts`）も同じ理由でこれを通す
+ */
+export function storage(): Storage | null {
   try {
     return globalThis.localStorage ?? null;
   } catch {

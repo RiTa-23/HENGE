@@ -26,11 +26,14 @@
 | POST | `/api/prompts/regenerate` | 必須 | 枯渇時の同期再生成 |
 | GET | `/api/me` | 必須 | ユーザー情報・本日の残ニューロン |
 | POST | `/api/rankings` | 必須 | ランキングへの登録（ベストのときだけ書き換え） |
+| POST | `/api/prompt-reports` | 必須 | おかしなお題の報告。**その場で配信から外す** |
 | GET | `/api/admin/themes` | 管理者 | 管理用一覧 |
 | DELETE | `/api/admin/themes/[id]` | 管理者 | 削除（prompts・KVも連鎖） |
 | GET | `/api/admin/themes/[id]/prompts` | 管理者 | テーマ1つ分のお題一覧（管理用） |
 | PATCH | `/api/admin/prompts/[id]` | 管理者 | お題本文の編集（読み・打鍵数はサーバーで取り直す） |
 | DELETE | `/api/admin/prompts/[id]` | 管理者 | お題の削除（連番は詰め直さない） |
+| GET | `/api/admin/prompt-reports` | 管理者 | 報告で配信から外れているお題の一覧 |
+| POST | `/api/admin/prompt-reports/[id]/restore` | 管理者 | 報告を取り消して配信に戻す |
 | GET | `/api/admin/users` | 管理者 | ユーザー一覧（閲覧のみ） |
 | GET | `/api/admin/check` | 常に200 | `{ isAdmin }` を返す。ヘッダーの「管理」導線を出すかの判定用 |
 
@@ -153,6 +156,25 @@
 - **重複はスキップされる。** `(surface, expectedKana)`（かなはひらがな正規化）が既存報告（pending / approved / applied）と一致する行は挿入せず `skipped` に数える。rejected は再報告できる。同一リクエスト内の重複も同様にスキップ
 - 承認→user-lex.csv追記PRの流れは `docs/03-data-model.md` の `reading_reports` を参照
 
+### POST /api/prompt-reports
+
+```jsonc
+// リクエスト。リザルト画面で、そのプレイに出たお題を選んで送る（1〜20件）
+{ "promptIds": ["...", "..."], "reason": "unnatural" }
+// reason は "unnatural"（日本語が不自然）/ "off_theme"（テーマと関係ない）/
+// "inappropriate"（不適切な内容）/ "other"
+
+// レスポンス。skipped はすでに報告中・存在しないお題の数
+{ "hidden": 2, "skipped": 0 }
+```
+
+- 読み違い（`/api/reading-reports`）ではなく、**文章そのもの**がおかしいお題の報告
+- **報告されたお題はその場で配信と在庫数から外れる**（`prompts.reported_at`。`docs/03-data-model.md`）。管理者が復帰か削除かを決める
+- **ログイン必須（`UNAUTHORIZED`）。** 読み違い報告と違い匿名を受けない。即座に外れるので、匿名で受けると連投でテーマの在庫を空にできてしまう
+- 1回に送れるのは1プレイ分（いちばん多い単語の20問）まで。上限を緩めると1回の操作で外せる数がそのまま増える
+- **連投は `REPORT_RATE_LIMIT` で弾く**（キーは `prompt:<ユーザーID>`。読み違い報告とは枠を分ける）。入力検証より先に判定する
+- そのプレイで実際に配られたお題かは確かめない（サーバーは配ったお題を覚えていない）。外したお題は管理画面から戻せるので、ログイン必須とレート制限で足りるとする
+
 ### GET /api/me
 
 ```jsonc
@@ -199,6 +221,18 @@
 
 // DELETE /api/admin/prompts/[id]
 { "deleted": true, "promptId": "..." }
+
+// GET /api/admin/prompt-reports?limit=&cursor=
+// 報告で配信から外れているお題を、新しい報告から返す
+{ "prompts": [{ "id": "...", "themeId": "...", "themeKind": "theme", "themeName": "忍びの心得",
+                "form": "sentence", "text": "...", "readingKana": "...",
+                "reportedAt": 1757000000, "reportedBy": "...", "reportReason": "unnatural" }],
+  "nextCursor": null }
+
+// POST /api/admin/prompt-reports/[id]/restore
+// 報告を取り消して配信に戻す。報告中でなければ NOT_FOUND。
+// 削除はお題の削除（DELETE /api/admin/prompts/[id]）をそのまま使う
+{ "restored": true, "promptId": "..." }
 
 // GET /api/admin/users?limit=&cursor=
 // 閲覧のみ。更新・削除の口は持たない
@@ -260,6 +294,9 @@
 | GET | `/admin/prompts` | テーマ1つ分のお題一覧（`themeId` / `limit` / `cursor` をクエリで受ける） |
 | PATCH | `/admin/prompts` | 編集（`id` と本文を本文で受ける）。読み取得をやり直し、検査後に読み・ローマ字・打鍵数を更新 |
 | DELETE | `/admin/prompts/:id` | お題1件の削除。連番は詰め直さない |
+| POST | `/prompt-reports` | おかしなお題の報告。`reported_at` を立てて配信から外す（`userId` を本文で受ける） |
+| GET | `/admin/prompt-reports` | 報告で外れているお題の一覧 |
+| POST | `/admin/prompt-reports/restore` | 報告の取り消し（`id` を本文で受ける） |
 | GET | `/admin/users` | ユーザー一覧 |
 
 **加算（`addUsage`）はルートとして露出しない。** 同期生成・バックグラウンド補充のいずれも、AIを呼んだ処理からHono内部で直接呼ぶ。バックグラウンド補充は `waitUntil` 内で動くためNext.jsからは観測できず、HTTP経由の加算ルートは設計上使えない。
@@ -334,6 +371,7 @@ Cloudflare の Rate Limiting binding（`GENERATION_RATE_LIMIT`、Next.js Worker 
 | `REFILL_RATE_LIMIT` | `POST /api/sessions/start`（ログイン時のみ） | ユーザーID | 10回 / 60秒 | **`allowRefill: false`。429は返さない** |
 | `RANKING_RATE_LIMIT` | `POST /api/rankings` | ユーザーID | 10回 / 60秒 | `RATE_LIMITED`(429) |
 | `REPORT_RATE_LIMIT` | `POST /api/reading-reports` | ユーザーID、匿名は接続元IP | 5回 / 60秒 | `RATE_LIMITED`(429) |
+| `REPORT_RATE_LIMIT` | `POST /api/prompt-reports` | `prompt:<ユーザーID>`（読み違い報告と枠を分ける） | 5回 / 60秒 | `RATE_LIMITED`(429) |
 
 - キーをIPにしないのは、共有回線の背後にいる別のユーザーを巻き添えにする理由が無いため。匿名の `sessions/start` は補充をキックしないので判定自体を行わない
 - **例外は読み違い報告。** 匿名でも送れる書き込み口で、ユーザーIDが無いのでIPで数える。1回で最大15件まとめて送れるため、共有回線でも人の操作で上限に届くことはまず無い

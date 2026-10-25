@@ -1,5 +1,5 @@
 import { normalizeName, type PromptForm, type ThemeKind } from "@henge/shared";
-import { and, desc, eq, sql } from "drizzle-orm";
+import { and, desc, eq, isNull, sql } from "drizzle-orm";
 import type { Db } from "./client";
 import { prompts, themes } from "./schema";
 
@@ -154,6 +154,16 @@ const promptCountColumns = {
   long: sql<number>`coalesce(sum(case when ${prompts.form} = 'long' then 1 else 0 end), 0)`,
 };
 
+/**
+ * 件数に数えるお題の結合条件。**報告で外したお題は数えない**（`db/prompts.ts` の
+ * `servable` と同じ条件）。数えると、配れない分だけ在庫を多く見積もって補充が遅れ、
+ * 外したお題の数によっては「在庫はあるのに10問揃わない」状態になる。
+ *
+ * WHERE ではなく結合条件に置く。WHERE に置くと、外したお題しかないテーマが
+ * 結合ごと落ちて、テーマ自体が見つからなくなる。
+ */
+const promptCountJoin = and(eq(prompts.themeId, themes.id), isNull(prompts.reportedAt));
+
 export async function getThemeDetail(db: Db, id: string): Promise<ThemeDetail | null> {
   const [row] = await db
     .select({
@@ -170,7 +180,7 @@ export async function getThemeDetail(db: Db, id: string): Promise<ThemeDetail | 
       longCount: promptCountColumns.long,
     })
     .from(themes)
-    .leftJoin(prompts, eq(prompts.themeId, themes.id))
+    .leftJoin(prompts, promptCountJoin)
     .where(eq(themes.id, id))
     .groupBy(themes.id)
     .limit(1);
@@ -247,7 +257,7 @@ export async function listThemesForAdmin(
       longCount: promptCountColumns.long,
     })
     .from(themes)
-    .leftJoin(prompts, eq(prompts.themeId, themes.id))
+    .leftJoin(prompts, promptCountJoin)
     .groupBy(themes.id)
     .orderBy(desc(themes.createdAt))
     // 次ページの有無を知るために1件多く取る

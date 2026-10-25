@@ -1,4 +1,4 @@
-import { hiraganaToKatakana } from "@henge/shared";
+import { hiraganaToKatakana, type PromptReportReason } from "@henge/shared";
 import { Hono } from "hono";
 import { createDb } from "../db/client";
 import {
@@ -11,6 +11,12 @@ import {
   updateReadingReportStatus,
   type ReportStatus,
 } from "../db/reports";
+import {
+  listReportedPrompts,
+  REPORTED_PROMPT_LIMIT_DEFAULT,
+  reportPrompts,
+  restoreReportedPrompt,
+} from "../db/prompts";
 import { fail } from "../http/error";
 
 /**
@@ -133,4 +139,45 @@ export const reportRoutes = new Hono<{ Bindings: Env }>()
     const db = createDb(c.env.DB);
     const done = await markReadingReportsApplied(db, ids ?? []);
     return c.json({ applied: done });
+  })
+  /**
+   * おかしなお題の報告。body: { promptIds, reason, userId }
+   *
+   * **その場で配信から外す**（`prompts.reported_at`）。ログインユーザーのみ（判定は Next.js）。
+   * すでに報告中・存在しないお題は skipped に数える。
+   */
+  .post("/prompt-reports", async (c) => {
+    const body = await c.req.json<{
+      promptIds: string[];
+      reason: PromptReportReason;
+      userId: string;
+    }>();
+    const db = createDb(c.env.DB);
+    const hidden = await reportPrompts(db, body);
+    const requested = new Set(body.promptIds).size;
+    return c.json({ hidden, skipped: requested - hidden });
+  })
+  /** 報告で外れているお題の一覧（管理画面）。`/admin/prompt-reports?limit=…&cursor=…` */
+  .get("/admin/prompt-reports", async (c) => {
+    const limit = Number.parseInt(c.req.query("limit") ?? "", 10);
+    const cursor = Number.parseInt(c.req.query("cursor") ?? "", 10);
+    const db = createDb(c.env.DB);
+    return c.json(
+      await listReportedPrompts(db, {
+        limit: Number.isNaN(limit) ? REPORTED_PROMPT_LIMIT_DEFAULT : Math.min(limit, 200),
+        cursor: Number.isNaN(cursor) || cursor < 0 ? 0 : cursor,
+      }),
+    );
+  })
+  /**
+   * 報告を取り消して配信に戻す。body: { id }
+   * 削除はお題の削除（`DELETE /admin/prompts/:id`）をそのまま使う。
+   */
+  .post("/admin/prompt-reports/restore", async (c) => {
+    const { id } = await c.req.json<{ id: string }>();
+    const db = createDb(c.env.DB);
+    if (!(await restoreReportedPrompt(db, id))) {
+      return fail(c, "NOT_FOUND", "報告中のお題が見つかりません");
+    }
+    return c.json({ restored: true, promptId: id });
   });

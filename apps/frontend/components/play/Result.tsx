@@ -9,6 +9,7 @@ import {
 } from "@henge/shared";
 import { FormMark } from "@/components/FormMark";
 import { RankingRegister } from "@/components/play/RankingRegister";
+import { PromptReportPanel } from "@/components/play/PromptReportPanel";
 import { ReportPanel, type ReportablePrompt } from "@/components/play/ReportPanel";
 import { topMissedKeys } from "@/lib/play/misses";
 import type { TargetTally } from "@/lib/practice/targets";
@@ -16,6 +17,9 @@ import { formColor, formLabel, rankingHref } from "@/lib/ui/kind";
 import { buildShareText, buildTweetIntentUrl } from "@/lib/share/tweet";
 
 export type { PlayStats };
+
+/** 結果画面で開ける報告モーダル。読み違いと、おかしなお題（文章そのもの）の2つ */
+export type ReportKind = "reading" | "prompt";
 
 /**
  * 結果。画面遷移せずプレイ画面内の状態として出す。**プレイごとの履歴は持たない。**
@@ -73,11 +77,14 @@ export function Result({
   form: PromptForm;
   /** X投稿で共有するURL（着地ページの絶対URL）。サーバー側で組み立て済み */
   shareUrl: string;
-  /** このプレイで出題されたお題。読み違い報告の一覧に使う */
-  prompts: ReportablePrompt[];
-  /** 報告モーダルの開閉。開いている間は結果画面のショートカットを止めるため PlayScreen が持つ */
-  reportOpen: boolean;
-  onReportOpenChange: (open: boolean) => void;
+  /** このプレイで出題されたお題。読み違い・おかしなお題の報告の一覧に使う */
+  prompts: (ReportablePrompt & { id: string })[];
+  /**
+   * 開いている報告モーダル。開いている間は結果画面のショートカットを止めるため PlayScreen が持つ。
+   * **1つにまとめて持つ**（2つのモーダルを同時に開かせない）
+   */
+  reportOpen: ReportKind | null;
+  onReportOpenChange: (open: ReportKind | null) => void;
 }) {
   const missed = topMissedKeys(missedKeys, MISSED_KEY_LIMIT);
   const items = [
@@ -161,8 +168,13 @@ export function Result({
         <ReportPanel
           themeId={themeId}
           prompts={prompts}
-          open={reportOpen}
-          onOpenChange={onReportOpenChange}
+          open={reportOpen === "reading"}
+          onOpenChange={(open) => onReportOpenChange(open ? "reading" : null)}
+        />
+        <PromptReportPanel
+          prompts={prompts}
+          open={reportOpen === "prompt"}
+          onOpenChange={(open) => onReportOpenChange(open ? "prompt" : null)}
         />
 
         <RankingRegister

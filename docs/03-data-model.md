@@ -70,15 +70,30 @@ CREATE INDEX themes_created_by ON themes (created_by, created_at DESC);
 | `form` | TEXT | NOT NULL, default `'sentence'` | `'sentence'` / `'word'` / `'long'`。**プールはこれで分かれる** |
 | `sequence_number` | INTEGER | NOT NULL | テーマ内・**形式内**で1始まりの連番 |
 | `created_at` | INTEGER | NOT NULL | unixepoch |
+| `reported_at` | INTEGER | NULL可 | 「おかしなお題」として報告された時刻。**NULL でなければ配信から外れている** |
+| `reported_by` | TEXT | NULL可, FK→`user.id` ON DELETE SET NULL | 報告者。報告はログインユーザーのみ。退会しても報告中のまま残す |
+| `report_reason` | TEXT | NULL可 | `'unnatural'` / `'off_theme'` / `'inappropriate'` / `'other'`（`PROMPT_REPORT_REASONS`）。管理者が復帰か削除かを決める材料 |
 
 ```sql
 CREATE UNIQUE INDEX prompts_theme_form_seq ON prompts (theme_id, form, sequence_number);
+CREATE INDEX prompts_reported ON prompts (reported_at DESC) WHERE reported_at IS NOT NULL;
 ```
 
 **`form` をインデックスに含める。** 連番は形式ごとに1から振り直すため、含めないと
 単語の1番が短文の1番と衝突する。採番（`MAX + 1`）もプールをまたいで飛ぶ。
 
 このインデックス1本で、配信・管理一覧のページネーション（`ORDER BY sequence_number LIMIT ? OFFSET ?`）と**次の採番**（`SELECT MAX(sequence_number)`）を賄える。**在庫数は `COUNT(*)` で数える。** 管理画面からお題を1件消すと連番に穴が空くため、最大値で数えると在庫を多く見積もりすぎる。配信も連番の「値」で範囲指定せず、行数で位置を数える（`OFFSET`）。そうしないと穴を含む1プレイ分のブロックが足りなくなり、1件の削除でテーマが遊べなくなる。
+
+### おかしなお題の報告（`reported_at`）
+
+利用者が報告したお題は、**報告の時点で配信から外す**（`reported_at` を立てる。行は消さない）。管理者が「復帰」（報告の3列を NULL に戻す）か「削除」かを決める。消してしまうと、いたずらの報告で外れたお題を戻せない。
+
+- **配信（`fetchPromptPage`）と在庫数（`COUNT`。`countPrompts` とテーマ詳細・管理一覧の件数）の両方から外す。** 片方だけだと「在庫はあるのに1プレイ分揃わない」ずれが出る。テーマ側の件数は結合条件に置く（WHERE に置くと、外したお題しかないテーマが結合ごと落ちて見つからなくなる）
+- 外した影響は管理画面からの削除と同じで、「以降のお題が1つずつ手前にずれる」だけ。復帰すると逆に1つ後ろへずれる。在庫が減れば次のログインユーザーのプレイで補充が走る
+- **採番（`MAX + 1`）と重複回避の文脈（`recentPromptTexts`）は外したお題も含める。** 採番から外すと既存の番号と衝突し、文脈から外すと同じおかしな文がまた作られうる
+- 報告中のお題をもう一度報告しても書き換えない（最初の報告者と理由を残す）
+- 管理画面の報告キューは `prompts_reported`（報告中の行だけの部分インデックス）で引く。全お題を走査しない
+- **`reported_by` の ON DELETE SET NULL はマイグレーション（0009）に手で足している。** drizzle-kit は `ADD COLUMN` の外部キーから ON DELETE を落とす。無いと報告者を退会させられない
 
 **テーマ行はお題10問と同じバッチで挿入する。** テーマ行を先に作ると、生成失敗時にお題ゼロのテーマが公開一覧に残り、クリックしても何も遊べない状態になる。
 

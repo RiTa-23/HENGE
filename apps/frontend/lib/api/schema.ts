@@ -1,4 +1,9 @@
-import { isHiraganaOnly, playStatsRejection } from "@henge/shared";
+import {
+  isHiraganaOnly,
+  PLAY_SIZE_WORD,
+  playStatsRejection,
+  PROMPT_REPORT_REASONS,
+} from "@henge/shared";
 import { z } from "zod";
 
 /**
@@ -228,6 +233,23 @@ export const readingReportAppliedSchema = z.object({
 /** 管理画面の報告一覧クエリ */
 export const readingReportListQuerySchema = z.object({
   status: z.enum(["pending", "approved", "rejected", "applied"]).default("pending"),
+  limit: z.coerce.number().int().min(1).max(200).optional(),
+  cursor: z.coerce.number().int().min(0).optional(),
+});
+
+/**
+ * おかしなお題の報告。そのプレイで出たお題の id と理由。
+ *
+ * 1回に送れるのは1プレイ分まで（いちばん多い単語の20問）。報告はその場で配信から
+ * 外すので、上限を緩めると1回の操作で外せる数がそのまま増える。
+ */
+export const promptReportSchema = z.object({
+  promptIds: z.array(z.string().min(1).max(64)).min(1).max(PLAY_SIZE_WORD),
+  reason: z.enum(PROMPT_REPORT_REASONS),
+});
+
+/** 管理画面の「お題の報告」の一覧クエリ */
+export const promptReportListQuerySchema = z.object({
   limit: z.coerce.number().int().min(1).max(200).optional(),
   cursor: z.coerce.number().int().min(0).optional(),
 });

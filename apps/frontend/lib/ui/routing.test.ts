@@ -23,6 +23,11 @@ const PAGES: { route: string; file: string; noindex: boolean }[] = [
   { route: "/themes/new", file: "themes/new/page.tsx", noindex: true },
   { route: "/admin", file: "admin/page.tsx", noindex: true },
   { route: "/admin/reports", file: "admin/reports/page.tsx", noindex: true },
+  {
+    route: "/admin/prompt-reports",
+    file: "admin/prompt-reports/page.tsx",
+    noindex: true,
+  },
   { route: "/admin/themes", file: "admin/themes/page.tsx", noindex: true },
   { route: "/admin/themes/[id]", file: "admin/themes/[id]/page.tsx", noindex: true },
   { route: "/admin/users", file: "admin/users/page.tsx", noindex: true },

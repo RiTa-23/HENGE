@@ -87,3 +87,8 @@ export {
   playStatsRejection,
   RANKING_SIZE,
 } from "./ranking";
+export {
+  PROMPT_REPORT_REASON_LABELS,
+  PROMPT_REPORT_REASONS,
+  type PromptReportReason,
+} from "./prompt-report";

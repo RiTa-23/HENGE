@@ -2,6 +2,7 @@ import { describe, expect, test } from "bun:test";
 import {
   adminPromptListQuerySchema,
   displayNameSchema,
+  promptReportSchema,
   promptTextSchema,
   rankingRegisterSchema,
   readingReportActionSchema,
@@ -337,5 +338,31 @@ describe("readingReportActionSchema", () => {
       readingReportActionSchema.safeParse({ id: "r1", action: "approve", cost: -30000 }).success,
     ).toBe(false);
     expect(readingReportActionSchema.safeParse({ id: "r1", action: "apply" }).success).toBe(false);
+  });
+});
+
+const ids = (n: number) => Array.from({ length: n }, (_, i) => `p${i}`);
+
+describe("promptReportSchema", () => {
+  test("1〜20件（単語の1プレイ分）まで送れる", () => {
+    expect(promptReportSchema.safeParse({ promptIds: ids(1), reason: "unnatural" }).success).toBe(
+      true,
+    );
+    expect(promptReportSchema.safeParse({ promptIds: ids(20), reason: "other" }).success).toBe(
+      true,
+    );
+    // 報告はその場で配信から外すので、1回で外せる数を1プレイ分より増やさない
+    expect(promptReportSchema.safeParse({ promptIds: ids(21), reason: "other" }).success).toBe(
+      false,
+    );
+    expect(promptReportSchema.safeParse({ promptIds: [], reason: "other" }).success).toBe(false);
+  });
+
+  test("理由は決まった値だけ。省略もできない", () => {
+    expect(
+      promptReportSchema.safeParse({ promptIds: ids(1), reason: "inappropriate" }).success,
+    ).toBe(true);
+    expect(promptReportSchema.safeParse({ promptIds: ids(1), reason: "spam" }).success).toBe(false);
+    expect(promptReportSchema.safeParse({ promptIds: ids(1) }).success).toBe(false);
   });
 });

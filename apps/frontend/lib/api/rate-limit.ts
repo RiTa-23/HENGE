@@ -71,3 +71,20 @@ export async function limitReadingReport(
   const { success } = await env.REPORT_RATE_LIMIT.limit({ key });
   return success ? null : errorResponse("RATE_LIMITED");
 }
+
+/**
+ * おかしなお題の報告（POST /api/prompt-reports）の連投を弾く。
+ *
+ * **報告はその場でお題を配信から外す**ので、連投はそのままテーマの在庫を削る行為になる。
+ * 報告はログインユーザーのみで、キーはユーザーID。
+ *
+ * バインディングは読み違い報告と同じ `REPORT_RATE_LIMIT`（5回/60秒）を使い、
+ * キーに `prompt:` を付けて**枠を分ける**。同じ枠にすると、読み違いを送っただけで
+ * お題の報告が弾かれる（逆も同じ）。1回で1プレイ分（最大20件）まとめて送れるので、
+ * 人の操作で上限に届くことはない。
+ */
+export async function limitPromptReport(userId: string): Promise<Response | null> {
+  const { env } = await getCloudflareContext({ async: true });
+  const { success } = await env.REPORT_RATE_LIMIT.limit({ key: `prompt:${userId}` });
+  return success ? null : errorResponse("RATE_LIMITED");
+}

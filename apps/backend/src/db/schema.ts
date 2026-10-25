@@ -8,6 +8,7 @@ import {
   text,
   uniqueIndex,
 } from "drizzle-orm/sqlite-core";
+import { PROMPT_REPORT_REASONS } from "@henge/shared";
 import { user } from "@henge/shared/db/auth-schema";
 
 /**
@@ -101,12 +102,28 @@ export const prompts = sqliteTable(
     createdAt: integer("created_at")
       .notNull()
       .default(sql`(unixepoch())`),
+    /**
+     * 利用者が「おかしなお題」として報告した時刻。**NULL でなければ配信から外れている。**
+     *
+     * 報告の時点で配信（`fetchPromptPage`）と在庫数（`COUNT`）から外し、行は消さない。
+     * 管理者が復帰（NULL に戻す）か削除かを決める。消してしまうと、いたずらの報告で
+     * 外れたお題を戻せない。
+     */
+    reportedAt: integer("reported_at"),
+    /** 報告者。報告はログインユーザーのみなので、報告中は原則入っている（退会で NULL） */
+    reportedBy: text("reported_by").references(() => user.id, { onDelete: "set null" }),
+    /** 報告の理由。管理者が復帰か削除かを決める材料 */
+    reportReason: text("report_reason", { enum: PROMPT_REPORT_REASONS }),
   },
   (t) => [
     // このインデックス1本で、ページネーションと総生成数の取得の両方を賄う。
     // **form を含める。** 含めないと単語の連番が短文と衝突し、採番（MAX+1）も
     // プールをまたいで飛ぶ
     uniqueIndex("prompts_theme_form_seq").on(t.themeId, t.form, t.sequenceNumber),
+    // 管理画面の報告キュー。報告中の行だけを載せる部分インデックス（全お題を走査しない）
+    index("prompts_reported")
+      .on(desc(t.reportedAt))
+      .where(sql`"reported_at" IS NOT NULL`),
   ],
 );
 

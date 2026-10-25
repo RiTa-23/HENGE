@@ -24,6 +24,7 @@ import { Loading } from "./Loading";
 import { LongScroll } from "./LongScroll";
 import { MatoBoard } from "./MatoBoard";
 import { ProgressDots } from "./ProgressDots";
+import { ShurikenStrike, SmokePuff } from "./PromptChange";
 import { Result, type PlayStats } from "./Result";
 import { Scroll } from "./Scroll";
 import { SoundToggle } from "./SoundToggle";
@@ -31,7 +32,15 @@ import { readJsonBody } from "@/lib/api/json";
 import { readOffset, writeOffset } from "@/lib/play/offset";
 import { mergeMissedKeys } from "@/lib/play/misses";
 import { addTally, EMPTY_TALLY, findTargets, type TargetTally } from "@/lib/practice/targets";
-import { playHit, playMiss, primeAudio, readMuted, writeMuted } from "@/lib/play/sound";
+import {
+  playDoron,
+  playHit,
+  playMiss,
+  playStrike,
+  primeAudio,
+  readMuted,
+  writeMuted,
+} from "@/lib/play/sound";
 import { detailHref, formColor, formLabel, kindLabel, listHref } from "@/lib/ui/kind";
 
 interface Prompt {
@@ -476,7 +485,12 @@ export function PlayScreen({
     if (missed) flashMissKey(toNextKey(typed).key);
     if (!muted) {
       if (missed) playMiss();
-      else playHit();
+      // **1問を打ち終えた打鍵は、打鍵音の代わりに完了音を鳴らす**（最後の問題も）。
+      // 重ねると完了音の頭が濁る。音はモードで分ける（煙／手裏剣。演出と同じ）
+      else if (next.finished) {
+        if (kind === "constraint") playStrike();
+        else playDoron();
+      } else playHit();
     }
 
     if (!next.finished) {
@@ -753,22 +767,35 @@ export function PlayScreen({
       ) : (
         <>
           <div className="flex flex-1 flex-col justify-center gap-8 py-8">
-            {/* 載せる物体だけをモードで分ける。中身（PromptLines）は共通 */}
-            {kind === "constraint" ? (
-              <MatoBoard
-                text={prompt.text}
-                kanaUnits={splitKanaUnits(prompt.readingKana)}
-                progress={progress}
-                // 最適化する音は themeName（最適化練習ではテーマ名＝音）
-                targets={findTargets(splitKanaUnits(prompt.readingKana), themeName)}
-              />
-            ) : (
-              <Scroll
-                text={prompt.text}
-                kanaUnits={splitKanaUnits(prompt.readingKana)}
-                progress={progress}
-              />
-            )}
+            {/*
+              **問題ごとに作り直す**（key）。切り替わりの演出（煙／手裏剣）はCSSの
+              アニメーションで、作り直したときに1度だけ走る。1問目には出さない
+              （切り替わりではない。開始の合図がすでにある）
+            */}
+            <div
+              key={promptIndex}
+              className={`relative mx-auto w-full max-w-3xl ${
+                promptIndex === 0 ? "" : kind === "constraint" ? "strike-shake" : "smoke-reveal"
+              }`}
+            >
+              {/* 載せる物体だけをモードで分ける。中身（PromptLines）は共通 */}
+              {kind === "constraint" ? (
+                <MatoBoard
+                  text={prompt.text}
+                  kanaUnits={splitKanaUnits(prompt.readingKana)}
+                  progress={progress}
+                  // 最適化する音は themeName（最適化練習ではテーマ名＝音）
+                  targets={findTargets(splitKanaUnits(prompt.readingKana), themeName)}
+                />
+              ) : (
+                <Scroll
+                  text={prompt.text}
+                  kanaUnits={splitKanaUnits(prompt.readingKana)}
+                  progress={progress}
+                />
+              )}
+              {promptIndex > 0 && (kind === "constraint" ? <ShurikenStrike /> : <SmokePuff />)}
+            </div>
 
             <div className="flex items-center justify-between">
               <ProgressDots current={promptIndex} total={phase.session.prompts.length} />

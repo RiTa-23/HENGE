@@ -1,5 +1,5 @@
 /**
- * 打鍵音とミス音。
+ * 打鍵音・ミス音と、1問打ち終えたときの完了音（テーマ＝ドロン、最適化＝手裏剣）。
  *
  * **音源ファイルを持たず、Web Audio API で合成する。** 読み込み待ちが無く
  * （1打目から鳴る）、Workerに載せる資産も増えない。世界観に合わせて、打鍵は
@@ -70,9 +70,15 @@ function noise(ctx: AudioContext): AudioBuffer {
  * 減衰する音量。**0から指数で上げない**（`exponentialRamp` は0を扱えないので、
  * ほぼ0の値から立ち上げて、ほぼ0へ落とす）。
  */
-function envelope(ctx: AudioContext, peak: number, attack: number, release: number): GainNode {
+function envelope(
+  ctx: AudioContext,
+  peak: number,
+  attack: number,
+  release: number,
+  // 遅らせて鳴らす層（手裏剣の「刺さる」）は、開始時刻をずらして組む
+  now = ctx.currentTime,
+): GainNode {
   const gain = ctx.createGain();
-  const now = ctx.currentTime;
   gain.gain.setValueAtTime(0.0001, now);
   gain.gain.exponentialRampToValueAtTime(peak, now + attack);
   gain.gain.exponentialRampToValueAtTime(0.0001, now + attack + release);
@@ -126,8 +132,7 @@ const HIT: Clack = {
  * **1打ごとに高さと音量を少しずらす。** まったく同じ音が並ぶと、打鍵ではなく
  * 機械の警告音に聞こえる。実際のキーボードも1打ごとに違う音が鳴っている。
  */
-function clack(ctx: AudioContext, spec: Clack): void {
-  const now = ctx.currentTime;
+function clack(ctx: AudioContext, spec: Clack, now = ctx.currentTime): void {
   const detune = 1 + (Math.random() - 0.5) * 0.12;
   const level = 0.88 + Math.random() * 0.24;
   // 雑音は毎回違うところから読む。同じ波形を鳴らすと「同じ音」に聞こえる
@@ -139,7 +144,7 @@ function clack(ctx: AudioContext, spec: Clack): void {
   tickBand.type = "bandpass";
   tickBand.frequency.value = spec.tickHz * detune;
   tickBand.Q.value = 1.2;
-  const tickGain = envelope(ctx, spec.tickGain * level, 0.001, 0.01);
+  const tickGain = envelope(ctx, spec.tickGain * level, 0.001, 0.01, now);
   tick.connect(tickBand).connect(tickGain).connect(ctx.destination);
   tick.start(now, offset);
   tick.stop(now + 0.02);
@@ -150,7 +155,7 @@ function clack(ctx: AudioContext, spec: Clack): void {
   ringBand.type = "bandpass";
   ringBand.frequency.value = spec.ringHz * detune;
   ringBand.Q.value = spec.ringQ;
-  const ringGain = envelope(ctx, spec.ringGain * level, 0.002, spec.ringRelease);
+  const ringGain = envelope(ctx, spec.ringGain * level, 0.002, spec.ringRelease, now);
   ring.connect(ringBand).connect(ringGain).connect(ctx.destination);
   ring.start(now, offset);
   ring.stop(now + spec.ringRelease + 0.02);
@@ -159,7 +164,7 @@ function clack(ctx: AudioContext, spec: Clack): void {
   body.type = "triangle";
   body.frequency.setValueAtTime(spec.bodyHz * detune, now);
   body.frequency.exponentialRampToValueAtTime(spec.bodyHz * 0.72, now + 0.05);
-  const bodyGain = envelope(ctx, spec.bodyGain * level, 0.002, 0.05);
+  const bodyGain = envelope(ctx, spec.bodyGain * level, 0.002, 0.05, now);
   body.connect(bodyGain).connect(ctx.destination);
   body.start(now);
   body.stop(now + 0.08);
@@ -196,4 +201,128 @@ export function playMiss(): void {
   thud.connect(low).connect(thudGain).connect(ctx.destination);
   thud.start(now);
   thud.stop(now + 0.1);
+}
+
+/** 煙が噴き出すまで（秒）。鈴の「チリン」を先に聞かせる。演出の煙（`.smoke__puff`）と揃える */
+const SMOKE_AT = 0.08;
+
+/**
+ * 鈴の音を1つ鳴らす。**倍音を整数倍にしない**（整数倍だと電子音の和音に聞こえる）。
+ * 金属の鳴りは基音に対して約2.3倍の上音が強く出るので、それを小さく重ねる。
+ */
+function bell(ctx: AudioContext, hz: number, peak: number, at: number): void {
+  for (const [ratio, gain] of [
+    [1, 1],
+    [2.32, 0.35],
+  ] as const) {
+    const osc = ctx.createOscillator();
+    osc.type = "sine";
+    osc.frequency.setValueAtTime(hz * ratio, at);
+    const env = envelope(ctx, peak * gain, 0.003, 0.9 / ratio, at);
+    osc.connect(env).connect(ctx.destination);
+    osc.start(at);
+    osc.stop(at + 1);
+  }
+}
+
+/**
+ * テーマの完了音。忍術の「ドロン」。**鈴が鳴って（チリン）、煙が噴き出す（ボフッ）。**
+ * 紹介動画の演出に合わせてある。
+ *
+ * - 鈴: 高い音を2つ、わずかにずらして鳴らす（約2.9kHz → 4kHz）。打ち終えた合図
+ * - ド: 三角波を低く落とす。打鍵音の胴より低く長い（区切りだと分かる重さ）
+ * - 煙: 雑音を低域通過に通し、通す帯域を高 → 低へ下げる。煙が広がって
+ *   薄まっていく見立てで、明るい「ぼわっ」から暗く消える
+ *
+ * 全体で0.6秒ほど（鈴の余韻を除く）。1問ごとにしか鳴らないので、打鍵音のように
+ * 短く詰める必要は無い。ただし**次の問題の1打目と重なっても濁らない**よう、
+ * 鈴は小さく、煙は低い帯域へ逃がす（打鍵音の鳴りは1kHz前後）。
+ */
+export function playDoron(): void {
+  const ctx = audioContext();
+  if (ctx === null) return;
+  const now = ctx.currentTime;
+
+  bell(ctx, 2900, 0.035, now);
+  bell(ctx, 4000, 0.025, now + 0.05);
+
+  const at = now + SMOKE_AT;
+  const don = ctx.createOscillator();
+  don.type = "triangle";
+  don.frequency.setValueAtTime(150, at);
+  don.frequency.exponentialRampToValueAtTime(52, at + 0.22);
+  const donGain = envelope(ctx, 0.22, 0.004, 0.26, at);
+  don.connect(donGain).connect(ctx.destination);
+  don.start(at);
+  don.stop(at + 0.3);
+
+  const smoke = ctx.createBufferSource();
+  smoke.buffer = noise(ctx);
+  // 雑音の材料は0.2秒しか無いので、繰り返して煙の長さを作る
+  smoke.loop = true;
+  const low = ctx.createBiquadFilter();
+  low.type = "lowpass";
+  low.Q.value = 2;
+  low.frequency.setValueAtTime(2600, at);
+  low.frequency.exponentialRampToValueAtTime(260, at + 0.46);
+  const smokeGain = envelope(ctx, 0.32, 0.03, 0.45, at);
+  smoke.connect(low).connect(smokeGain).connect(ctx.destination);
+  smoke.start(at, Math.random() * 0.15);
+  smoke.stop(at + 0.5);
+}
+
+/** 手裏剣が的に届くまで（秒）。演出の飛ぶ長さ（`.strike__shuriken`）と揃える */
+const STRIKE_AT = 0.14;
+
+/** 刺さる音。打鍵音より低く太く、板の鳴りを長めに残す */
+const BOARD: Clack = {
+  tickHz: 2600,
+  tickGain: 0.18,
+  ringHz: 620,
+  ringQ: 7,
+  ringGain: 1.3,
+  ringRelease: 0.09,
+  bodyHz: 140,
+  bodyGain: 0.2,
+};
+
+/**
+ * 最適化練習の完了音。手裏剣が**飛んで（シュッ）、的に刺さる（タンッ）。**
+ *
+ * - 風切り: 雑音の狭い帯域を低 → 高へ上げながら大きくする（近づいてくる）
+ * - 刺さる: 打鍵音と同じ木の3層（`clack`）を、木の板らしく低めに太く鳴らす。
+ *   金属の刃が刺さるので、高い正弦波の「キン」をごく小さく重ねる
+ *
+ * 刺さる瞬間は、演出（`ShurikenStrike`）で手裏剣が的に届く時刻に揃える（`STRIKE_AT`）。
+ */
+export function playStrike(): void {
+  const ctx = audioContext();
+  if (ctx === null) return;
+  const now = ctx.currentTime;
+
+  const whoosh = ctx.createBufferSource();
+  whoosh.buffer = noise(ctx);
+  const band = ctx.createBiquadFilter();
+  band.type = "bandpass";
+  band.Q.value = 2.5;
+  band.frequency.setValueAtTime(900, now);
+  band.frequency.exponentialRampToValueAtTime(4800, now + STRIKE_AT);
+  const whooshGain = ctx.createGain();
+  whooshGain.gain.setValueAtTime(0.0001, now);
+  whooshGain.gain.exponentialRampToValueAtTime(0.16, now + STRIKE_AT - 0.01);
+  whooshGain.gain.exponentialRampToValueAtTime(0.0001, now + STRIKE_AT + 0.02);
+  whoosh.connect(band).connect(whooshGain).connect(ctx.destination);
+  whoosh.start(now, Math.random() * 0.05);
+  whoosh.stop(now + STRIKE_AT + 0.04);
+
+  const hitAt = now + STRIKE_AT;
+  clack(ctx, BOARD, hitAt);
+
+  const kin = ctx.createOscillator();
+  kin.type = "sine";
+  kin.frequency.setValueAtTime(3300, hitAt);
+  const kinGain = envelope(ctx, 0.03, 0.002, 0.16, hitAt);
+  kin.connect(kinGain).connect(ctx.destination);
+  kin.start(hitAt);
+  kin.stop(hitAt + 0.2);
 }

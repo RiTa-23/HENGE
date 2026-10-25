@@ -373,6 +373,232 @@
   }
 }
 
+/* ---- お題の切り替わり ------------------------------------------------------
+ * 1問打ち終えて次のお題に変わる瞬間だけ出す（PromptChange.tsx）。**載せる物体と同じく
+ * モードで分ける。** テーマは巻物から煙（ドロン）、最適化練習は的板に手裏剣が刺さる。
+ *
+ * - 物体の上に重ねるだけで、**打鍵を妨げない**（pointer-events: none）
+ * - 時刻は効果音と揃えてある（lib/play/sound.ts の SMOKE_AT / STRIKE_AT）。
+ *   煙は 80ms 後に噴き出し、手裏剣は 140ms で的に届く
+ * - 色は金と生成り（と墨）だけ。**朱は使わない**（朱は「今すぐ打つべきもの」の色。
+ *   刺さった衝撃の輪を朱にすると、次に打つかなの朱と取り違える）
+ */
+.prompt-fx {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+}
+
+.prompt-fx--clip {
+  overflow: hidden;
+  border-radius: 6px;
+}
+
+/* 打ち終えた合図。紙の下の縁に金の線が一瞬走る。左右は巻物の軸（.scroll の
+   --roller-width。プレイ画面は 44px）の内側に収める */
+.smoke__line {
+  position: absolute;
+  inset-inline: 44px;
+  bottom: 0;
+  height: 2px;
+  background: var(--color-kin);
+  box-shadow: 0 0 8px var(--color-kin);
+  animation: smoke-line 280ms ease-out both;
+}
+
+@keyframes smoke-line {
+  0% {
+    opacity: 0;
+    scale: 0.2 1;
+  }
+  30% {
+    opacity: 1;
+    scale: 1 1;
+  }
+  100% {
+    opacity: 0;
+    scale: 1 1;
+  }
+}
+
+/* 煙のかたまり。巻物の左寄り（次のお題の書き出しのあたり）から噴き出し、右へ流れながら
+   広がって薄れる。**最初の一瞬だけ濃い**（そこで前のお題が消えて次のお題に変わって見える） */
+.smoke__puff {
+  position: absolute;
+  left: 30%;
+  top: 50%;
+  width: 10rem;
+  height: 10rem;
+  margin: -5rem 0 0 -5rem;
+  animation: smoke-puff 620ms 80ms cubic-bezier(0.2, 0.7, 0.3, 1) both;
+}
+
+.smoke__ball {
+  position: absolute;
+  inset: 0;
+  translate: var(--x) var(--y);
+  scale: var(--s);
+  border-radius: 50%;
+  background: radial-gradient(
+    circle closest-side,
+    color-mix(in oklab, var(--color-kinari) 88%, var(--color-sumi)) 0 55%,
+    transparent 100%
+  );
+  filter: blur(5px);
+}
+
+@keyframes smoke-puff {
+  0% {
+    opacity: 0;
+    scale: 0.35;
+    translate: 0 0;
+  }
+  16% {
+    opacity: 1;
+    scale: 1;
+  }
+  100% {
+    opacity: 0;
+    scale: 1.7;
+    translate: 16rem 1.5rem;
+  }
+}
+
+/* 煙の下から次のお題が現れる。**真っ白から始めない**（薄く見えてはいる）。
+   打ち始めは待たないので、読めない時間を作らない */
+.smoke-reveal .scroll__sheet > * {
+  animation: smoke-reveal 300ms ease-out both;
+}
+
+@keyframes smoke-reveal {
+  from {
+    opacity: 0.2;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+/* 手裏剣。板の右下の外から回りながら飛び込み、的の中心で止まる（刺さる）。
+   刺さったまま少し残ってから消える（読みの行の真上に来るので長くは置かない） */
+.strike__shuriken {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: 52px;
+  height: 52px;
+  margin: -26px 0 0 -26px;
+  color: var(--color-kin);
+  filter: drop-shadow(0 2px 3px color-mix(in oklab, var(--color-sumi) 70%, transparent));
+  animation:
+    strike-fly 140ms cubic-bezier(0.5, 0, 0.9, 0.6) both,
+    strike-fade 240ms 440ms ease-in forwards;
+}
+
+@keyframes strike-fly {
+  from {
+    translate: 22rem 7rem;
+    rotate: -720deg;
+    scale: 1.35;
+  }
+  to {
+    translate: 0 0;
+    rotate: 0deg;
+    scale: 1;
+  }
+}
+
+@keyframes strike-fade {
+  to {
+    opacity: 0;
+  }
+}
+
+/* 刺さった衝撃の輪。中心から広がって消える */
+.strike__ring {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: 12rem;
+  height: 12rem;
+  margin: -6rem 0 0 -6rem;
+  border: 3px solid var(--color-kin);
+  border-radius: 50%;
+  /* 刺さるまでは見せない。fill を both にすると、待っている間も最初の姿（濃い輪）が出る */
+  opacity: 0;
+  animation: strike-ring 480ms 140ms cubic-bezier(0.2, 0.8, 0.3, 1) forwards;
+}
+
+@keyframes strike-ring {
+  from {
+    opacity: 0.9;
+    scale: 0.15;
+  }
+  to {
+    opacity: 0;
+    scale: 1;
+  }
+}
+
+/* 火花。中心から外へ短い線が散る。向き（--a）と長さ（--l）は1本ずつ変えてある */
+.strike__spark {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: 2px;
+  height: calc(0.9rem * var(--l));
+  margin-left: -1px;
+  border-radius: 1px;
+  background: var(--color-kinari);
+  transform-origin: 50% 0;
+  opacity: 0;
+  animation: strike-spark 360ms 140ms ease-out forwards;
+}
+
+@keyframes strike-spark {
+  from {
+    opacity: 1;
+    transform: rotate(var(--a)) translateY(1.4rem);
+  }
+  to {
+    opacity: 0;
+    transform: rotate(var(--a)) translateY(3.6rem);
+  }
+}
+
+/* 刺さった瞬間に板が揺れる */
+.strike-shake .mato {
+  animation: mato-shake 220ms 140ms ease-out both;
+}
+
+@keyframes mato-shake {
+  0%,
+  100% {
+    translate: 0 0;
+  }
+  25% {
+    translate: 3px 1px;
+  }
+  55% {
+    translate: -2px 0;
+  }
+  80% {
+    translate: 1px 0;
+  }
+}
+
+/* 視差効果を減らす設定では演出を出さない。区切りは効果音と進捗のドットで伝わる */
+@media (prefers-reduced-motion: reduce) {
+  .prompt-fx {
+    display: none;
+  }
+
+  .smoke-reveal .scroll__sheet > *,
+  .strike-shake .mato {
+    animation: none;
+  }
+}
+
 /* ---- 開始の合図 ---------------------------------------------------------
  * 「はじめ！」。**お題が出る前**に一度だけ出して、構える間を作る。
  * 大きく踏み込むように、少し大きい状態から原寸へ落として止める。

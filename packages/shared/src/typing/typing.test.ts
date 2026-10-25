@@ -4,8 +4,12 @@ import {
   countKeystrokesFromKana,
   hiraganaToKatakana,
   katakanaToHiragana,
+  splitKanaUnits,
   UnsupportedKanaError,
 } from "./index";
+
+/** 小書きのかな。分解されたまま単体の単位で残っていないかを見るのに使う */
+const SMALL_KANA = "ぁぃぅぇぉゃゅょゎ";
 
 /** 読みを打てる最短のローマ字列にする（テストの可読性のため） */
 function shortest(kana: string): string {
@@ -167,6 +171,71 @@ describe("外来語のかな", () => {
     expect(accepts("ちぇ", 0, "tye")).toBe(true);
     expect(accepts("ちぇ", 0, "cye")).toBe(true);
     expect(accepts("ちぇ", 0, "tixe")).toBe(true);
+  });
+
+  // 「ヴァンパイア」が ゔ+ぁ、「タトゥー」が と+ぅ に割れていて、IMEで通る va / twu が
+  // 通らなかった。**族ごとに固定する**（1つだけ足すと、隣り合うかなが分解入力のまま残る）
+  test("ts / q / v / fy / tw・dw 系は族ごとに打てる", () => {
+    const direct: [string, string][] = [
+      ["つぁ", "tsa"],
+      ["つぃ", "tsi"],
+      ["つぇ", "tse"],
+      ["つぉ", "tso"],
+      ["くぁ", "qa"],
+      ["くぃ", "qi"],
+      ["くぇ", "qe"],
+      ["くぉ", "qo"],
+      ["ゔぁ", "va"],
+      ["ゔぃ", "vi"],
+      ["ゔぇ", "ve"],
+      ["ゔぉ", "vo"],
+      ["ふゃ", "fya"],
+      ["ふゅ", "fyu"],
+      ["ふょ", "fyo"],
+      ["とぅ", "twu"],
+      ["どぅ", "dwu"],
+    ];
+    for (const [kana, roman] of direct) expect(accepts(kana, 0, roman)).toBe(true);
+  });
+
+  test("くぁ系は kw 系でも、分解入力でも打てる", () => {
+    for (const [kana, roman] of [
+      ["くぁ", "kwa"],
+      ["くぃ", "kwi"],
+      ["くぇ", "kwe"],
+      ["くぉ", "kwo"],
+    ])
+      expect(accepts(kana as string, 0, roman as string)).toBe(true);
+    expect(accepts("くぉ", 0, "kuxo")).toBe(true);
+    expect(accepts("ゔぁ", 0, "vuxa")).toBe(true);
+  });
+
+  /*
+    **小書きのかなが単体の単位で残らないことを、実在の外来語の読みで機械的に見る。**
+    この壊れ方（`ゔぁ` が `vuxa` でしか打てない）は打てなくはないので、画面を見ても
+    気付けない。読みは共通語彙リストに実際に入っている語から取った
+  */
+  test("外来語の読みに、分解されたままの小書きのかなが残らない", () => {
+    const readings = [
+      "しぇあ", // シェア
+      "たとぅー", // タトゥー
+      "ぷろでゅーさー", // プロデューサー
+      "ゔぁんぱいあ", // ヴァンパイア
+      "ふゅーじょん", // フュージョン
+      "ゔぃんてーじ", // ヴィンテージ
+      "くぉーたー", // クォーター
+      "ひんどぅー", // ヒンドゥー
+      "ゔぇのむ", // ヴェノム
+      "ぷれっつぇる", // プレッツェル
+      "もっつぁれら", // モッツァレラ
+      "くぃでぃっち", // クィディッチ
+      "えすくぁいあ", // エスクァイア
+      "すけるつぉ", // スケルツォ
+    ];
+    for (const reading of readings) {
+      const lone = splitKanaUnits(reading).filter((unit) => SMALL_KANA.includes(unit));
+      expect(lone).toEqual([]);
+    }
   });
 
   test("うぃ・うぇ・ゔ", () => {

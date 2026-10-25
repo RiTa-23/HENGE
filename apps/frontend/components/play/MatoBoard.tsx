@@ -10,6 +10,9 @@ import "./ninja.css";
  *
  * 中身（本文・読み・ローマ字）は `PromptLines` で巻物と共通。大きさも巻物の紙と
  * 揃える（`max-w-3xl`・`min-h-60`）。物体を替えても、打つ文章の位置が動かないように。
+ *
+ * 巻物と違うのは**読みの行の的**だけ。最適化する音の箇所を輪で囲み、打ち終えたら
+ * 的中か外れかを示す（`targets`。`lib/practice/targets.ts`）。
  */
 export function MatoBoard(props: PromptLinesProps) {
   return (

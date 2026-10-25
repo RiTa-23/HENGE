@@ -11,6 +11,7 @@ import { FormMark } from "@/components/FormMark";
 import { RankingRegister } from "@/components/play/RankingRegister";
 import { ReportPanel, type ReportablePrompt } from "@/components/play/ReportPanel";
 import { topMissedKeys } from "@/lib/play/misses";
+import type { TargetTally } from "@/lib/practice/targets";
 import { formColor, formLabel, rankingHref } from "@/lib/ui/kind";
 import { buildShareText, buildTweetIntentUrl } from "@/lib/share/tweet";
 
@@ -31,6 +32,7 @@ export function Result({
   themeId,
   stats,
   missedKeys,
+  targetTally,
   onRetry,
   themeName,
   listHref,
@@ -47,6 +49,11 @@ export function Result({
   stats: PlayStats;
   /** 打ち損ねた文字と回数。1プレイ（短文10問／単語20問）の通算 */
   missedKeys: ReadonlyMap<string, number>;
+  /**
+   * 最適化練習の的中数（最適化する音をミスなく打てた数／出てきた数）。テーマでは渡さない。
+   * **表示だけ。** スコア・ランキングには入れない（算出が変わると記録の比較が崩れる）
+   */
+  targetTally?: TargetTally;
   onRetry: () => void;
   themeName: string;
   /** 離脱先の一覧。テーマなら /themes、最適化する音なら /practice */
@@ -113,6 +120,22 @@ export function Result({
             </div>
           ))}
         </dl>
+
+        {targetTally !== undefined && targetTally.total > 0 && (
+          <div className="mt-12 text-center">
+            <p className="text-xs tracking-[0.3em] text-kinari/50">「{themeName}」の的中</p>
+            <p className="mt-2 font-mono text-3xl text-kinari">
+              {targetTally.hits}
+              <span className="text-base text-kinari/50"> / {targetTally.total}</span>
+              <span className="ml-3 text-base text-kinari/70">
+                {Math.floor((targetTally.hits / targetTally.total) * 100)}%
+              </span>
+            </p>
+            <p className="mt-2 text-xs text-kinari/40">
+              最適化する音をミスなく打てた数です。スコアには含めません。
+            </p>
+          </div>
+        )}
 
         {missed.length > 0 && (
           <div className="mt-12">

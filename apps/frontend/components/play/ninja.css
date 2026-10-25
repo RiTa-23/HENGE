@@ -320,6 +320,59 @@
   );
 }
 
+/* ---- 的（最適化する音の箇所） ----------------------------------------------
+ * 的板の読みの行で、最適化する音のかなを囲む輪。**輪は最初から全部の的に出す**
+ * （打ち進めてから現れると、そこでかなの幅が変わって行がずれる）。状態は色だけで表す。
+ *
+ * - 未着手: 生成りを薄く
+ * - いま打っている: 朱（今すぐ打つべきもの。いま打つかなの朱と同じ意味）
+ * - 的中（ミスなく打ち終えた）: 金の二重線。金は「完了」の色で、線までに留める
+ * - 外れ（途中でミスした）: 撒菱の色（＝ミス）の**破線**。朱と撒菱の色はこの大きさだと
+ *   見分けにくい（キーボードで橙に移したのと同じ問題）ので、形でも分ける
+ */
+.mato-target {
+  --mato-target-color: color-mix(in oklab, var(--color-kinari) 28%, transparent);
+  padding: 0.05em 0.25em;
+  margin-inline: 0.1em;
+  border: 1.5px solid var(--mato-target-color);
+  border-radius: 9999px;
+  outline: 1px solid transparent;
+  outline-offset: 2px;
+}
+
+.mato-target--active {
+  --mato-target-color: var(--color-shu);
+}
+
+.mato-target--miss {
+  --mato-target-color: var(--color-makibishi);
+  border-style: dashed;
+}
+
+/* 的中の外輪。外から絞り込むように一度だけ寄せる（的に吸い込まれる見立て） */
+.mato-target--hit {
+  --mato-target-color: var(--color-kin);
+  outline-color: var(--color-kin);
+  animation: mato-hit 260ms cubic-bezier(0.2, 0.9, 0.3, 1) both;
+}
+
+@keyframes mato-hit {
+  from {
+    outline-offset: 8px;
+    outline-color: transparent;
+  }
+  to {
+    outline-offset: 2px;
+    outline-color: var(--color-kin);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .mato-target--hit {
+    animation: none;
+  }
+}
+
 /* ---- 開始の合図 ---------------------------------------------------------
  * 「はじめ！」。**お題が出る前**に一度だけ出して、構える間を作る。
  * 大きく踏み込むように、少し大きい状態から原寸へ落として止める。

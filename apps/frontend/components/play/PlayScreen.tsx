@@ -27,6 +27,7 @@ import { ProgressDots } from "./ProgressDots";
 import { Result, type PlayStats } from "./Result";
 import { Scroll } from "./Scroll";
 import { FingerGuide } from "./FingerGuide";
+import { CaseIcon, FingerIcon, SoundIcon } from "./SettingIcons";
 import { SettingToggle } from "./SettingToggle";
 import { readJsonBody } from "@/lib/api/json";
 import { readOffset, writeOffset } from "@/lib/play/offset";
@@ -394,16 +395,24 @@ export function PlayScreen({
    */
   const settingToggles = (
     <>
-      <SettingToggle label="音" ariaLabel="効果音" on={!muted} onToggle={toggleSound} />
+      <SettingToggle
+        icon={<SoundIcon on={!muted} className="size-4" />}
+        label="効果音"
+        ariaLabel="効果音"
+        on={!muted}
+        onToggle={toggleSound}
+      />
       {form !== "long" && (
         <SettingToggle
-          label="指"
+          icon={<FingerIcon className="size-4" />}
+          label="運指"
           ariaLabel="押す指の表示"
           on={fingerGuide}
           onToggle={toggleFingerGuide}
         />
       )}
       <SettingToggle
+        icon={<CaseIcon className="size-4" />}
         label="大文字"
         ariaLabel="ローマ字を大文字で表示"
         on={romanUpper}
@@ -589,7 +598,9 @@ export function PlayScreen({
             押すまでお題は消費されません。
           </p>
 
-          <div className="mt-8 flex flex-wrap justify-center gap-2">{settingToggles}</div>
+          {/* 開始前は縦に並べて幅を揃える。横に並べると枠の幅に収まらず2つと1つに割れ、
+              長さの違うスイッチが段違いに並ぶ */}
+          <div className="mx-auto mt-8 grid w-fit gap-2">{settingToggles}</div>
         </div>
 
         {/* 離脱の導線は枠の外に置く。枠の中は「開始」に関することだけ。

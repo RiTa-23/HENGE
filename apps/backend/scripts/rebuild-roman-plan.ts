@@ -60,6 +60,29 @@ export type RebuildPlan = {
  * `readingRomanJson` と `keystrokeCount` は**必ず一緒に**作り直す。片方だけ直すと、
  * 画面に出る打鍵数と実際の打鍵数が食い違う。
  */
+/**
+ * 保存済みの候補と、いま組み立てた候補が同じか。**かな1単位の中の並びは見ない。**
+ *
+ * 表示する打ち方は保存値の並びではなく実行時に table.ts から決めるので
+ * （packages/shared の `match.ts`）、並びだけの違いは書き直す理由にならない。
+ * 並びまで比べると、`し` の既定を `si` にしただけで「し」を含む行が全部
+ * 書き込み対象になり、D1の書き込み枠を無駄に使う。
+ */
+function sameCandidates(storedJson: string, roman: readonly string[][]): boolean {
+  let stored: unknown;
+  try {
+    stored = JSON.parse(storedJson);
+  } catch {
+    return false;
+  }
+  if (!Array.isArray(stored) || stored.length !== roman.length) return false;
+  return roman.every((unit, i) => {
+    const old: unknown = stored[i];
+    if (!Array.isArray(old) || old.length !== unit.length) return false;
+    return unit.every((candidate) => old.includes(candidate));
+  });
+}
+
 export function planRebuild(rows: readonly StoredPrompt[]): RebuildPlan {
   const changed: ChangedPrompt[] = [];
   const unsupported: UnsupportedPrompt[] = [];
@@ -83,7 +106,7 @@ export function planRebuild(rows: readonly StoredPrompt[]): RebuildPlan {
 
     const readingRomanJson = JSON.stringify(roman);
     const keystrokeCount = countKeystrokes(roman);
-    if (readingRomanJson === row.readingRomanJson && keystrokeCount === row.keystrokeCount) {
+    if (sameCandidates(row.readingRomanJson, roman) && keystrokeCount === row.keystrokeCount) {
       unchanged++;
       continue;
     }

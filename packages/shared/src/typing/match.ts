@@ -1,5 +1,5 @@
 import type { RomanCandidates } from "./build";
-import { SOKUON_FALLBACK } from "./table";
+import { KANA_TABLE, SOKUON_FALLBACK } from "./table";
 
 /**
  * 打鍵の判定。**候補テーブルは組み立て済みのものを受け取る**（「ん」「っ」の
@@ -45,9 +45,35 @@ export interface TypingProgress {
   readonly finished: boolean;
 }
 
-/** 最短の候補。同じ長さなら table.ts で先に書いたもの（`ふ` は `fu`） */
-function shortest(candidates: readonly string[]): string {
-  return candidates.reduce((best, c) => (c.length < best.length ? c : best), candidates[0] ?? "");
+/**
+ * 打ち方ごとの表示の優先順位。table.ts でそのかなの何番目に書いたか（小さいほど先）。
+ *
+ * **保存済みの候補配列（`reading_roman_json`）の並びではなく、いまの table.ts を見る。**
+ * 並びを変えても既存のお題を作り直さずに表示へ効かせるため。
+ */
+const DISPLAY_RANK: ReadonlyMap<string, number> = (() => {
+  const rank = new Map<string, number>();
+  for (const candidates of Object.values(KANA_TABLE)) {
+    candidates.forEach((c, i) => rank.set(c, Math.min(rank.get(c) ?? i, i)));
+  }
+  return rank;
+})();
+
+/**
+ * 画面に出す候補。table.ts で先に書いたもの（`し` は `si`、`しょ` は `syo`）。
+ * table.ts に無い打ち方（「ん」「っ」は build で組み立てる）は配列の並びのまま。
+ */
+function preferred(candidates: readonly string[]): string {
+  let best = candidates[0] ?? "";
+  let bestRank = DISPLAY_RANK.get(best) ?? Infinity;
+  for (const c of candidates) {
+    const rank = DISPLAY_RANK.get(c) ?? Infinity;
+    if (rank < bestRank) {
+      best = c;
+      bestRank = rank;
+    }
+  }
+  return best;
 }
 
 /** 「っ」の単位か。build は「っ」に必ず SOKUON_FALLBACK を足すので、それで見分ける */
@@ -59,8 +85,8 @@ function isSokuon(unit: readonly string[] | undefined): boolean {
  * 未確定のかな `index` を画面に出す打ち方。`candidates` はその候補
  * （現在のかななら絞り込み済みの `matches`）。
  *
- * 基本は最短の候補（`し` は `si`、`ち` は `ti`）。ただし**「っ」と次のかなは
- * 揃える。** 単独で最短を取ると、`っ` は `chi` 由来の `c`、`ち` は `ti` になり
+ * 基本は table.ts で先に書いた候補（`preferred`）。ただし**「っ」と次のかなは
+ * 揃える。** かなごとに選ぶと、`っ` は `chi` 由来の `c`、`ち` は `ti` になり
  * `まっち` が `macti` と出る。
  *
  * - 未確定の「っ」は、次のかなの表示の頭文字を重ねる（`matti`）
@@ -68,13 +94,13 @@ function isSokuon(unit: readonly string[] | undefined): boolean {
  *   （`mac` と打てば `macchi`）
  *
  * 保存済みの候補配列（`reading_roman_json`）の並びに頼らず実行時に決めるので、
- * 選び方を変えても既存のお題を作り直さなくてよい。
+ * 選び方や table.ts の並びを変えても既存のお題を作り直さなくてよい。
  */
 function displayOf(p: TypingProgress, index: number, candidates: readonly string[]): string {
   const prevTyped = index - 1 < p.unitIndex ? p.typedUnits[index - 1] : undefined;
   if (prevTyped !== undefined && prevTyped.length === 1 && isSokuon(p.units[index - 1])) {
     const following = candidates.filter((c) => c.startsWith(prevTyped));
-    if (following.length > 0) return shortest(following);
+    if (following.length > 0) return preferred(following);
   }
 
   const next = p.units[index + 1];
@@ -83,7 +109,7 @@ function displayOf(p: TypingProgress, index: number, candidates: readonly string
     if (head !== undefined && candidates.includes(head)) return head;
   }
 
-  return shortest(candidates);
+  return preferred(candidates);
 }
 
 /** 未確定のかなを、`unitIndex` から順に画面に出す打ち方で並べる */
@@ -183,7 +209,7 @@ export function pressKey(p: TypingProgress, key: string): TypingProgress {
 /**
  * 画面に出すローマ字列と、苦無（キャレット）を置く位置。
  *
- * 未確定のかなは最短候補で表示する（「っ」は次のかなに揃える。`displayOf`）。
+ * 未確定のかなは table.ts で先に書いた候補で表示する（「っ」は次のかなに揃える。`displayOf`）。
  * **打ち進めると表示が変わることがある**（`si` を表示中に `shi` で確定するなど）。
  * docs/07-ui.md で許容している副作用。
  */
@@ -194,7 +220,7 @@ export function romanDisplay(p: TypingProgress): { text: string; cursor: number 
 /**
  * かな1単位ごとの表示用ローマ字列。
  *
- * 確定済みは**実際に打たれた経路**、未確定は最短候補（「っ」は次のかなに揃える）。つなげると
+ * 確定済みは**実際に打たれた経路**、未確定は table.ts で先に書いた候補（「っ」は次のかなに揃える）。つなげると
  * `romanDisplay().text` と同じになる。長文では「かな1単位」と「そのローマ字列」を
  * 縦に1列にまとめるため、単位ごとに切り分けた配列が必要（連結文字列からは
  * 単位の切れ目を計算できない。`shi` と `si` で文字数が違う）。

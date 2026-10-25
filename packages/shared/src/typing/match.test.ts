@@ -193,11 +193,25 @@ describe("表示用のローマ字列と苦無の位置", () => {
   // かなごとに最短を取ると、っ は c（chi 由来）、ち は ti になり「macti」と表示されていた
   test("っ は次のかなの表示に合わせて子音を重ねる（まっち は matti）", () => {
     expect(romanDisplay(startTyping(buildRomanCandidates("まっち"))).text).toBe("matti");
-    expect(romanDisplay(startTyping(buildRomanCandidates("いっしょ"))).text).toBe("issho");
+    expect(romanDisplay(startTyping(buildRomanCandidates("いっしょ"))).text).toBe("issyo");
   });
 
   test("っ を c で打ったら、次のかなも c で始まる打ち方を出す（macchi）", () => {
     expect(romanDisplay(type("まっち", "mac")).text).toBe("macchi");
+  });
+
+  test("しょ は syo で表示する（sho と同じ長さだが table.ts で先に書いた方）", () => {
+    expect(romanDisplay(startTyping(buildRomanCandidates("しょ"))).text).toBe("syo");
+    expect(romanDisplay(type("しょ", "sh")).text).toBe("sho");
+  });
+
+  // 保存済みのお題は table.ts を並べ替える前の並びのまま。表示はいまの table.ts に従う
+  test("保存済みの候補配列の並びに関係なく、table.ts の並びで表示する", () => {
+    const stored = [
+      ["shi", "si", "ci"],
+      ["sho", "syo"],
+    ];
+    expect(romanDisplay(startTyping(stored)).text).toBe("sisyo");
   });
 
   test("打ち方を変えると、残った候補に表示が切り替わる", () => {

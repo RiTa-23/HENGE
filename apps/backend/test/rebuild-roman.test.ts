@@ -39,6 +39,24 @@ describe("planRebuild", () => {
     expect(plan.scanned).toBe(2);
   });
 
+  // 表示は実行時に table.ts の並びで決める。並びだけ違う行を書くと D1 の枠を無駄に使う
+  it("候補の並びだけが違う行は書き直さない", () => {
+    const roman = buildRomanCandidates("しょうし");
+    const reordered = roman.map((unit) => unit.toReversed());
+    const row: StoredPrompt = {
+      id: "p1",
+      form: "word",
+      readingKana: "しょうし",
+      readingRomanJson: JSON.stringify(reordered),
+      keystrokeCount: countKeystrokes(roman),
+    };
+
+    const plan = planRebuild([row]);
+
+    expect(plan.changed).toHaveLength(0);
+    expect(plan.unchanged).toBe(1);
+  });
+
   /** 「ちぇ」を足す前に作られた行。ち＋ぇに分解されたまま保存されている */
   it("古いテーブルで作られた行を拾い、新しい候補と打鍵数を返す", () => {
     const stale: StoredPrompt = {

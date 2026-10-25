@@ -48,6 +48,8 @@ interface LongScrollProps {
   text: string;
   kanaUnits: string[];
   progress: TypingProgress;
+  /** ローマ字列を大文字で出すか。表示だけを変える（`PromptLines` と同じ） */
+  upper?: boolean;
 }
 
 /**
@@ -69,7 +71,7 @@ interface LongScrollProps {
  *
  * `.scroll` の作りは短文・一覧・詳細と同じ（別の物体に見せない）。
  */
-export function LongScroll({ text, kanaUnits, progress }: LongScrollProps) {
+export function LongScroll({ text, kanaUnits, progress, upper = false }: LongScrollProps) {
   const segments = romanSegments(progress);
   const slide = useSlide(progress.unitIndex);
 
@@ -128,7 +130,7 @@ export function LongScroll({ text, kanaUnits, progress }: LongScrollProps) {
                               : "relative text-kinari/30"
                         }
                       >
-                        {letter}
+                        {upper ? letter.toUpperCase() : letter}
                         {progress.misses.has(index) && <Makibishi />}
                         {index === cursor && (
                           <span className="kunai" aria-hidden="true">

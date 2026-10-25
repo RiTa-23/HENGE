@@ -1,5 +1,12 @@
 import { beforeEach, describe, expect, it } from "bun:test";
-import { readMuted, writeMuted } from "./sound";
+import {
+  readFingerGuide,
+  readMuted,
+  readRomanUpper,
+  writeFingerGuide,
+  writeMuted,
+  writeRomanUpper,
+} from "./prefs";
 
 /**
  * bun のテスト環境には localStorage が無いので最小限の実装を置く
@@ -50,5 +57,50 @@ describe("効果音の消音設定", () => {
     localStorage.setItem("henge:muted", "にんじゃ");
 
     expect(readMuted()).toBe(false);
+  });
+});
+
+describe("運指ガイドの表示設定", () => {
+  // 既定で隠すと、指が出せること自体が伝わらない
+  it("何も保存していなければ出す", () => {
+    expect(readFingerGuide()).toBe(true);
+  });
+
+  it("隠したことを覚える", () => {
+    writeFingerGuide(false);
+
+    expect(readFingerGuide()).toBe(false);
+  });
+
+  it("出す側に戻したことも覚える", () => {
+    writeFingerGuide(false);
+    writeFingerGuide(true);
+
+    expect(readFingerGuide()).toBe(true);
+  });
+
+  it("読めない値は出す側に倒す", () => {
+    localStorage.setItem("henge:finger-guide", "にんじゃ");
+
+    expect(readFingerGuide()).toBe(true);
+  });
+});
+
+describe("ローマ字の大文字表示の設定", () => {
+  // これまでの表示（小文字）を既定に保つ
+  it("何も保存していなければ小文字", () => {
+    expect(readRomanUpper()).toBe(false);
+  });
+
+  it("大文字にしたことを覚える", () => {
+    writeRomanUpper(true);
+
+    expect(readRomanUpper()).toBe(true);
+  });
+
+  it("読めない値は小文字に倒す", () => {
+    localStorage.setItem("henge:roman-upper", "にんじゃ");
+
+    expect(readRomanUpper()).toBe(false);
   });
 });

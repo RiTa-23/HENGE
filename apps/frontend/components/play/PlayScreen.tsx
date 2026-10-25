@@ -27,11 +27,21 @@ import { ProgressDots } from "./ProgressDots";
 import { ShurikenStrike, SmokePuff } from "./PromptChange";
 import { Result, type PlayStats } from "./Result";
 import { Scroll } from "./Scroll";
-import { SoundToggle } from "./SoundToggle";
+import { FingerGuide } from "./FingerGuide";
+import { CaseIcon, FingerIcon, SoundIcon } from "./SettingIcons";
+import { SettingToggle } from "./SettingToggle";
 import { readJsonBody } from "@/lib/api/json";
 import { readOffset, writeOffset } from "@/lib/play/offset";
 import { mergeMissedKeys } from "@/lib/play/misses";
 import { addTally, EMPTY_TALLY, findTargets, type TargetTally } from "@/lib/practice/targets";
+import {
+  readFingerGuide,
+  readMuted,
+  readRomanUpper,
+  writeFingerGuide,
+  writeMuted,
+  writeRomanUpper,
+} from "@/lib/play/prefs";
 import {
   playDoron,
   playEnd,
@@ -41,8 +51,6 @@ import {
   playStart,
   playStrike,
   primeAudio,
-  readMuted,
-  writeMuted,
 } from "@/lib/play/sound";
 import { detailHref, formColor, formLabel, kindLabel, listHref } from "@/lib/ui/kind";
 
@@ -228,6 +236,10 @@ export function PlayScreen({
    * 出力と食い違って hydration が壊れる）。
    */
   const [muted, setMuted] = useState(false);
+  /** 運指ガイド（押す指）を出すか。muted と同じく描画してから読む */
+  const [fingerGuide, setFingerGuide] = useState(true);
+  /** ローマ字列を大文字で出すか。同上 */
+  const [romanUpper, setRomanUpper] = useState(false);
   /**
    * 消音の最新値。開始の合図の音は合図のタイマーと同じ effect で鳴らすので、
    * deps に `muted` を入れると、合図の最中に音を切り替えただけで合図が出し直しになる
@@ -382,7 +394,11 @@ export function PlayScreen({
     if (attempt > 0) void load();
   }, [load, attempt]);
 
-  useEffect(() => setMuted(readMuted()), []);
+  useEffect(() => {
+    setMuted(readMuted());
+    setFingerGuide(readFingerGuide());
+    setRomanUpper(readRomanUpper());
+  }, []);
 
   useEffect(() => {
     mutedRef.current = muted;
@@ -399,6 +415,51 @@ export function PlayScreen({
     // 鳴らす側へ戻したこの操作が、音を出せる状態にするきっかけになる
     if (!next) primeAudio();
   };
+
+  const toggleFingerGuide = () => {
+    const next = !fingerGuide;
+    setFingerGuide(next);
+    writeFingerGuide(next);
+  };
+
+  const toggleRomanUpper = () => {
+    const next = !romanUpper;
+    setRomanUpper(next);
+    writeRomanUpper(next);
+  };
+
+  /**
+   * 設定のスイッチ。開始前とプレイ中で同じものを並べる。
+   * **運指は長文では出さない。** 長文はキーボードを出さないので、指だけ出しても
+   * どのキーの話か分からない
+   */
+  const settingToggles = (
+    <>
+      <SettingToggle
+        icon={<SoundIcon on={!muted} className="size-4" />}
+        label="効果音"
+        ariaLabel="効果音"
+        on={!muted}
+        onToggle={toggleSound}
+      />
+      {form !== "long" && (
+        <SettingToggle
+          icon={<FingerIcon className="size-4" />}
+          label="運指"
+          ariaLabel="運指（押す指の表示）"
+          on={fingerGuide}
+          onToggle={toggleFingerGuide}
+        />
+      )}
+      <SettingToggle
+        icon={<CaseIcon className="size-4" />}
+        label="大文字"
+        ariaLabel="ローマ字を大文字で表示"
+        on={romanUpper}
+        onToggle={toggleRomanUpper}
+      />
+    </>
+  );
 
   // 予約を残したまま画面を離れない
   useEffect(() => {
@@ -599,9 +660,9 @@ export function PlayScreen({
             押すまでお題は消費されません。
           </p>
 
-          <div className="mt-8 flex justify-center">
-            <SoundToggle muted={muted} onToggle={toggleSound} />
-          </div>
+          {/* 開始前は縦に並べて幅を揃える。横に並べると枠の幅に収まらず2つと1つに割れ、
+              長さの違うスイッチが段違いに並ぶ */}
+          <div className="mx-auto mt-8 grid w-fit gap-2">{settingToggles}</div>
         </div>
 
         {/* 離脱の導線は枠の外に置く。枠の中は「開始」に関することだけ。
@@ -767,6 +828,7 @@ export function PlayScreen({
 
   const prompt = phase.session.prompts[promptIndex];
   if (prompt === undefined) return null;
+  const nextKey = nextKeyOf(progress);
 
   /** 載せる物体だけをモードで分ける。中身（PromptLines）は共通。切り替わりの写しも同じ物体で描く */
   const board = (shown: Prompt, shownProgress: TypingProgress) => {
@@ -778,9 +840,10 @@ export function PlayScreen({
         progress={shownProgress}
         // 最適化する音は themeName（最適化練習ではテーマ名＝音）
         targets={findTargets(kanaUnits, themeName)}
+        upper={romanUpper}
       />
     ) : (
-      <Scroll text={shown.text} kanaUnits={kanaUnits} progress={shownProgress} />
+      <Scroll text={shown.text} kanaUnits={kanaUnits} progress={shownProgress} upper={romanUpper} />
     );
   };
 
@@ -810,8 +873,6 @@ export function PlayScreen({
               <span className={formColor(form).text}>{formLabel(form)}</span>
             </span>
           </div>
-          {/* 音の入/切も、やめるボタンと同じ理由でこの中に置く */}
-          <SoundToggle muted={muted} onToggle={toggleSound} />
           {/*
             打鍵を拾う要素の中に置く。外に出すと、押した時点でフォーカスが
             surface から外れ、onBlur の当て直しと競合する。
@@ -829,6 +890,13 @@ export function PlayScreen({
         </div>
       </header>
 
+      {/*
+        設定の入/切も、やめるボタンと同じ理由で surface の中に置く。
+        **ヘッダーとは別の行にする。** 3つをヘッダーに並べると幅が足りず、
+        テーマ名・形式・やめるボタンが1文字ずつ縦に折り返す
+      */}
+      <div className="mt-3 flex flex-wrap justify-end gap-2">{settingToggles}</div>
+
       {form === "long" ? (
         /*
           **長文はキーボードを出さない。** そのぶん巻物を縦に大きくし、紙の大半を本文で
@@ -840,6 +908,7 @@ export function PlayScreen({
             text={prompt.text}
             kanaUnits={splitKanaUnits(prompt.readingKana)}
             progress={progress}
+            upper={romanUpper}
           />
           <LongProgress progress={progress} />
         </div>
@@ -875,8 +944,9 @@ export function PlayScreen({
             </div>
           </div>
 
-          <div className="border-t border-kin/40 pt-6">
-            <Keyboard nextKey={nextKeyOf(progress)} missKey={missKey} />
+          <div className="flex flex-col gap-5 border-t border-kin/40 pt-6">
+            <Keyboard nextKey={nextKey} missKey={missKey} />
+            {fingerGuide && <FingerGuide nextKey={nextKey} />}
           </div>
         </>
       )}

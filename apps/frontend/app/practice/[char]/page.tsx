@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import { AdjustingView } from "@/components/Adjusting";
-import { DetailScroll } from "@/components/DetailScroll";
+import { DetailMato } from "@/components/DetailScroll";
 import { FormButton } from "@/components/FormButton";
 import { RankingBoard } from "@/components/RankingBoard";
 import { PracticeMark } from "@/components/ModeMark";
@@ -64,7 +64,7 @@ export default async function PracticeDetailPage({
     <>
       <SiteHeader />
       <main className="mx-auto w-full max-w-4xl px-6 py-16">
-        <DetailScroll
+        <DetailMato
           mark={<PracticeMark className="h-5 w-5" />}
           eyebrow="最適化する音"
           title={theme.name}

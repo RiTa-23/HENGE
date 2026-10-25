@@ -22,6 +22,7 @@ import { authClient } from "@/lib/api/auth-client";
 import { Keyboard, type NextKey, toNextKey } from "./Keyboard";
 import { Loading } from "./Loading";
 import { LongScroll } from "./LongScroll";
+import { MatoBoard } from "./MatoBoard";
 import { ProgressDots } from "./ProgressDots";
 import { Result, type PlayStats } from "./Result";
 import { Scroll } from "./Scroll";
@@ -129,8 +130,9 @@ function LongProgress({ progress }: { progress: TypingProgress }) {
 }
 
 /**
- * 打鍵の画面。**テーマモードと最適化モードで分けない。**
- * 違うのは離脱先の一覧と、画面に出す呼び名（「このテーマ」／「この音」）だけ。
+ * 打鍵の画面。**テーマモードと最適化モードで流れは分けない。**
+ * 違うのは文章を載せる物体（テーマは巻物、最適化は的板）と、離脱先の一覧と、
+ * 画面に出す呼び名（「このテーマ」／「この音」）だけ。
  */
 export function PlayScreen({
   themeId,
@@ -738,11 +740,20 @@ export function PlayScreen({
       ) : (
         <>
           <div className="flex flex-1 flex-col justify-center gap-8 py-8">
-            <Scroll
-              text={prompt.text}
-              kanaUnits={splitKanaUnits(prompt.readingKana)}
-              progress={progress}
-            />
+            {/* 載せる物体だけをモードで分ける。中身（PromptLines）は共通 */}
+            {kind === "constraint" ? (
+              <MatoBoard
+                text={prompt.text}
+                kanaUnits={splitKanaUnits(prompt.readingKana)}
+                progress={progress}
+              />
+            ) : (
+              <Scroll
+                text={prompt.text}
+                kanaUnits={splitKanaUnits(prompt.readingKana)}
+                progress={progress}
+              />
+            )}
 
             <div className="flex items-center justify-between">
               <ProgressDots current={promptIndex} total={phase.session.prompts.length} />

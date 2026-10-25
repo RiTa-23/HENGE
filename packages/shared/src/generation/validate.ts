@@ -1,4 +1,6 @@
 import { normalizeConstraintChar } from "../normalize";
+import { splitKanaUnits } from "../typing/build";
+import { KANA_TABLE } from "../typing/table";
 import type { PromptForm } from "../session";
 
 /**
@@ -146,6 +148,7 @@ export function isKeystrokeCountInRange(count: number, form: PromptForm = "sente
  * 「含む」モードの判定。指定された文字が**読み仮名**に含まれるかを見る。
  *
  * 表記に現れていなくてよい。「座禅」は表記に「ざ」が無いが、読み「ざぜん」に含まれる。
+ * 含むかどうかは文字列ではなく**打鍵の単位で見る**（`findConstraintSpans`）。
  */
 export function includesConstraint(readingKana: string, constraintChar: string): boolean {
   return countConstraint(readingKana, constraintChar) > 0;
@@ -159,16 +162,66 @@ export function includesConstraint(readingKana: string, constraintChar: string):
  * 指示が効いているかどうかは、実際に出てきたお題を数えないと分からない。
  */
 export function countConstraint(readingKana: string, constraintChar: string): number {
-  const kana = normalizeConstraintChar(readingKana);
-  const target = normalizeConstraintChar(constraintChar);
-  if (target === "") return 0;
+  return findConstraintSpans(splitKanaUnits(normalizeConstraintChar(readingKana)), constraintChar)
+    .length;
+}
 
-  let count = 0;
-  let from = 0;
-  for (;;) {
-    const at = kana.indexOf(target, from);
-    if (at === -1) return count;
-    count++;
-    from = at + target.length;
+/** 指定の音が出る箇所1つ。かな単位（`splitKanaUnits` の添字）の範囲で、両端を含む */
+export interface ConstraintSpan {
+  first: number;
+  last: number;
+}
+
+/**
+ * 子音で始まる打ち方を持つかな。「っ」がその子音を借りられるか（`ka` → `kka`）。
+ * 母音・記号・「っ」「ん」の前では借りられず、「っ」は `ltu` と単独で打つ。
+ */
+function lendsConsonant(unit: string | undefined): boolean {
+  if (unit === undefined) return false;
+  return (KANA_TABLE[unit] ?? []).some((candidate) => /^[b-df-hj-np-tv-z]/.test(candidate));
+}
+
+/**
+ * 読みの中で、指定の音が出る箇所。生成の検証（`countConstraint`）とプレイ画面の的
+ * （`findTargets`）が同じこれを使う。採用の根拠と違う箇所に的が立たないようにするため。
+ *
+ * **文字列の部分一致では探さない。打鍵の単位の並びで探す。** 字面では含まれていても、
+ * 打つときには別のかなになるものがある。
+ *
+ * - **後ろの小書きのかなと1単位になる。**「でぃ」は `dhi` で「で」（`de`）を打たない。
+ *   「きゃ」（`kya`）も「き」（`ki`）ではない。「ふぁ」「うぉ」「つぁ」「しぇ」も同じ
+ * - **前のかなと1単位になる小書きのかな。**「きゃ」の「ゃ」は `kya` の一部で、
+ *   「ゃ」（`xya`）を単独では打たない。小書きで始まる音は、前と組まない箇所にしか当たらない
+ * - **音の最後の「っ」は、次のかなの子音を借りるときだけ。**「きって」の「きっ」は
+ *   `kit`。「きっ。」のように次が母音・記号・文末だと `ltu` と単独で打つので当てない
+ *
+ * 単位の切り方は打鍵の候補と同じ `splitKanaUnits`。音の側も同じ関数で切って並びを
+ * 比べるので、境界がずれた一致（単位の途中から始まる・途中で終わる）は自然に外れる。
+ * 「ん」は前後で `n` / `nn` が変わるが、どちらも `n` から打ち始めるので区別しない。
+ *
+ * 単位ごとに NFC に揃える（分解された濁点で書かれた指定・読みでも当たる）。
+ */
+export function findConstraintSpans(
+  kanaUnits: readonly string[],
+  constraintChar: string,
+): ConstraintSpan[] {
+  const target = splitKanaUnits(normalizeConstraintChar(constraintChar));
+  if (target.length === 0) return [];
+  const units = kanaUnits.map(normalizeConstraintChar);
+  const endsWithSokuon = target.at(-1) === "っ";
+
+  const spans: ConstraintSpan[] = [];
+  for (let at = 0; at + target.length <= units.length;) {
+    const last = at + target.length - 1;
+    const matches =
+      target.every((unit, i) => units[at + i] === unit) &&
+      (!endsWithSokuon || lendsConsonant(units[last + 1]));
+    if (!matches) {
+      at++;
+      continue;
+    }
+    spans.push({ first: at, last });
+    at = last + 1;
   }
+  return spans;
 }

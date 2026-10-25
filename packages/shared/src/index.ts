@@ -27,8 +27,10 @@ export {
   UnsupportedKanaError,
 } from "./typing/index";
 export {
+  type ConstraintSpan,
   containsKanji,
   countConstraint,
+  findConstraintSpans,
   countSentenceEnds,
   includesConstraint,
   isHiraganaOnlyWord,

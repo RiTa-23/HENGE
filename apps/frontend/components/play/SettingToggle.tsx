@@ -8,9 +8,9 @@ import type { ReactNode } from "react";
  * 消す」しかできない。設定ごとに見た目を変えない（同じ形で並べる）。
  *
  * **トグルスイッチで出す。** 「音入/音切」のラベル差し替えは、いまどちらの
- * 状態か一目で読めない。軌道とつまみの位置＋ON/OFF表記で状態を示す。
- * **全体の幅は常に同じにする。** ON/OFF の文字数差でボタンが伸縮すると、
- * クリックのたびに指標が揺れる。状態表記は固定幅で出す。
+ * 状態か一目で読めない。軌道とつまみの位置と色で状態を示す。
+ * **ON/OFF の文字は出さない。** スイッチの形で状態は伝わり、文字を足すと
+ * スイッチが3つ並んだときに読む物が増えるだけになる。
  *
  * **頭に印（`SettingIcons`）を置く。** スイッチの形が同じなので、名前の文字だけでは
  * 何の設定か読まないと分からない。印は入のとき金、切のとき薄くして、状態も形と色の
@@ -52,24 +52,17 @@ export function SettingToggle({
         </span>
         {label}
       </span>
-      <span className="flex items-center gap-2">
+      <span
+        aria-hidden="true"
+        className={`relative inline-flex h-4 w-8 items-center rounded-full transition-colors ${
+          on ? "bg-kin/80" : "bg-kinari/15"
+        }`}
+      >
         <span
-          aria-hidden="true"
-          className={`relative inline-flex h-4 w-8 items-center rounded-full transition-colors ${
-            on ? "bg-kin/80" : "bg-kinari/15"
+          className={`absolute left-0.5 h-3 w-3 rounded-full bg-kinari transition-transform ${
+            on ? "translate-x-4" : "translate-x-0"
           }`}
-        >
-          <span
-            className={`absolute left-0.5 h-3 w-3 rounded-full bg-kinari transition-transform ${
-              on ? "translate-x-4" : "translate-x-0"
-            }`}
-          />
-        </span>
-        <span
-          className={`inline-block w-8 text-center font-mono ${on ? "text-kinari" : "text-kinari/40"}`}
-        >
-          {on ? "ON" : "OFF"}
-        </span>
+        />
       </span>
     </button>
   );

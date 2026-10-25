@@ -34,8 +34,10 @@ import { mergeMissedKeys } from "@/lib/play/misses";
 import { addTally, EMPTY_TALLY, findTargets, type TargetTally } from "@/lib/practice/targets";
 import {
   playDoron,
+  playFinish,
   playHit,
   playMiss,
+  playStart,
   playStrike,
   primeAudio,
   readMuted,
@@ -214,6 +216,12 @@ export function PlayScreen({
    * 出力と食い違って hydration が壊れる）。
    */
   const [muted, setMuted] = useState(false);
+  /**
+   * 消音の最新値。開始の合図の音は合図のタイマーと同じ effect で鳴らすので、
+   * deps に `muted` を入れると、合図の最中に音を切り替えただけで合図が出し直しになる
+   * （計時の始まりもずれる）。ref 経由で値だけを見る（`loggedIn` と同じ）
+   */
+  const mutedRef = useRef(false);
   const missTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const startedAt = useRef<number>(0);
   const surface = useRef<HTMLDivElement>(null);
@@ -365,6 +373,10 @@ export function PlayScreen({
   useEffect(() => setMuted(readMuted()), []);
 
   useEffect(() => {
+    mutedRef.current = muted;
+  }, [muted]);
+
+  useEffect(() => {
     loggedIn.current = authSession != null;
   }, [authSession]);
 
@@ -387,6 +399,8 @@ export function PlayScreen({
   // 開始の合図。出しきってから1問目を見せる（ここまで時間は数えない）
   useEffect(() => {
     if (phase.name !== "starting") return;
+    // 合図の文字が出るのと同時に鳴らす。音は開始の Space で起こしてある
+    if (!mutedRef.current) playStart();
     const timer = setTimeout(() => beginPlay(phase.session), START_CUE_MS);
     return () => clearTimeout(timer);
   }, [phase, beginPlay]);
@@ -494,8 +508,11 @@ export function PlayScreen({
     if (missed) flashMissKey(toNextKey(typed).key);
     if (!muted) {
       if (missed) playMiss();
-      // **1問を打ち終えた打鍵は、打鍵音の代わりに完了音を鳴らす**（最後の問題も）。
-      // 重ねると完了音の頭が濁る。音はモードで分ける（煙／手裏剣。演出と同じ）
+      // **最後の問題を打ち終えた打鍵は、終了の音**（開始の合図と対になる）。
+      // 次のお題が無いので、切り替わりの音（煙／手裏剣）を鳴らすと「まだ続く」ように聞こえる
+      else if (next.finished && promptIndex + 1 >= phase.session.prompts.length) playFinish();
+      // **1問を打ち終えた打鍵は、打鍵音の代わりに完了音を鳴らす。** 重ねると完了音の頭が
+      // 濁る。音はモードで分ける（煙／手裏剣。演出と同じ）
       else if (next.finished) {
         if (kind === "constraint") playStrike();
         else playDoron();

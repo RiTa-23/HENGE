@@ -1,12 +1,13 @@
 /**
- * 打鍵音・ミス音と、1問打ち終えたときの完了音（テーマ＝ドロン、最適化＝手裏剣）。
+ * 打鍵音・ミス音、1問打ち終えたときの完了音（テーマ＝ドロン、最適化＝手裏剣）、
+ * 開始の合図と終了の音。
  *
  * **音源ファイルを持たず、Web Audio API で合成する。** 読み込み待ちが無く
  * （1打目から鳴る）、Workerに載せる資産も増えない。世界観に合わせて、打鍵は
  * 短く硬い音、ミスは鈍く低い音にしてある。
  *
  * **鳴らすかどうかはここで決めない。** 消音の状態は画面が持ち、消音中は
- * `playHit()` / `playMiss()` を呼ばない。ここに状態を持つと、テストからも
+ * どの `play*()` も呼ばない。ここに状態を持つと、テストからも
  * 画面からも同じ値を2か所で見ることになる。
  */
 
@@ -325,4 +326,70 @@ export function playStrike(): void {
   kin.connect(kinGain).connect(ctx.destination);
   kin.start(hitAt);
   kin.stop(hitAt + 0.2);
+}
+
+/** 柝（拍子木）。打鍵音と同じ木の3層を、高く鋭く、鳴りを長めに残す。合図の音に使う */
+const KI: Clack = {
+  tickHz: 4200,
+  tickGain: 0.12,
+  ringHz: 1900,
+  ringQ: 14,
+  ringGain: 1.6,
+  ringRelease: 0.14,
+  bodyHz: 320,
+  bodyGain: 0.06,
+};
+
+/** 太鼓の一打。低い正弦波を少し落とし、皮を打つ雑音を短く重ねる */
+function taiko(ctx: AudioContext, peak: number, at: number): void {
+  const drum = ctx.createOscillator();
+  drum.type = "sine";
+  drum.frequency.setValueAtTime(120, at);
+  drum.frequency.exponentialRampToValueAtTime(62, at + 0.3);
+  const drumGain = envelope(ctx, peak, 0.004, 0.42, at);
+  drum.connect(drumGain).connect(ctx.destination);
+  drum.start(at);
+  drum.stop(at + 0.5);
+
+  const skin = ctx.createBufferSource();
+  skin.buffer = noise(ctx);
+  const low = ctx.createBiquadFilter();
+  low.type = "lowpass";
+  low.frequency.value = 900;
+  const skinGain = envelope(ctx, peak * 0.5, 0.002, 0.08, at);
+  skin.connect(low).connect(skinGain).connect(ctx.destination);
+  skin.start(at, Math.random() * 0.1);
+  skin.stop(at + 0.12);
+}
+
+/**
+ * 開始の合図（「はじめ！」）の音。**太鼓の一打に柝を重ねる。**
+ * 打鍵音（柝より柔らかい木）と同じ系統の音で、それより重く大きくして「始まり」を示す。
+ * 合図の文字が出るのと同時に鳴らす（`START_CUE_MS` のあいだは計時しないので、
+ * 音が打ち始めと重なることは無い）。
+ */
+export function playStart(): void {
+  const ctx = audioContext();
+  if (ctx === null) return;
+  const now = ctx.currentTime;
+  taiko(ctx, 0.5, now);
+  clack(ctx, KI, now);
+}
+
+/**
+ * 1プレイを打ち終えたときの音。**柝を2つ（カン、カンッ）打ち、鈴の余韻を残す。**
+ * 開始の合図（太鼓＋柝）と対にして、始まりと終わりを音で挟む。最後の問題を打ち終えた
+ * 打鍵で、問題ごとの完了音（ドロン／手裏剣）の代わりに鳴らす。最後は次のお題が無く、
+ * 結果画面に移るので、切り替わりの音を鳴らすと「まだ続く」ように聞こえる。
+ */
+export function playFinish(): void {
+  const ctx = audioContext();
+  if (ctx === null) return;
+  const now = ctx.currentTime;
+  clack(ctx, KI, now);
+  // 2打目は少し強く。締めの一打
+  clack(ctx, { ...KI, ringGain: KI.ringGain * 1.3, bodyGain: KI.bodyGain * 1.5 }, now + 0.17);
+  taiko(ctx, 0.35, now + 0.17);
+  bell(ctx, 2900, 0.04, now + 0.19);
+  bell(ctx, 4000, 0.03, now + 0.24);
 }

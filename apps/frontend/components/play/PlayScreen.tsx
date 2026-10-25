@@ -82,14 +82,17 @@ const MISS_FLASH_MS = 450;
  */
 const START_CUE_MS = 900;
 
-/** 次に打てるキー。候補それぞれの「いま打つべき1文字」を集める */
-function nextKeysOf(progress: TypingProgress): NextKey[] {
-  const letters = new Set(
-    progress.matches
-      .map((candidate) => candidate[progress.input.length])
-      .filter((letter): letter is string => letter !== undefined),
-  );
-  return [...letters].map((letter) => toNextKey(letter));
+/**
+ * 次に打つキー。**巻物に出ているローマ字の、苦無が指す1文字だけ**を光らせる。
+ *
+ * 候補それぞれの次の1文字を全部光らせると（`し` で `S` の次に `H` と `I`）、
+ * 画面の表記と違うキーまで光ってどれを押せばよいか迷う。別の候補で打っても
+ * 受理はされ、打った経路に表示が切り替わるので、光るキーもそれに従う。
+ */
+function nextKeyOf(progress: TypingProgress): NextKey | null {
+  const { text, cursor } = romanDisplay(progress);
+  const letter = text[cursor];
+  return letter === undefined ? null : toNextKey(letter);
 }
 
 /**
@@ -750,7 +753,7 @@ export function PlayScreen({
           </div>
 
           <div className="border-t border-kin/40 pt-6">
-            <Keyboard nextKeys={nextKeysOf(progress)} missKey={missKey} />
+            <Keyboard nextKey={nextKeyOf(progress)} missKey={missKey} />
           </div>
         </>
       )}

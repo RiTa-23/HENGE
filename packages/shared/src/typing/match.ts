@@ -44,9 +44,15 @@ export interface TypingProgress {
   readonly finished: boolean;
 }
 
-/** 最短の候補。表示とカーソル位置の基準に使う */
-function shortest(candidates: readonly string[]): string {
-  return candidates.reduce((best, c) => (c.length < best.length ? c : best));
+/**
+ * 画面に出す候補。**候補配列の先頭**（table.ts の並び＝一般的な打ち方の順）。
+ *
+ * 最短の候補を出すと `し` が `si`、`っち` が `cti` のように、IMEでは通るが
+ * 見慣れない打ち方が既定になる。打鍵数は別に最短で数える（keystrokes.ts）。
+ * 打ち進めて候補が絞られれば、残った候補の先頭に表示が切り替わる。
+ */
+function preferred(candidates: readonly string[]): string {
+  return candidates[0] ?? "";
 }
 
 export function startTyping(units: RomanCandidates): TypingProgress {
@@ -90,9 +96,9 @@ function recordMiss(p: TypingProgress): TypingProgress {
   const misses = new Set(p.misses);
   misses.add(cursorOf(p));
 
-  // 表示は最短候補で出しているので、苦無が指していた文字も最短候補から取る。
+  // 苦無が指していた文字は、画面に出していた候補から取る。
   // 候補が複数残っていても（`F`/`H` のような並列）、画面で見えていたのは1つ
-  const expected = p.matches.length === 0 ? undefined : shortest(p.matches)[p.input.length];
+  const expected = p.matches.length === 0 ? undefined : preferred(p.matches)[p.input.length];
   const missedKeys = new Map(p.missedKeys);
   if (expected !== undefined) missedKeys.set(expected, (missedKeys.get(expected) ?? 0) + 1);
 
@@ -137,14 +143,15 @@ export function pressKey(p: TypingProgress, key: string): TypingProgress {
 /**
  * 画面に出すローマ字列と、苦無（キャレット）を置く位置。
  *
- * 未確定のかなは最短候補で表示する。**打ち進めると表示が変わることがある**
- * （`shi` を表示中に `si` で確定するなど）。docs/07-ui.md で許容している副作用。
+ * 未確定のかなは候補の先頭（一般的な打ち方）で表示する。**打ち進めると表示が
+ * 変わることがある**（`shi` を表示中に `si` で確定するなど）。docs/07-ui.md で
+ * 許容している副作用。
  */
 export function romanDisplay(p: TypingProgress): { text: string; cursor: number } {
-  const current = p.matches.length === 0 ? "" : shortest(p.matches);
+  const current = preferred(p.matches);
   const future = p.units
     .slice(p.unitIndex + 1)
-    .map((unit) => shortest(unit))
+    .map((unit) => preferred(unit))
     .join("");
   return { text: p.settled + current + future, cursor: cursorOf(p) };
 }
@@ -152,7 +159,7 @@ export function romanDisplay(p: TypingProgress): { text: string; cursor: number 
 /**
  * かな1単位ごとの表示用ローマ字列。
  *
- * 確定済みは**実際に打たれた経路**、未確定は最短候補。つなげると
+ * 確定済みは**実際に打たれた経路**、未確定は候補の先頭。つなげると
  * `romanDisplay().text` と同じになる。長文では「かな1単位」と「そのローマ字列」を
  * 縦に1列にまとめるため、単位ごとに切り分けた配列が必要（連結文字列からは
  * 単位の切れ目を計算できない。`shi` と `si` で文字数が違う）。
@@ -160,7 +167,7 @@ export function romanDisplay(p: TypingProgress): { text: string; cursor: number 
 export function romanSegments(p: TypingProgress): readonly string[] {
   return [
     ...p.typedUnits,
-    p.matches.length === 0 ? "" : shortest(p.matches),
-    ...p.units.slice(p.unitIndex + 1).map((unit) => shortest(unit)),
+    preferred(p.matches),
+    ...p.units.slice(p.unitIndex + 1).map((unit) => preferred(unit)),
   ];
 }

@@ -184,22 +184,34 @@ describe("撒菱の位置（ミスした表示位置）", () => {
 });
 
 describe("表示用のローマ字列と苦無の位置", () => {
-  test("未確定のかなは最短候補で表示する", () => {
+  test("未確定のかなは一般的な打ち方（候補の先頭）で表示する", () => {
     const progress = startTyping(buildRomanCandidates("しち"));
 
-    expect(romanDisplay(progress)).toEqual({ text: "siti", cursor: 0 });
+    expect(romanDisplay(progress)).toEqual({ text: "shichi", cursor: 0 });
+  });
+
+  // 最短候補で出すと、っ は c（chi 由来）、ち は ti になり「macti」と表示されていた
+  test("っ は次のかなの表示に合わせて子音を重ねる（まっち は macchi）", () => {
+    const progress = startTyping(buildRomanCandidates("まっち"));
+
+    expect(romanDisplay(progress).text).toBe("macchi");
+  });
+
+  test("打ち方を変えると、残った候補の先頭に表示が切り替わる", () => {
+    // し を si で打ち始めると、表示も si になる
+    expect(romanDisplay(type("しち", "si")).text).toBe("sichi");
   });
 
   test("打った経路が確定した部分に反映される", () => {
     const progress = type("しち", "shi");
 
-    expect(romanDisplay(progress)).toEqual({ text: "shiti", cursor: 3 });
+    expect(romanDisplay(progress)).toEqual({ text: "shichi", cursor: 3 });
   });
 
   test("打ち込み途中は絞り込まれた候補が表示に出る", () => {
     const progress = type("しち", "sh");
 
-    expect(romanDisplay(progress)).toEqual({ text: "shiti", cursor: 2 });
+    expect(romanDisplay(progress)).toEqual({ text: "shichi", cursor: 2 });
   });
 
   test("苦無はミスしても進まない", () => {
@@ -208,33 +220,33 @@ describe("表示用のローマ字列と苦無の位置", () => {
 });
 
 describe("かな1単位ごとの表示用ローマ字列", () => {
-  test("未確定のかなは最短候補で1単位ずつ返す", () => {
+  test("未確定のかなは候補の先頭で1単位ずつ返す", () => {
     const progress = startTyping(buildRomanCandidates("しち"));
 
-    expect(romanSegments(progress)).toEqual(["si", "ti"]);
+    expect(romanSegments(progress)).toEqual(["shi", "chi"]);
   });
 
-  test("確定済みは実際に打たれた経路で返す（最短候補で畳まない）", () => {
+  test("確定済みは実際に打たれた経路で返す（表示の候補で畳まない）", () => {
     // 「し」を si で確定した場合、si で返る（shi に直すと切れ目がずれる）
-    expect(romanSegments(type("しち", "si"))).toEqual(["si", "ti"]);
-    expect(romanSegments(type("しち", "shi"))).toEqual(["shi", "ti"]);
+    expect(romanSegments(type("しち", "si"))).toEqual(["si", "chi"]);
+    expect(romanSegments(type("しち", "shi"))).toEqual(["shi", "chi"]);
   });
 
   test("つなげると romanDisplay().text と同じになる", () => {
     const progress = type("しゃしん", "sha");
 
     expect(romanSegments(progress).join("")).toBe(romanDisplay(progress).text);
-    // ん は文末なので最短候補は nn
-    expect(romanSegments(progress)).toEqual(["sha", "si", "nn"]);
+    // ん は文末なので n 単体は無く、先頭は nn
+    expect(romanSegments(progress)).toEqual(["sha", "shi", "nn"]);
   });
 
   test("ミスの通し番号と切れ目が対応する（苦無が指す文字が保たれる）", () => {
-    // shq: s・h は受理、q はミス。苦無は si の「i」…ではなく shi 表示なら「i」の位置
+    // shq: s・h は受理、q はミス。苦無は shi の「i」の位置
     const progress = type("しち", "shq");
     const segments = romanSegments(progress);
     const cursor = romanDisplay(progress).cursor;
 
-    expect(segments).toEqual(["shi", "ti"]);
+    expect(segments).toEqual(["shi", "chi"]);
     expect(segments.join("")[cursor]).toBe("i");
     expect(cursor).toBe(progress.settled.length + progress.input.length);
   });
@@ -297,10 +309,10 @@ describe("missedKeys", () => {
     expect(progress.finished).toBe(true);
   });
 
-  test("候補が複数あるときは画面に出ている最短候補で数える", () => {
-    // 「し」は si / shi / ci。表示は最短の si なので、打ち損ねた文字は s
-    const progress = play("し", ["x"]);
+  test("候補が複数あるときは画面に出ている候補で数える", () => {
+    // 「し」は shi / si / ci。表示は shi なので、s の後に打ち損ねた文字は h
+    const progress = play("し", ["s", "x"]);
 
-    expect([...progress.missedKeys]).toEqual([["s", 1]]);
+    expect([...progress.missedKeys]).toEqual([["h", 1]]);
   });
 });

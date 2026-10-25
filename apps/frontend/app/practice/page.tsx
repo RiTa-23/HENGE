@@ -86,10 +86,11 @@ export default async function PracticePage({
                         ? presetCreateHref(preset.char)
                         : playHref("constraint", preset.char)
                     }
-                    className="flex items-center justify-between rounded-md border border-kinari/10 bg-kinari/5 px-6 py-5 transition-colors hover:border-shu/60"
+                    // 一覧のカードと同じ的板（.mato--card）。的の中心に音が来る
+                    className="mato mato--card flex min-h-24 items-center justify-between py-3 pr-6 pl-4"
                   >
-                    <span className="flex items-baseline gap-4">
-                      <span className="font-mincho text-2xl tracking-wide text-kinari">
+                    <span className="flex items-center gap-2">
+                      <span className="w-36 shrink-0 text-center font-mincho text-2xl tracking-wide text-kinari">
                         {preset.char}
                       </span>
                       <span className="text-xs tracking-wider text-kinari/50">{preset.reason}</span>

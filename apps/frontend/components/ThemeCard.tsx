@@ -2,11 +2,12 @@ import { PROMPT_FORMS } from "@henge/shared";
 import type { ThemeSummary } from "@/lib/api/themes";
 import { difficultForms } from "@/components/DifficultBadge";
 import { FormButton } from "@/components/FormButton";
+import { MatoCard } from "@/components/MatoCard";
 import { detailHref, playHref } from "@/lib/ui/kind";
 import "@/components/play/ninja.css";
 
 /**
- * 一覧のテーマ／最適化する音1件。**巻物の形で出す。**
+ * 一覧のテーマ1件。**巻物の形で出す。** 最適化する音は的板（`MatoCard`）に任せる。
  *
  * プレイ画面の巻物をそのまま小さくしたもの（`.scroll--card`）。軸・キャップ・紙の面は
  * 同じ作りで、別の物体に見えないようにしてある。
@@ -31,23 +32,20 @@ import "@/components/play/ninja.css";
  * 「カード全体をリンクにする」ときの常套手段で、読み上げでもテーマ名のリンクと
  * ボタンが別々に辿れる。
  *
- * テーマは単語・短文・長文の3枚（短いものから）。縦長の札が収まる高さを紙に持たせる
+ * 単語・短文・長文の3枚（短いものから）。縦長の札が収まる高さを紙に持たせる
  * （`min-h-32`。紙は `overflow: hidden` なので、足りないと札の下が切れる）。
- * 最適化する音は形式が1つ（単語・長文を付けない）なので、ボタンは「打つ」1つ。
  * リンク先の組み立ては `lib/ui/kind.ts` に任せる（`?kind=` `?form=` を手で書かない）。
+ *
+ * **最適化する音は的板で出す**（`MatoCard`）。一覧（`/practice`）とマイページの
+ * 混ざった格子の両方で、呼び出し側が kind を見なくて済むようここで振り分ける。
  */
 export function ThemeCard({ theme }: { theme: ThemeSummary }) {
-  const isTheme = theme.kind === "theme";
+  if (theme.kind === "constraint") return <MatoCard theme={theme} />;
   const difficult = difficultForms(theme);
   return (
     <article className="scroll scroll--card relative">
       <div className="scroll__roller" />
-      <div
-        className={
-          "scroll__sheet relative flex items-center px-4 py-3 " +
-          (isTheme ? "min-h-32" : "min-h-24")
-        }
-      >
+      <div className="scroll__sheet relative flex min-h-32 items-center px-4 py-3">
         {/* 閉じた巻物に見えている部分。幅は固定（--scroll-closed と合わせてある） */}
         <div className="w-32 shrink-0">
           <a
@@ -64,23 +62,14 @@ export function ThemeCard({ theme }: { theme: ThemeSummary }) {
 
         {/* ほどけた側に現れる部分。巻物全体を覆うリンクより上に置き、ここだけプレイへ直行する */}
         <div className="scroll__tags absolute inset-y-0 left-36 right-4 z-10 flex items-center justify-center-safe gap-2">
-          {isTheme ? (
-            PROMPT_FORMS.map((form) => (
-              <FormButton
-                key={form}
-                form={form}
-                href={playHref(theme.kind, theme.name, form)}
-                difficult={difficult.includes(form)}
-              />
-            ))
-          ) : (
+          {PROMPT_FORMS.map((form) => (
             <FormButton
-              form="sentence"
-              href={playHref(theme.kind, theme.name)}
-              label="打つ"
-              difficult={difficult.includes("sentence")}
+              key={form}
+              form={form}
+              href={playHref(theme.kind, theme.name, form)}
+              difficult={difficult.includes(form)}
             />
-          )}
+          ))}
         </div>
       </div>
       <div className="scroll__roller" />

@@ -22,6 +22,7 @@ import { authClient } from "@/lib/api/auth-client";
 import { Keyboard, type NextKey, toNextKey } from "./Keyboard";
 import { Loading } from "./Loading";
 import { LongScroll } from "./LongScroll";
+import { MatoBoard } from "./MatoBoard";
 import { ProgressDots } from "./ProgressDots";
 import { Result, type PlayStats } from "./Result";
 import { Scroll } from "./Scroll";
@@ -29,6 +30,7 @@ import { SoundToggle } from "./SoundToggle";
 import { readJsonBody } from "@/lib/api/json";
 import { readOffset, writeOffset } from "@/lib/play/offset";
 import { mergeMissedKeys } from "@/lib/play/misses";
+import { addTally, EMPTY_TALLY, findTargets, type TargetTally } from "@/lib/practice/targets";
 import { playHit, playMiss, primeAudio, readMuted, writeMuted } from "@/lib/play/sound";
 import { detailHref, formColor, formLabel, kindLabel, listHref } from "@/lib/ui/kind";
 
@@ -129,8 +131,9 @@ function LongProgress({ progress }: { progress: TypingProgress }) {
 }
 
 /**
- * 打鍵の画面。**テーマモードと最適化モードで分けない。**
- * 違うのは離脱先の一覧と、画面に出す呼び名（「このテーマ」／「この音」）だけ。
+ * 打鍵の画面。**テーマモードと最適化モードで流れは分けない。**
+ * 違うのは文章を載せる物体（テーマは巻物、最適化は的板）と、離脱先の一覧と、
+ * 画面に出す呼び名（「このテーマ」／「この音」）だけ。
  */
 export function PlayScreen({
   themeId,
@@ -177,6 +180,11 @@ export function PlayScreen({
   /** 1プレイを通した苦手キー。問題ごとの集計をここへ畳む */
   const [missedKeys, setMissedKeys] = useState<ReadonlyMap<string, number>>(() => new Map());
   /**
+   * 最適化練習の的中数。問題ごとに数えて1プレイ通しで足す。**表示だけ**に使い、
+   * スコアにもランキングにも入れない（docs/07-ui.md）
+   */
+  const [targetTally, setTargetTally] = useState<TargetTally>(EMPTY_TALLY);
+  /**
    * 日本語入力のまま打たれたことがあるか。**一度でも見たら出しっぱなしにする。**
    * 打つたびに出たり消えたりすると、打鍵に気を取られて読めない
    */
@@ -219,6 +227,7 @@ export function PlayScreen({
     setPromptIndex(0);
     setStats({ hits: 0, misses: 0, elapsedMs: 0 });
     setMissedKeys(new Map());
+    setTargetTally(EMPTY_TALLY);
     startedAt.current = performance.now();
     setProgress(startTyping(session.prompts[0]?.readingRoman ?? []));
     setPhase({ name: "playing", session });
@@ -481,6 +490,11 @@ export function PlayScreen({
     const upcoming = promptIndex + 1;
     // missedKeys は問題ごとに作り直されるので、ここで通算へ足す
     setMissedKeys((total) => mergeMissedKeys(total, next.missedKeys));
+    const finishedPrompt = phase.session.prompts[promptIndex];
+    if (kind === "constraint" && finishedPrompt !== undefined) {
+      const spans = findTargets(splitKanaUnits(finishedPrompt.readingKana), themeName);
+      setTargetTally((total) => addTally(total, spans, next));
+    }
 
     if (upcoming >= phase.session.prompts.length) {
       setStats({ hits, misses, elapsedMs: performance.now() - startedAt.current });
@@ -660,6 +674,7 @@ export function PlayScreen({
         detailHref={backToDetail}
         stats={stats}
         missedKeys={missedKeys}
+        targetTally={kind === "constraint" ? targetTally : undefined}
         themeName={themeName}
         onRetry={start}
         listHref={backToList}
@@ -738,11 +753,22 @@ export function PlayScreen({
       ) : (
         <>
           <div className="flex flex-1 flex-col justify-center gap-8 py-8">
-            <Scroll
-              text={prompt.text}
-              kanaUnits={splitKanaUnits(prompt.readingKana)}
-              progress={progress}
-            />
+            {/* 載せる物体だけをモードで分ける。中身（PromptLines）は共通 */}
+            {kind === "constraint" ? (
+              <MatoBoard
+                text={prompt.text}
+                kanaUnits={splitKanaUnits(prompt.readingKana)}
+                progress={progress}
+                // 最適化する音は themeName（最適化練習ではテーマ名＝音）
+                targets={findTargets(splitKanaUnits(prompt.readingKana), themeName)}
+              />
+            ) : (
+              <Scroll
+                text={prompt.text}
+                kanaUnits={splitKanaUnits(prompt.readingKana)}
+                progress={progress}
+              />
+            )}
 
             <div className="flex items-center justify-between">
               <ProgressDots current={promptIndex} total={phase.session.prompts.length} />

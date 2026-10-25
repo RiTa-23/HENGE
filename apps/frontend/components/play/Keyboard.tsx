@@ -34,11 +34,10 @@ export function toNextKey(letter: string): NextKey {
  * 巻物とキーボードのあいだを往復する速さに追いつかない。文字は地の色に
  * 落として読ませる。
  */
-function keyClass(state: "idle" | "candidate" | "modifier" | "miss"): string {
+function keyClass(state: "idle" | "next" | "modifier" | "miss"): string {
   const base =
     "flex h-11 min-w-11 items-center justify-center rounded-md border px-3 font-mono text-sm transition-colors";
-  if (state === "candidate") {
-    // 候補違い（どちらか一方を押す）はすべて同じ強さで光らせる
+  if (state === "next") {
     return `${base} border-daidai bg-daidai font-bold text-sumi shadow-[0_0_12px_var(--color-daidai)]`;
   }
   if (state === "miss") {
@@ -53,8 +52,11 @@ function keyClass(state: "idle" | "candidate" | "modifier" | "miss"): string {
 }
 
 interface KeyboardProps {
-  /** 次に打てるキー。複数あるときは「どれか一方」を押す */
-  nextKeys: NextKey[];
+  /**
+   * 次に打つキー。**巻物に出ている打ち方の1文字だけ**で、別の候補のキーは光らせない。
+   * 打ち終えたら null
+   */
+  nextKey: NextKey | null;
   /**
    * 直前に打ち間違えたキー（キーボード上の表示）。少しのあいだ赤くする。
    *
@@ -65,16 +67,15 @@ interface KeyboardProps {
   missKey?: string | null;
 }
 
-export function Keyboard({ nextKeys, missKey = null }: KeyboardProps) {
-  const lit = new Set(nextKeys.map((next) => next.key));
-  const needsShift = nextKeys.some((next) => next.shift);
+export function Keyboard({ nextKey, missKey = null }: KeyboardProps) {
+  const needsShift = nextKey?.shift ?? false;
 
   return (
     <div className="flex flex-col items-center gap-1.5">
       {ROWS.map((row, rowIndex) => (
         <div key={rowIndex} className="flex gap-1.5">
           {row.map((key, keyIndex) => {
-            // **候補をミスより優先する。** 打った瞬間は両方に該当しないが、
+            // **次に打つキーをミスより優先する。** 打った瞬間は両方に該当しないが、
             // 赤が消える前に打ち直して先へ進むと、**さっき打ち間違えたキーが
             // 次に打つキーになる**ことがある（`し` の `h` を先に打ってから `s`
             // を打つと、次は `h`）。ここでミスを優先すると、いま押すべきキーが
@@ -84,8 +85,8 @@ export function Keyboard({ nextKeys, missKey = null }: KeyboardProps) {
                 ? needsShift
                   ? "modifier"
                   : "idle"
-                : lit.has(key)
-                  ? "candidate"
+                : key === nextKey?.key
+                  ? "next"
                   : key === missKey
                     ? "miss"
                     : "idle";

@@ -183,11 +183,53 @@ describe("撒菱の位置（ミスした表示位置）", () => {
   });
 });
 
+/** 打ち始める前に画面に出るローマ字列 */
+function shown(kana: string): string {
+  return romanDisplay(startTyping(buildRomanCandidates(kana))).text;
+}
+
 describe("表示用のローマ字列と苦無の位置", () => {
   test("未確定のかなは最短候補で表示する", () => {
     const progress = startTyping(buildRomanCandidates("しち"));
 
     expect(romanDisplay(progress)).toEqual({ text: "siti", cursor: 0 });
+  });
+
+  // かなごとに最短を取ると、っ は c（chi 由来）、ち は ti になり「macti」と表示されていた
+  test("っ は次のかなの表示に合わせて子音を重ねる（まっち は matti）", () => {
+    expect(romanDisplay(startTyping(buildRomanCandidates("まっち"))).text).toBe("matti");
+    expect(romanDisplay(startTyping(buildRomanCandidates("いっしょ"))).text).toBe("issyo");
+  });
+
+  test("っ を c で打ったら、次のかなも c で始まる打ち方を出す（macchi）", () => {
+    expect(romanDisplay(type("まっち", "mac")).text).toBe("macchi");
+  });
+
+  test("しょ は syo で表示する（sho と同じ長さだが table.ts で先に書いた方）", () => {
+    expect(romanDisplay(startTyping(buildRomanCandidates("しょ"))).text).toBe("syo");
+    expect(romanDisplay(type("しょ", "sh")).text).toBe("sho");
+  });
+
+  // 既定の表示は利用者と相談して決めた（し・ち の拗音は sy / ty 系、じ・じゃ・ふ は ji / ja / fu）
+  test("既定の表示を固定する", () => {
+    expect(shown("しゃしゅしぇ")).toBe("syasyusye");
+    expect(shown("ちゃちゅちぇちょ")).toBe("tyatyutyetyo");
+    expect(shown("じじゃじゅじょじぇ")).toBe("jijajujoje");
+    expect(shown("ふつ")).toBe("futu");
+  });
+
+  // 保存済みのお題は table.ts を並べ替える前の並びのまま。表示はいまの table.ts に従う
+  test("保存済みの候補配列の並びに関係なく、table.ts の並びで表示する", () => {
+    const stored = [
+      ["shi", "si", "ci"],
+      ["sho", "syo"],
+    ];
+    expect(romanDisplay(startTyping(stored)).text).toBe("sisyo");
+  });
+
+  test("打ち方を変えると、残った候補に表示が切り替わる", () => {
+    // し を sh で打ち始めると、表示も shi になる
+    expect(romanDisplay(type("しち", "sh")).text).toBe("shiti");
   });
 
   test("打った経路が確定した部分に反映される", () => {
@@ -215,7 +257,7 @@ describe("かな1単位ごとの表示用ローマ字列", () => {
   });
 
   test("確定済みは実際に打たれた経路で返す（最短候補で畳まない）", () => {
-    // 「し」を si で確定した場合、si で返る（shi に直すと切れ目がずれる）
+    // 「し」を shi で確定した場合、shi で返る（si に直すと切れ目がずれる）
     expect(romanSegments(type("しち", "si"))).toEqual(["si", "ti"]);
     expect(romanSegments(type("しち", "shi"))).toEqual(["shi", "ti"]);
   });
@@ -229,7 +271,7 @@ describe("かな1単位ごとの表示用ローマ字列", () => {
   });
 
   test("ミスの通し番号と切れ目が対応する（苦無が指す文字が保たれる）", () => {
-    // shq: s・h は受理、q はミス。苦無は si の「i」…ではなく shi 表示なら「i」の位置
+    // shq: s・h は受理、q はミス。苦無は shi の「i」の位置
     const progress = type("しち", "shq");
     const segments = romanSegments(progress);
     const cursor = romanDisplay(progress).cursor;
@@ -298,9 +340,16 @@ describe("missedKeys", () => {
   });
 
   test("候補が複数あるときは画面に出ている最短候補で数える", () => {
-    // 「し」は si / shi / ci。表示は最短の si なので、打ち損ねた文字は s
+    // 「し」は shi / si / ci。表示は最短の si なので、打ち損ねた文字は s
     const progress = play("し", ["x"]);
 
     expect([...progress.missedKeys]).toEqual([["s", 1]]);
+  });
+
+  test("っ を c で打った後は、画面に出ている chi の文字で数える", () => {
+    // まっち を mac と打つと、ち の表示は chi。2打目に打ち損ねた文字は h
+    const progress = play("まっち", ["m", "a", "c", "c", "x"]);
+
+    expect([...progress.missedKeys]).toEqual([["h", 1]]);
   });
 });

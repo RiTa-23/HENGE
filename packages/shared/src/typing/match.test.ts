@@ -183,6 +183,11 @@ describe("撒菱の位置（ミスした表示位置）", () => {
   });
 });
 
+/** 打ち始める前に画面に出るローマ字列 */
+function shown(kana: string): string {
+  return romanDisplay(startTyping(buildRomanCandidates(kana))).text;
+}
+
 describe("表示用のローマ字列と苦無の位置", () => {
   test("未確定のかなは最短候補で表示する", () => {
     const progress = startTyping(buildRomanCandidates("しち"));
@@ -203,6 +208,14 @@ describe("表示用のローマ字列と苦無の位置", () => {
   test("しょ は syo で表示する（sho と同じ長さだが table.ts で先に書いた方）", () => {
     expect(romanDisplay(startTyping(buildRomanCandidates("しょ"))).text).toBe("syo");
     expect(romanDisplay(type("しょ", "sh")).text).toBe("sho");
+  });
+
+  // 既定の表示は利用者と相談して決めた（し・ち の拗音は sy / ty 系、じ・じゃ・ふ は ji / ja / fu）
+  test("既定の表示を固定する", () => {
+    expect(shown("しゃしゅしぇ")).toBe("syasyusye");
+    expect(shown("ちゃちゅちぇちょ")).toBe("tyatyutyetyo");
+    expect(shown("じじゃじゅじょじぇ")).toBe("jijajujoje");
+    expect(shown("ふつ")).toBe("futu");
   });
 
   // 保存済みのお題は table.ts を並べ替える前の並びのまま。表示はいまの table.ts に従う

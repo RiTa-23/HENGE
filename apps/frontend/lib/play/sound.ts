@@ -245,14 +245,14 @@ export function playDoron(): void {
   bell(ctx, 2900, 0.035, now);
   bell(ctx, 4000, 0.025, now + 0.05);
 
-  const don = ctx.createOscillator();
-  don.type = "triangle";
-  don.frequency.setValueAtTime(150, now);
-  don.frequency.exponentialRampToValueAtTime(52, now + 0.22);
-  const donGain = envelope(ctx, 0.22, 0.004, 0.26, now);
-  don.connect(donGain).connect(ctx.destination);
-  don.start(now);
-  don.stop(now + 0.3);
+  const thump = ctx.createOscillator();
+  thump.type = "triangle";
+  thump.frequency.setValueAtTime(150, now);
+  thump.frequency.exponentialRampToValueAtTime(52, now + 0.22);
+  const thumpGain = envelope(ctx, 0.22, 0.004, 0.26, now);
+  thump.connect(thumpGain).connect(ctx.destination);
+  thump.start(now);
+  thump.stop(now + 0.3);
 
   const smoke = ctx.createBufferSource();
   smoke.buffer = noise(ctx);
@@ -328,68 +328,96 @@ export function playStrike(): void {
   kin.stop(hitAt + 0.2);
 }
 
-/** 柝（拍子木）。打鍵音と同じ木の3層を、高く鋭く、鳴りを長めに残す。合図の音に使う */
-const KI: Clack = {
-  tickHz: 4200,
-  tickGain: 0.12,
-  ringHz: 1900,
-  ringQ: 14,
-  ringGain: 1.6,
-  ringRelease: 0.14,
-  bodyHz: 320,
-  bodyGain: 0.06,
-};
+/**
+ * 太鼓の面（皮の真ん中）を打った「ドン」。開始の合図と結果の表示に使う。
+ *
+ * 単一の正弦波だけだと低いブザーに聞こえるので、3層で組む（打鍵音と同じ考え方）。
+ *
+ * | 層 | 作り方 |
+ * |---|---|
+ * | 胴鳴り | 低い正弦波を打った瞬間だけ高く、すぐ落とす（110Hz → 58Hz）。長く残す |
+ * | 張り | 胴鳴りの約1.6倍の三角波を短く。皮の張りの手応え |
+ * | 皮を打つ音 | 雑音を低域で一瞬だけ。撥が当たった輪郭 |
+ */
+function don(ctx: AudioContext, peak: number, at: number, release = 0.55): void {
+  const body = ctx.createOscillator();
+  body.type = "sine";
+  body.frequency.setValueAtTime(110, at);
+  body.frequency.exponentialRampToValueAtTime(58, at + 0.18);
+  const bodyGain = envelope(ctx, peak, 0.003, release, at);
+  body.connect(bodyGain).connect(ctx.destination);
+  body.start(at);
+  body.stop(at + release + 0.05);
 
-/** 太鼓の一打。低い正弦波を少し落とし、皮を打つ雑音を短く重ねる */
-function taiko(ctx: AudioContext, peak: number, at: number): void {
-  const drum = ctx.createOscillator();
-  drum.type = "sine";
-  drum.frequency.setValueAtTime(120, at);
-  drum.frequency.exponentialRampToValueAtTime(62, at + 0.3);
-  const drumGain = envelope(ctx, peak, 0.004, 0.42, at);
-  drum.connect(drumGain).connect(ctx.destination);
-  drum.start(at);
-  drum.stop(at + 0.5);
+  const tension = ctx.createOscillator();
+  tension.type = "triangle";
+  tension.frequency.setValueAtTime(180, at);
+  tension.frequency.exponentialRampToValueAtTime(120, at + 0.1);
+  const tensionGain = envelope(ctx, peak * 0.35, 0.002, 0.12, at);
+  tension.connect(tensionGain).connect(ctx.destination);
+  tension.start(at);
+  tension.stop(at + 0.16);
 
   const skin = ctx.createBufferSource();
   skin.buffer = noise(ctx);
   const low = ctx.createBiquadFilter();
   low.type = "lowpass";
-  low.frequency.value = 900;
-  const skinGain = envelope(ctx, peak * 0.5, 0.002, 0.08, at);
+  low.frequency.value = 700;
+  const skinGain = envelope(ctx, peak * 0.6, 0.001, 0.05, at);
   skin.connect(low).connect(skinGain).connect(ctx.destination);
   skin.start(at, Math.random() * 0.1);
-  skin.stop(at + 0.12);
+  skin.stop(at + 0.08);
 }
 
 /**
- * 開始の合図（「はじめ！」）の音。**太鼓の一打に柝を重ねる。**
- * 打鍵音（柝より柔らかい木）と同じ系統の音で、それより重く大きくして「始まり」を示す。
- * 合図の文字が出るのと同時に鳴らす（`START_CUE_MS` のあいだは計時しないので、
- * 音が打ち始めと重なることは無い）。
+ * 太鼓の縁（ふち）を打った「カッ」。**胴鳴りが無い、乾いた高い木の音。**
+ * 打鍵音（柔らかい木）より高く、短く、硬い。面の「ドン」と同じ太鼓だと分かるよう、
+ * ごく小さく低い鳴りを残す。
+ */
+const KA: Clack = {
+  tickHz: 5200,
+  tickGain: 0.22,
+  ringHz: 2300,
+  ringQ: 5,
+  ringGain: 1.5,
+  ringRelease: 0.05,
+  bodyHz: 520,
+  bodyGain: 0.07,
+};
+
+/**
+ * 開始の合図（「はじめ！」）の音。**太鼓の「ドドンッ」。**
+ * 1打目を軽く、2打目を強く長く打つ（踏み込む）。合図の文字が出るのと同時に鳴らす
+ * （`START_CUE_MS` のあいだは計時しないので、音が打ち始めと重なることは無い）。
  */
 export function playStart(): void {
   const ctx = audioContext();
   if (ctx === null) return;
   const now = ctx.currentTime;
-  taiko(ctx, 0.5, now);
-  clack(ctx, KI, now);
+  don(ctx, 0.32, now, 0.18);
+  don(ctx, 0.55, now + 0.13, 0.6);
 }
 
 /**
- * 1プレイを打ち終えたときの音。**柝を2つ（カン、カンッ）打ち、鈴の余韻を残す。**
- * 開始の合図（太鼓＋柝）と対にして、始まりと終わりを音で挟む。最後の問題を打ち終えた
- * 打鍵で、問題ごとの完了音（ドロン／手裏剣）の代わりに鳴らす。最後は次のお題が無く、
- * 結果画面に移るので、切り替わりの音を鳴らすと「まだ続く」ように聞こえる。
+ * 終了の合図（「そこまで！」）の音。**太鼓の縁を打つ「カカッ」。**
+ * 開始の「ドドンッ」（面）と打つ場所を変えて、始まりと終わりを聞き分けられるようにする。
+ * 2打目を少し強く。最後の問題を打ち終えた打鍵で、問題ごとの完了音（ドロン／手裏剣）の
+ * 代わりに鳴らす（次のお題が無いので、切り替わりの音だと「まだ続く」ように聞こえる）。
  */
-export function playFinish(): void {
+export function playEnd(): void {
   const ctx = audioContext();
   if (ctx === null) return;
   const now = ctx.currentTime;
-  clack(ctx, KI, now);
-  // 2打目は少し強く。締めの一打
-  clack(ctx, { ...KI, ringGain: KI.ringGain * 1.3, bodyGain: KI.bodyGain * 1.5 }, now + 0.17);
-  taiko(ctx, 0.35, now + 0.17);
-  bell(ctx, 2900, 0.04, now + 0.19);
-  bell(ctx, 4000, 0.03, now + 0.24);
+  clack(ctx, KA, now);
+  clack(ctx, { ...KA, ringGain: KA.ringGain * 1.3, tickGain: KA.tickGain * 1.3 }, now + 0.1);
+}
+
+/**
+ * 結果を出す音。**太鼓の面を1つ大きく「ドンッ」。** 結果画面が出るのと同時に鳴らす。
+ * 開始の2打目より強く長く。締めの一打
+ */
+export function playResult(): void {
+  const ctx = audioContext();
+  if (ctx === null) return;
+  don(ctx, 0.62, ctx.currentTime, 0.75);
 }

@@ -34,9 +34,10 @@ import { mergeMissedKeys } from "@/lib/play/misses";
 import { addTally, EMPTY_TALLY, findTargets, type TargetTally } from "@/lib/practice/targets";
 import {
   playDoron,
-  playFinish,
+  playEnd,
   playHit,
   playMiss,
+  playResult,
   playStart,
   playStrike,
   primeAudio,
@@ -70,6 +71,8 @@ type Phase =
   /** お題は手元にあるが、まだ見せていない。開始の合図を出している最中 */
   | { name: "starting"; session: SessionResponse }
   | { name: "playing"; session: SessionResponse }
+  /** 打ち終えた。終了の合図（「そこまで！」）を出している最中。計時はもう止まっている */
+  | { name: "finishing"; session: SessionResponse }
   | { name: "result"; session: SessionResponse };
 
 /**
@@ -94,6 +97,15 @@ const MISS_FLASH_MS = 450;
  * お題も合図が消えるまで出さない。見えていれば、待っているあいだに読めてしまう。
  */
 const START_CUE_MS = 900;
+
+/**
+ * 終了の合図（「そこまで！」）を出しておく長さ。出しきったら結果画面を
+ * 太鼓の「ドンッ」と同時に出す。
+ *
+ * **計時は最後の打鍵で止めてある**（合図のぶんは入らない）。開始の合図と同じく、
+ * ここを計時に含めると WPM が実際より低く出る。
+ */
+const END_CUE_MS = 900;
 
 /**
  * 次に打つキー。**巻物に出ているローマ字の、苦無が指す1文字だけ**を光らせる。
@@ -405,6 +417,16 @@ export function PlayScreen({
     return () => clearTimeout(timer);
   }, [phase, beginPlay]);
 
+  // 終了の合図。出しきってから、太鼓の「ドンッ」と同時に結果画面を出す
+  useEffect(() => {
+    if (phase.name !== "finishing") return;
+    const timer = setTimeout(() => {
+      if (!mutedRef.current) playResult();
+      setPhase({ name: "result", session: phase.session });
+    }, END_CUE_MS);
+    return () => clearTimeout(timer);
+  }, [phase]);
+
   // 打鍵を拾う要素にフォーカスを当て続ける。外れると1打も拾えなくなる
   useEffect(() => {
     if (phase.name === "playing") surface.current?.focus();
@@ -508,9 +530,9 @@ export function PlayScreen({
     if (missed) flashMissKey(toNextKey(typed).key);
     if (!muted) {
       if (missed) playMiss();
-      // **最後の問題を打ち終えた打鍵は、終了の音**（開始の合図と対になる）。
+      // **最後の問題を打ち終えた打鍵は、終了の合図（「そこまで！」）の音。**
       // 次のお題が無いので、切り替わりの音（煙／手裏剣）を鳴らすと「まだ続く」ように聞こえる
-      else if (next.finished && promptIndex + 1 >= phase.session.prompts.length) playFinish();
+      else if (next.finished && promptIndex + 1 >= phase.session.prompts.length) playEnd();
       // **1問を打ち終えた打鍵は、打鍵音の代わりに完了音を鳴らす。** 重ねると完了音の頭が
       // 濁る。音はモードで分ける（煙／手裏剣。演出と同じ）
       else if (next.finished) {
@@ -537,8 +559,9 @@ export function PlayScreen({
     }
 
     if (upcoming >= phase.session.prompts.length) {
+      // 計時はここで止める。結果画面は終了の合図を挟んでから出す
       setStats({ hits, misses, elapsedMs: performance.now() - startedAt.current });
-      setPhase({ name: "result", session: phase.session });
+      setPhase({ name: "finishing", session: phase.session });
       return;
     }
 
@@ -615,7 +638,17 @@ export function PlayScreen({
     return (
       <div className="flex min-h-dvh flex-col items-center justify-center gap-8 p-6">
         <p className="text-sm tracking-widest text-kinari/50">{themeName}</p>
-        <p className="start-cue font-mincho text-6xl tracking-widest text-shu">はじめ！</p>
+        <p className="cue font-mincho text-6xl tracking-widest text-shu">はじめ！</p>
+      </div>
+    );
+  }
+
+  if (phase.name === "finishing") {
+    // 開始の合図と同じ形。始まりと終わりを同じ見せ方で挟む
+    return (
+      <div className="flex min-h-dvh flex-col items-center justify-center gap-8 p-6">
+        <p className="text-sm tracking-widest text-kinari/50">{themeName}</p>
+        <p className="cue font-mincho text-6xl tracking-widest text-shu">そこまで！</p>
       </div>
     );
   }
@@ -710,22 +743,25 @@ export function PlayScreen({
 
   if (phase.name === "result") {
     return (
-      <Result
-        themeId={themeId}
-        detailHref={backToDetail}
-        stats={stats}
-        missedKeys={missedKeys}
-        targetTally={kind === "constraint" ? targetTally : undefined}
-        themeName={themeName}
-        onRetry={start}
-        listHref={backToList}
-        kind={kind}
-        form={form}
-        shareUrl={shareUrl}
-        prompts={phase.session.prompts}
-        reportOpen={reportOpen}
-        onReportOpenChange={setReportOpen}
-      />
+      // 太鼓の「ドンッ」と同時に、どんと出す（ninja.css の .result-enter）
+      <div className="result-enter">
+        <Result
+          themeId={themeId}
+          detailHref={backToDetail}
+          stats={stats}
+          missedKeys={missedKeys}
+          targetTally={kind === "constraint" ? targetTally : undefined}
+          themeName={themeName}
+          onRetry={start}
+          listHref={backToList}
+          kind={kind}
+          form={form}
+          shareUrl={shareUrl}
+          prompts={phase.session.prompts}
+          reportOpen={reportOpen}
+          onReportOpenChange={setReportOpen}
+        />
+      </div>
     );
   }
 

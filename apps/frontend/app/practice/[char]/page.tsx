@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import { AdjustingView } from "@/components/Adjusting";
 import { DetailMato } from "@/components/DetailScroll";
+import { FingeringEditor } from "@/components/FingeringEditor";
 import { FormButton } from "@/components/FormButton";
 import { RankingBoard } from "@/components/RankingBoard";
 import { PracticeMark } from "@/components/ModeMark";
@@ -92,6 +93,23 @@ export default async function PracticeDetailPage({
             />
           }
         />
+
+        {/*
+          最適化の運指。打つ前にここで決めておける（開始前の画面と同じ設定）。
+          標準運指を崩す練習なので、どう崩すかを決める場所を練習の入口に置く
+        */}
+        <section aria-labelledby="fingering-heading" className="mt-12">
+          <h2 id="fingering-heading" className="font-mincho text-xl tracking-wide text-kinari">
+            運指
+          </h2>
+          <p className="mt-2 text-sm leading-relaxed text-kinari/60">
+            「{theme.name}」を打つ打ち方と指を決めると、プレイ中の的の箇所でその打ち方と指が出ます。
+            決めなければ標準の運指です。設定はこの端末に保存されます。
+          </p>
+          <div className="mt-6 rounded-lg border border-kinari/15 bg-kinari/5 p-6">
+            <FingeringEditor sound={theme.name} />
+          </div>
+        </section>
 
         <RankingBoard boards={[{ form: "sentence", entries }]} />
 

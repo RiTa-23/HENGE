@@ -16,6 +16,7 @@ import {
   type TypingProgress,
 } from "@henge/shared";
 import { useCallback, useEffect, useRef, useState } from "react";
+import { FingeringEditor } from "@/components/FingeringEditor";
 import { FormMark } from "@/components/FormMark";
 import { Logo } from "@/components/Logo";
 import { authClient } from "@/lib/api/auth-client";
@@ -34,6 +35,12 @@ import { readJsonBody } from "@/lib/api/json";
 import { readOffset, writeOffset } from "@/lib/play/offset";
 import { mergeMissedKeys } from "@/lib/play/misses";
 import { addTally, EMPTY_TALLY, findTargets, type TargetTally } from "@/lib/practice/targets";
+import {
+  chosenFingerAt,
+  chosenRomans,
+  type Fingering,
+  readFingering,
+} from "@/lib/practice/fingering";
 import {
   readFingerGuide,
   readMuted,
@@ -241,6 +248,13 @@ export function PlayScreen({
   /** ローマ字列を大文字で出すか。同上 */
   const [romanUpper, setRomanUpper] = useState(false);
   /**
+   * 最適化の運指（最適化練習で、的の箇所に出す打ち方と指）。同上。
+   * お題を出すたびに打ち方を当てるので ref にも持つ（`mutedRef` と同じく、
+   * 開始の合図の effect を設定の変更で出し直させない）
+   */
+  const [fingering, setFingering] = useState<Fingering | null>(null);
+  const fingeringRef = useRef<Fingering | null>(null);
+  /**
    * 消音の最新値。開始の合図の音は合図のタイマーと同じ effect で鳴らすので、
    * deps に `muted` を入れると、合図の最中に音を切り替えただけで合図が出し直しになる
    * （計時の始まりもずれる）。ref 経由で値だけを見る（`loggedIn` と同じ）
@@ -269,19 +283,36 @@ export function PlayScreen({
   const loggedIn = useRef(false);
 
   /**
+   * お題1問の打ち始め。最適化練習では、的の箇所に決めた打ち方を出す
+   * （`chosenRomans`。表示だけで、受理する打ち方は変わらない）
+   */
+  const typingFor = useCallback(
+    (prompt: Prompt | undefined): TypingProgress => {
+      if (prompt === undefined) return startTyping([]);
+      if (kind !== "constraint") return startTyping(prompt.readingRoman);
+      const spans = findTargets(splitKanaUnits(prompt.readingKana), themeName);
+      return startTyping(prompt.readingRoman, chosenRomans(fingeringRef.current, spans));
+    },
+    [kind, themeName],
+  );
+
+  /**
    * 1問目を出して打ち始める。**開始の合図が消えた瞬間に呼ぶ。**
    * ここで `startedAt` を置くので、合図のぶんは計時に入らない。
    */
-  const beginPlay = useCallback((session: SessionResponse) => {
-    setPromptIndex(0);
-    setStats({ hits: 0, misses: 0, elapsedMs: 0 });
-    setMissedKeys(new Map());
-    setTargetTally(EMPTY_TALLY);
-    setFinished(null);
-    startedAt.current = performance.now();
-    setProgress(startTyping(session.prompts[0]?.readingRoman ?? []));
-    setPhase({ name: "playing", session });
-  }, []);
+  const beginPlay = useCallback(
+    (session: SessionResponse) => {
+      setPromptIndex(0);
+      setStats({ hits: 0, misses: 0, elapsedMs: 0 });
+      setMissedKeys(new Map());
+      setTargetTally(EMPTY_TALLY);
+      setFinished(null);
+      startedAt.current = performance.now();
+      setProgress(typingFor(session.prompts[0]));
+      setPhase({ name: "playing", session });
+    },
+    [typingFor],
+  );
 
   /**
    * 途中でやめて開始前へ戻る。**取得済みのお題は捨てる。**
@@ -401,6 +432,10 @@ export function PlayScreen({
   }, []);
 
   useEffect(() => {
+    if (kind === "constraint") changeFingering(readFingering(themeName));
+  }, [kind, themeName]);
+
+  useEffect(() => {
     mutedRef.current = muted;
   }, [muted]);
 
@@ -421,6 +456,12 @@ export function PlayScreen({
     setFingerGuide(next);
     writeFingerGuide(next);
   };
+
+  /** 保存は `FingeringEditor` が済ませている。ここでは画面に持つだけ */
+  function changeFingering(next: Fingering | null) {
+    fingeringRef.current = next;
+    setFingering(next);
+  }
 
   const toggleRomanUpper = () => {
     const next = !romanUpper;
@@ -630,7 +671,7 @@ export function PlayScreen({
     if (finishedPrompt !== undefined) setFinished({ prompt: finishedPrompt, progress: next });
     setPromptIndex(upcoming);
     // 撒菱は次の問題で消える（新しい TypingProgress を作り直すため）
-    setProgress(startTyping(phase.session.prompts[upcoming]?.readingRoman ?? []));
+    setProgress(typingFor(phase.session.prompts[upcoming]));
   };
 
   if (phase.name === "ready") {
@@ -663,6 +704,29 @@ export function PlayScreen({
           {/* 開始前は縦に並べて幅を揃える。横に並べると枠の幅に収まらず2つと1つに割れ、
               長さの違うスイッチが段違いに並ぶ */}
           <div className="mx-auto mt-8 grid w-fit gap-2">{settingToggles}</div>
+
+          {/*
+            最適化の運指。**打つ直前に決め直せるよう、開始前にも置く**（詳細ページと同じ設定）。
+            畳んでおく。開けたままだと「Space で開始」が枠の下に押し出される。
+            長文は最適化練習に無い（形式は短文だけ）が、キーボードを出さない形式では
+            運指ガイドも出ないので、念のため形式でも絞る
+          */}
+          {kind === "constraint" && form !== "long" && (
+            <details className="group mx-auto mt-6 w-fit">
+              <summary className="mx-auto w-fit cursor-pointer list-none rounded-full border border-kinari/15 px-4 py-1.5 text-xs tracking-widest text-kinari/60 transition-colors hover:border-kin hover:text-kinari">
+                運指を決める
+                <span className="ml-2 text-kinari/40">
+                  {fingering === null ? "標準" : "最適化"}
+                </span>
+                <span className="ml-2 inline-block transition-transform group-open:rotate-180">
+                  ▾
+                </span>
+              </summary>
+              <div className="mt-5">
+                <FingeringEditor sound={themeName} onChange={changeFingering} />
+              </div>
+            </details>
+          )}
         </div>
 
         {/* 離脱の導線は枠の外に置く。枠の中は「開始」に関することだけ。
@@ -946,7 +1010,20 @@ export function PlayScreen({
 
           <div className="flex flex-col gap-5 border-t border-kin/40 pt-6">
             <Keyboard nextKey={nextKey} missKey={missKey} />
-            {fingerGuide && <FingerGuide nextKey={nextKey} />}
+            {fingerGuide && (
+              <FingerGuide
+                nextKey={nextKey}
+                chosen={
+                  kind === "constraint"
+                    ? chosenFingerAt(
+                        progress,
+                        findTargets(splitKanaUnits(prompt.readingKana), themeName),
+                        fingering,
+                      )
+                    : null
+                }
+              />
+            )}
           </div>
         </>
       )}

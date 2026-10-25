@@ -9,6 +9,7 @@ import {
   N_REQUEST_LONG,
   N_REQUEST_WORD,
   requestCount,
+  wordGroupsFor,
 } from "../src/generation/batch";
 import {
   DEFAULT_MAX_TOKENS,
@@ -16,7 +17,12 @@ import {
   modelConfig,
   resolveModel,
 } from "../src/generation/model";
-import { parseGeneratedBlocks, parseGeneratedLines } from "../src/generation/prompt";
+import {
+  buildGenerationPrompt,
+  parseGeneratedBlocks,
+  parseGeneratedLines,
+} from "../src/generation/prompt";
+import { vocabularyFor } from "../src/generation/vocabulary";
 import { fromSingle, type GetReading } from "./fake-readings";
 
 describe("parseGeneratedLines", () => {
@@ -68,6 +74,91 @@ describe("parseGeneratedBlocks（長文）", () => {
       "忍びは走る。",
       "影が揺れた。",
     ]);
+  });
+});
+
+describe("最適化の生成（語を渡して文を作らせる）", () => {
+  it("語彙から選んだ語を組にしてプロンプトに載せる。指定の音そのものは書かない", async () => {
+    const prompts: string[] = [];
+    await generateBatch(
+      envCapturingPrompts([[], []], prompts),
+      input({ kind: "constraint", name: "ざ", target: 1, vocabulary: ZA_WORDS }),
+    );
+
+    const words = wordsInPrompt(prompts[0] ?? "");
+    expect(words).toHaveLength(N_REQUEST * 2);
+    const known = new Set(ZA_WORDS.map((w) => w.text));
+    for (const word of words) expect(known.has(word)).toBe(true);
+    // 書くと、渡した語を無視してその音で書き始める癖が戻る
+    expect(prompts[0]).not.toContain("「ざ」");
+  });
+
+  it("1回の生成の中では、2ラウンド目に1ラウンド目と同じ語を渡さない", async () => {
+    const prompts: string[] = [];
+    await generateBatch(
+      envCapturingPrompts([[], []], prompts),
+      input({ kind: "constraint", name: "ざ", target: 1, vocabulary: ZA_WORDS }),
+    );
+
+    expect(prompts).toHaveLength(2);
+    const first = new Set(wordsInPrompt(prompts[0] ?? ""));
+    for (const word of wordsInPrompt(prompts[1] ?? "")) expect(first.has(word)).toBe(false);
+  });
+
+  it("生成ごとに選ぶ語が変わる（ランダム）", async () => {
+    const a: string[] = [];
+    const b: string[] = [];
+    let seed = 1;
+    const random = () => ((seed = (seed * 16807) % 2147483647) - 1) / 2147483646;
+    const base = { kind: "constraint" as const, name: "ざ", target: 1, vocabulary: ZA_WORDS };
+    await generateBatch(envCapturingPrompts([[], []], a), input({ ...base, random }));
+    await generateBatch(envCapturingPrompts([[], []], b), input({ ...base, random }));
+
+    expect(wordsInPrompt(a[0] ?? "")).not.toEqual(wordsInPrompt(b[0] ?? ""));
+  });
+
+  it("語彙が空なら AI を呼ばずに終わる（ニューロンを使わない）", async () => {
+    const prompts: string[] = [];
+    let recorded = 0;
+    const result = await generateBatch(envCapturingPrompts([[], []], prompts), {
+      ...input({ kind: "constraint", name: "を", target: 1, vocabulary: [] }),
+      onNeurons: () => {
+        recorded++;
+      },
+    });
+
+    expect(prompts).toHaveLength(0);
+    expect(recorded).toBe(0);
+    expect(result).toMatchObject({ rounds: 0, neurons: 0, reachedTarget: false });
+  });
+
+  it("語が足りなければ先頭に戻って使い回す", () => {
+    const words = [
+      { text: "座席", reading: "ざせき" },
+      { text: "雑誌", reading: "ざっし" },
+      { text: "財布", reading: "さいふ" },
+    ];
+    expect(wordGroupsFor(words, 1, 2, 2)).toEqual([
+      ["座席", "雑誌"],
+      ["財布", "座席"],
+    ]);
+    expect(wordGroupsFor(words, 2, 2, 2)).toEqual([
+      ["雑誌", "財布"],
+      ["座席", "雑誌"],
+    ]);
+  });
+
+  it("3語の案では「2語以上を選んで使う」と指示する", () => {
+    const { user } = buildGenerationPrompt({
+      kind: "constraint",
+      name: "ざ",
+      count: 1,
+      existing: [],
+      wordGroups: [["座席", "雑誌", "財産"]],
+      wordsPerSentence: 3,
+    });
+    expect(user).toContain("2語以上");
+    expect(user).toContain("座席／雑誌／財産");
   });
 });
 
@@ -173,6 +264,36 @@ function envWithAiResponses(rounds: string[][], logs: PatchedLog[] = []): Env {
   return { ...env, AI: ai } as unknown as Env;
 }
 
+/** 最適化の語彙。共通語彙リストから本物を取る（最低100語） */
+const ZA_WORDS = vocabularyFor("ざ");
+
+/** AIへの依頼（ユーザー側のメッセージ）を記録する env。応答はラウンドごとに返す */
+function envCapturingPrompts(rounds: string[][], prompts: string[]): Env {
+  let call = 0;
+  const ai = {
+    async run(_model: string, body: { messages: { role: string; content: string }[] }) {
+      prompts.push(body.messages.find((m) => m.role === "user")?.content ?? "");
+      return { response: (rounds[call++] ?? []).join("\n") };
+    },
+    aiGatewayLogId: "log-id",
+    gateway: () => ({ patchLog: async () => {} }),
+  };
+  return { ...env, AI: ai } as unknown as Env;
+}
+
+/** プロンプトの「語の組:」以降に並んだ語 */
+function wordsInPrompt(prompt: string): string[] {
+  return (
+    prompt
+      .slice(prompt.indexOf("語の組:") + "語の組:".length)
+      .trim()
+      .split("\n")
+      // 末尾にはモデル固有の指示（qwen3 の /no_think）が付く
+      .filter((line) => !line.startsWith("/"))
+      .flatMap((line) => line.split("／"))
+  );
+}
+
 function input(overrides: Partial<GenerateBatchInput> = {}): GenerateBatchInput {
   return {
     kind: "theme",
@@ -236,6 +357,45 @@ describe("generateBatch", () => {
     expect(readingCalls).toBe(1); // 弾いた分は読み取得を呼ばない
   });
 
+  it("依頼した件数より多く返っても、読み取得には依頼した件数までしか渡さない（読み Worker の上限）", async () => {
+    const sizes: number[] = [];
+    // 書き出しの重なりで弾かれないよう、1文字目を変える
+    const lines = Array.from(
+      { length: 60 },
+      (_, i) => `${String.fromCodePoint(0x4e00 + i)}は闇を走る。`,
+    );
+    const reading = fromSingle(async () => fakeReading("忍びは闇を走る。"));
+    const result = await generateBatch(envWithAiResponses([lines, lines]), {
+      ...input({ target: 100 }),
+      getReadings: async (texts) => {
+        sizes.push(texts.length);
+        return reading(texts);
+      },
+    });
+
+    expect(sizes[0]).toBe(N_REQUEST);
+    for (const size of sizes) expect(size).toBeLessThanOrEqual(N_REQUEST);
+    // 枠を超えた行は数えずに捨てる（seen に入れない）ので、2ラウンド目で採られうる
+    expect(result.valid.length).toBeLessThanOrEqual(N_REQUEST * result.rounds);
+  });
+
+  it("前置きの行は件数に数えない（20文の前に前置きが1行あっても20文とも検査する）", async () => {
+    const sentences = Array.from(
+      { length: N_REQUEST },
+      (_, i) => `${String.fromCodePoint(0x4e00 + i)}は闇を走る。`,
+    );
+    // 実測で出た前置き。「〜個」の数字が文字種で落ちる
+    const preamble = "提供された語を使って自然な日本語の短文を20個作成します。";
+    const reading = fromSingle(async () => fakeReading("忍びは闇を走る。"));
+    const result = await generateBatch(
+      envWithAiResponses([[preamble, ...sentences]]),
+      input({ target: N_REQUEST, getReadings: reading }),
+    );
+
+    expect(result.rejected.charset).toBe(1);
+    expect(result.valid.map((p) => p.text)).toEqual(sentences);
+  });
+
   it("打鍵数が範囲外なら keystroke で却下する", async () => {
     const result = await generateBatch(
       envWithAiResponses([["影。", "忍びは闇を走る。"], []]),
@@ -249,7 +409,7 @@ describe("generateBatch", () => {
   it("含むモードで指定文字が読みに無ければ constraint で却下する", async () => {
     const result = await generateBatch(
       envWithAiResponses([["座禅を組む。", "静寂が満ちる。"], []]),
-      input({ kind: "constraint", name: "ざ", target: 2 }),
+      input({ kind: "constraint", name: "ざ", target: 2, vocabulary: ZA_WORDS }),
     );
 
     expect(result.rejected.constraint).toBe(1);
@@ -278,7 +438,7 @@ describe("generateBatch", () => {
     await generateBatch(
       // 「ざぜんをくむ。」は1回、「ざあざあとざつおん。」は3回
       envWithAiResponses([["座禅を組む。", "ざあざあと雑音。"], []], logs),
-      input({ kind: "constraint", name: "ざ", target: 2 }),
+      input({ kind: "constraint", name: "ざ", target: 2, vocabulary: ZA_WORDS }),
     );
 
     expect(logs[0]?.metadata?.counts).toContain("twice:1");
@@ -339,6 +499,22 @@ describe("generateBatch", () => {
     expect(result.rejected.opening).toBe(0);
   });
 
+  it("NG 語の入ったお題は ng で却下する（テーマでも検査する）", async () => {
+    const result = await generateBatch(
+      envWithAiResponses([["夜道で痴漢に遭った。", "影が揺れた。"], []]),
+      input({ target: 1 }),
+    );
+    expect(result.valid.map((v) => v.text)).toEqual(["影が揺れた。"]);
+    expect(result.rejected.ng).toBe(1);
+  });
+
+  it("NG 語は単語でも見る", async () => {
+    const word = await generateBatch(envWithAiResponses([["ポルノ"]]), {
+      ...input({ form: "word", target: 1 }),
+    });
+    expect(word.rejected.ng).toBe(1);
+  });
+
   it("既存お題と重複するものは除外する", async () => {
     const result = await generateBatch(
       envWithAiResponses([["忍びは闇を走る。", "影が揺れた。"], []]),
@@ -365,11 +541,11 @@ describe("generateBatch", () => {
 
     expect(logs).toHaveLength(2);
     expect(logs[0]?.metadata?.counts).toBe(
-      "charset:1,kanji:0,opening:0,keystroke:0,constraint:0,punct:0,dup:0",
+      "charset:1,kanji:0,opening:0,keystroke:0,constraint:0,punct:0,ng:0,dup:0",
     );
     // 累積を渡していれば charset:2 になる
     expect(logs[1]?.metadata?.counts).toBe(
-      "charset:1,kanji:0,opening:0,keystroke:0,constraint:0,punct:0,dup:0",
+      "charset:1,kanji:0,opening:0,keystroke:0,constraint:0,punct:0,ng:0,dup:0",
     );
   });
 

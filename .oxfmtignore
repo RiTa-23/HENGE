@@ -10,3 +10,6 @@
 
 # wasm-bindgen が生成する（packages/reading-wasm/README.md）。再生成で元に戻る
 packages/reading-wasm/pkg/
+
+# scripts/vocabulary/build.py が生成する（約78万バイトの文字列1つ）。再生成で元に戻る
+apps/backend/src/generation/vocabulary.generated.ts

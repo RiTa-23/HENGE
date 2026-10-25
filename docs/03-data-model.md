@@ -82,6 +82,19 @@ CREATE UNIQUE INDEX prompts_theme_form_seq ON prompts (theme_id, form, sequence_
 
 **テーマ行はお題10問と同じバッチで挿入する。** テーマ行を先に作ると、生成失敗時にお題ゼロのテーマが公開一覧に残り、クリックしても何も遊べない状態になる。
 
+## constraint_vocabularies
+
+最適化練習（`kind: 'constraint'`）の語彙。**1つの最適化につき1行。** 作成時に共通語彙リスト（`apps/backend/src/generation/vocabulary.ts`）から、読みに指定の連接を含む語をよく使われる順に最大1000語選んで保存する。生成のたびにこの中からランダムに選んでモデルに渡す（`docs/05-generation.md` の「最適化練習の語彙」）。
+
+| カラム | 型 | 制約 | 説明 |
+|---|---|---|---|
+| `theme_id` | TEXT | PK, FK→`themes.id` ON DELETE CASCADE | |
+| `words_json` | TEXT | NOT NULL | `[表記, 読み][]` の JSON。よく使われる順。最大1000語で約20KB |
+
+**1語1行にしない。** 1000語を1語1行で挿入するとバインド変数の上限（1文100個）で約31文に割れ、テーマ行・お題と同じバッチがそのぶん重くなる。生成時も `ORDER BY RANDOM()` が最大1000行を読む。1行の JSON なら挿入も読み取りも1回で済む。
+
+**テーマ行・お題10問と同じバッチで挿入する**（お題と同じ理由。語彙だけ残る・語彙の無い最適化が残る、を防ぐ）。語彙を保存するようになる前に作られた最適化には、最初の生成で共通リストから作って保存する（`loadConstraintVocabulary`。100語に届かない連接なら保存しない）。
+
 ## user_theme_progress
 
 ログインユーザーのみ。匿名ユーザーはlocalStorageで同等の値を保持する。
@@ -150,6 +163,7 @@ MVPでは日次上限のみ（**500ニューロン/日**）。月次上限は設
 | 対象 | 消え方 |
 |---|---|
 | `prompts` | FKのCASCADEで自動削除 |
+| `constraint_vocabularies` | 同上 |
 | `user_theme_progress` / `rankings` | 同上 |
 | **KVのキャッシュ・ロック** | **自動では消えない。削除処理で明示的に削除する**（ロックは**形式ぶんすべて**） |
 

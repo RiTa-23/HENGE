@@ -3,6 +3,8 @@ import { asBatch, chunk } from "./batch";
 import type { Db } from "./client";
 import { prompts, themes } from "./schema";
 import type { ValidPrompt } from "../generation/batch";
+import type { VocabularyWord } from "../generation/vocabulary";
+import { constraintVocabularyInsert } from "./vocabularies";
 import type { PromptForm, ThemeKind } from "@henge/shared";
 
 /**
@@ -135,10 +137,11 @@ function toRows(
 }
 
 /**
- * テーマとお題を**同じバッチで**挿入する。
+ * テーマとお題を**同じバッチで**挿入する。最適化なら語彙も同じバッチに入れる。
  *
  * テーマ行を先に作ると、生成失敗時にお題ゼロのテーマが公開一覧に残り、
- * クリックしても何も遊べない状態になる。
+ * クリックしても何も遊べない状態になる。語彙だけを別に入れると、語彙だけが残る・
+ * 語彙の無い最適化が残る、のどちらかが起きうる。
  */
 export async function insertThemeWithPrompts(
   db: Db,
@@ -151,13 +154,17 @@ export async function insertThemeWithPrompts(
   },
   items: ValidPrompt[],
   model: string,
+  /** 最適化の語彙（`constraint_vocabularies`）。テーマでは渡さない */
+  vocabulary?: VocabularyWord[],
 ): Promise<void> {
   // 新規作成で作るのは短文のプールだけ。**単語を同じリクエストで作らない**
   // （1実行の外部サブリクエスト上限50回に対し、2形式で最大80回になる）
   const rows = toRows(theme.id, "sentence", model, 1, items);
   const inserts = chunk(rows, INSERT_CHUNK_SIZE).map((part) => db.insert(prompts).values(part));
   // テーマ行とお題を同じバッチで入れる。分割してもバッチの中に収める
-  await db.batch(asBatch([db.insert(themes).values(theme), ...inserts]));
+  const vocabularyInsert =
+    vocabulary === undefined ? [] : [constraintVocabularyInsert(db, theme.id, vocabulary)];
+  await db.batch(asBatch([db.insert(themes).values(theme), ...inserts, ...vocabularyInsert]));
 }
 
 /**

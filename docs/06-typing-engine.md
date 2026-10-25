@@ -59,8 +59,8 @@
 | かな | 候補 |
 |---|---|
 | ふぁ / ふぃ / ふぇ / ふぉ | `fa` / `fi` / `fe` / `fo` |
-| じぇ / ぢぇ / ちぇ | `je`・`zye`・`jye` / `dye` / `che`・`tye`・`cye` |
-| てぃ / でぃ | `thi` / `dhi` |
+| しぇ / じぇ / ぢぇ / ちぇ | `she`・`sye` / `je`・`zye`・`jye` / `dye` / `che`・`tye`・`cye` |
+| てぃ / てゅ / でぃ / でゅ | `thi` / `thu` / `dhi` / `dhu` |
 | うぁ / うぃ / うぇ / うぉ | `wha` / `wi`・`whi` / `we`・`whe` / `who` |
 | ゔ | `vu` |
 

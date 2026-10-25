@@ -122,6 +122,7 @@ const YOUON_DIRECT: Record<string, string[]> = {
   きょ: ["kyo"],
   しゃ: ["sha", "sya"],
   しゅ: ["shu", "syu"],
+  しぇ: ["she", "sye"],
   しょ: ["sho", "syo"],
   ちゃ: ["cha", "tya", "cya"],
   ちゅ: ["chu", "tyu", "cyu"],
@@ -165,7 +166,9 @@ const FOREIGN: Record<string, string[]> = {
   ふぇ: ["fe"],
   ふぉ: ["fo"],
   てぃ: ["thi"],
+  てゅ: ["thu"],
   でぃ: ["dhi"],
+  でゅ: ["dhu"],
   /**
    * わ行の外来語（`wh` 系）。**4つまとめて持つ。**
    * `うぉ` だけ足すと、隣り合う `うぁ` が分解入力でしか打てないままになり、

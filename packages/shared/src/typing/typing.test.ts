@@ -155,6 +155,20 @@ describe("外来語のかな", () => {
     expect(accepts("ちぇ", 0, "tixe")).toBe(true);
   });
 
+  // 「シェア」「シェフ」が し+ぇ に割れていて、IMEで通る she / sye が通らなかった
+  test("しぇ は she / sye、分解入力もできる", () => {
+    expect(accepts("しぇ", 0, "she")).toBe(true);
+    expect(accepts("しぇ", 0, "sye")).toBe(true);
+    expect(accepts("しぇ", 0, "sixe")).toBe(true);
+  });
+
+  // 「プロデューサー」。てぃ / でぃ と同じ th / dh 系で揃える（てゅ は でゅ の対）
+  test("てゅ は thu、でゅ は dhu", () => {
+    expect(accepts("てゅ", 0, "thu")).toBe(true);
+    expect(accepts("でゅ", 0, "dhu")).toBe(true);
+    expect(accepts("でゅ", 0, "dexyu")).toBe(true);
+  });
+
   test("うぃ・うぇ・ゔ", () => {
     expect(accepts("うぃ", 0, "wi")).toBe(true);
     expect(accepts("うぇ", 0, "we")).toBe(true);

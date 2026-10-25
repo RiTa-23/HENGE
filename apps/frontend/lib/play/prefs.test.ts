@@ -1,5 +1,12 @@
 import { beforeEach, describe, expect, it } from "bun:test";
-import { readFingerGuide, readMuted, writeFingerGuide, writeMuted } from "./prefs";
+import {
+  readFingerGuide,
+  readMuted,
+  readRomanUpper,
+  writeFingerGuide,
+  writeMuted,
+  writeRomanUpper,
+} from "./prefs";
 
 /**
  * bun のテスト環境には localStorage が無いので最小限の実装を置く
@@ -76,5 +83,24 @@ describe("運指ガイドの表示設定", () => {
     localStorage.setItem("henge:finger-guide", "にんじゃ");
 
     expect(readFingerGuide()).toBe(true);
+  });
+});
+
+describe("ローマ字の大文字表示の設定", () => {
+  // これまでの表示（小文字）を既定に保つ
+  it("何も保存していなければ小文字", () => {
+    expect(readRomanUpper()).toBe(false);
+  });
+
+  it("大文字にしたことを覚える", () => {
+    writeRomanUpper(true);
+
+    expect(readRomanUpper()).toBe(true);
+  });
+
+  it("読めない値は小文字に倒す", () => {
+    localStorage.setItem("henge:roman-upper", "にんじゃ");
+
+    expect(readRomanUpper()).toBe(false);
   });
 });

@@ -44,3 +44,8 @@ export const writeMuted = (muted: boolean) => writeFlag(MUTED_KEY, muted);
 const FINGER_GUIDE_KEY = "henge:finger-guide";
 export const readFingerGuide = () => readFlag(FINGER_GUIDE_KEY, true);
 export const writeFingerGuide = (shown: boolean) => writeFlag(FINGER_GUIDE_KEY, shown);
+
+/** ローマ字列を大文字で出すか。**既定は小文字**（これまでの表示） */
+const ROMAN_UPPER_KEY = "henge:roman-upper";
+export const readRomanUpper = () => readFlag(ROMAN_UPPER_KEY, false);
+export const writeRomanUpper = (upper: boolean) => writeFlag(ROMAN_UPPER_KEY, upper);

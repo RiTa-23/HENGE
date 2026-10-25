@@ -21,6 +21,11 @@ export interface PromptLinesProps {
    * 読みの行でその範囲のかなを輪で囲む
    */
   targets?: readonly TargetSpan[];
+  /**
+   * ローマ字列を大文字で出すか（設定の「大文字」）。**表示だけを変える。**
+   * 判定は小文字の候補テーブルのまま（打鍵は `normalizeTypedKey` が小文字に倒す）
+   */
+  upper?: boolean;
 }
 
 /**
@@ -73,7 +78,13 @@ function kanaLine(
  * 情報を持っていないため、進捗に合わせて色を変えると必ずずれる。
  * 進捗は読みの行とローマ字の行で示す。
  */
-export function PromptLines({ text, kanaUnits, progress, targets = [] }: PromptLinesProps) {
+export function PromptLines({
+  text,
+  kanaUnits,
+  progress,
+  targets = [],
+  upper = false,
+}: PromptLinesProps) {
   const { text: roman, cursor } = romanDisplay(progress);
 
   return (
@@ -101,7 +112,7 @@ export function PromptLines({ text, kanaUnits, progress, targets = [] }: PromptL
                   : "relative text-kinari/30"
             }
           >
-            {letter}
+            {upper ? letter.toUpperCase() : letter}
             {progress.misses.has(index) && <Makibishi />}
             {index === cursor && (
               <span className="kunai" aria-hidden="true">

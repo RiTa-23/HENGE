@@ -32,7 +32,14 @@ import { readJsonBody } from "@/lib/api/json";
 import { readOffset, writeOffset } from "@/lib/play/offset";
 import { mergeMissedKeys } from "@/lib/play/misses";
 import { addTally, EMPTY_TALLY, findTargets, type TargetTally } from "@/lib/practice/targets";
-import { readFingerGuide, readMuted, writeFingerGuide, writeMuted } from "@/lib/play/prefs";
+import {
+  readFingerGuide,
+  readMuted,
+  readRomanUpper,
+  writeFingerGuide,
+  writeMuted,
+  writeRomanUpper,
+} from "@/lib/play/prefs";
 import { playHit, playMiss, primeAudio } from "@/lib/play/sound";
 import { detailHref, formColor, formLabel, kindLabel, listHref } from "@/lib/ui/kind";
 
@@ -201,6 +208,8 @@ export function PlayScreen({
   const [muted, setMuted] = useState(false);
   /** 運指ガイド（押す指）を出すか。muted と同じく描画してから読む */
   const [fingerGuide, setFingerGuide] = useState(true);
+  /** ローマ字列を大文字で出すか。同上 */
+  const [romanUpper, setRomanUpper] = useState(false);
   const missTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const startedAt = useRef<number>(0);
   const surface = useRef<HTMLDivElement>(null);
@@ -351,6 +360,7 @@ export function PlayScreen({
   useEffect(() => {
     setMuted(readMuted());
     setFingerGuide(readFingerGuide());
+    setRomanUpper(readRomanUpper());
   }, []);
 
   useEffect(() => {
@@ -371,6 +381,12 @@ export function PlayScreen({
     writeFingerGuide(next);
   };
 
+  const toggleRomanUpper = () => {
+    const next = !romanUpper;
+    setRomanUpper(next);
+    writeRomanUpper(next);
+  };
+
   /**
    * 設定のスイッチ。開始前とプレイ中で同じものを並べる。
    * **運指は長文では出さない。** 長文はキーボードを出さないので、指だけ出しても
@@ -387,6 +403,12 @@ export function PlayScreen({
           onToggle={toggleFingerGuide}
         />
       )}
+      <SettingToggle
+        label="大文字"
+        ariaLabel="ローマ字を大文字で表示"
+        on={romanUpper}
+        onToggle={toggleRomanUpper}
+      />
     </>
   );
 
@@ -778,6 +800,7 @@ export function PlayScreen({
             text={prompt.text}
             kanaUnits={splitKanaUnits(prompt.readingKana)}
             progress={progress}
+            upper={romanUpper}
           />
           <LongProgress progress={progress} />
         </div>
@@ -792,12 +815,14 @@ export function PlayScreen({
                 progress={progress}
                 // 最適化する音は themeName（最適化練習ではテーマ名＝音）
                 targets={findTargets(splitKanaUnits(prompt.readingKana), themeName)}
+                upper={romanUpper}
               />
             ) : (
               <Scroll
                 text={prompt.text}
                 kanaUnits={splitKanaUnits(prompt.readingKana)}
                 progress={progress}
+                upper={romanUpper}
               />
             )}
 

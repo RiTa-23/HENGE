@@ -1,11 +1,20 @@
-import { and, desc, eq, sql } from "drizzle-orm";
+import { and, desc, eq, inArray, isNull, sql } from "drizzle-orm";
 import { asBatch, chunk } from "./batch";
 import type { Db } from "./client";
 import { prompts, themes } from "./schema";
 import type { ValidPrompt } from "../generation/batch";
 import type { VocabularyWord } from "../generation/vocabulary";
 import { constraintVocabularyInsert } from "./vocabularies";
-import type { PromptForm, ThemeKind } from "@henge/shared";
+import type { PromptForm, PromptReportReason, ThemeKind } from "@henge/shared";
+
+/**
+ * 配信できるお題の条件。**報告されたお題（`reported_at` あり）は外す。**
+ *
+ * 在庫数（`countPrompts` / テーマ詳細の件数）と配信（`fetchPromptPage`）の両方に
+ * 同じ条件をかけること。片方だけだと「在庫はあるのに10問揃わない」ずれが出る。
+ */
+const servable = (themeId: string, form: PromptForm) =>
+  and(eq(prompts.themeId, themeId), eq(prompts.form, form), isNull(prompts.reportedAt));
 
 /**
  * テーマ内のお題の数。**`COUNT(*)` で数える（`MAX(sequence_number)` ではない）。**
@@ -18,7 +27,7 @@ export async function countPrompts(db: Db, themeId: string, form: PromptForm): P
   const [row] = await db
     .select({ count: sql<number>`count(*)` })
     .from(prompts)
-    .where(and(eq(prompts.themeId, themeId), eq(prompts.form, form)));
+    .where(servable(themeId, form));
   return row?.count ?? 0;
 }
 
@@ -57,6 +66,7 @@ export interface PlayablePrompt {
  *
  * 削除の影響は「以降のお題が1つずつ手前にずれる」だけになる。まだ遊んでいない
  * ユーザーには関係がなく、進んでいるユーザーも1問ずれるだけで済む。
+ * 報告で外したお題（`servable`）も同じ扱いになる。
  */
 export async function fetchPromptPage(
   db: Db,
@@ -73,7 +83,7 @@ export async function fetchPromptPage(
       readingRomanJson: prompts.readingRomanJson,
     })
     .from(prompts)
-    .where(and(eq(prompts.themeId, themeId), eq(prompts.form, form)))
+    .where(servable(themeId, form))
     .orderBy(prompts.sequenceNumber)
     .limit(limit)
     .offset(offset);
@@ -86,7 +96,12 @@ export async function fetchPromptPage(
   }));
 }
 
-/** 重複回避の文脈として渡す既存お題（直近から） */
+/**
+ * 重複回避の文脈として渡す既存お題（直近から）。
+ *
+ * **報告で外したお題も含める。** 「これと同じものを作らない」ための一覧なので、
+ * 外したお題を抜くと、同じおかしな文がまた作られうる。
+ */
 export async function recentPromptTexts(
   db: Db,
   themeId: string,
@@ -197,6 +212,8 @@ export interface AdminPrompt {
   sequenceNumber: number;
   model: string | null;
   createdAt: number;
+  /** 報告で配信から外れていれば、その時刻。管理画面で「外れている」と分かるように返す */
+  reportedAt: number | null;
 }
 
 /** 管理画面のお題一覧。既定の取得件数 */
@@ -225,8 +242,10 @@ export async function listPromptsForAdmin(
       sequenceNumber: prompts.sequenceNumber,
       model: prompts.model,
       createdAt: prompts.createdAt,
+      reportedAt: prompts.reportedAt,
     })
     .from(prompts)
+    // **報告で外したお題も出す**（管理者は中身を見て直すので、外れていても一覧から消さない）。
     // **形式で絞る。** 短文と単語はプールが別で、連番も1から振り直される。
     // 混ぜて出すと番号が2回りして、どの行を消せばよいか読めない
     .where(and(eq(prompts.themeId, themeId), eq(prompts.form, form)))
@@ -297,4 +316,95 @@ export async function deletePrompt(db: Db, promptId: string): Promise<boolean> {
   if (row === undefined) return false;
   await db.delete(prompts).where(eq(prompts.id, promptId));
   return true;
+}
+
+/**
+ * おかしなお題の報告。**その場で配信から外す**（`reported_at` を立てる）。
+ *
+ * すでに報告中のお題は書き換えない（最初の報告者と理由を残す）。存在しない id は
+ * 何もしない。戻り値は今回外した件数で、呼び出し側は残りを skipped として返す。
+ *
+ * 1文の UPDATE に `IN (...)` でまとめる。報告は1回で最大20件（単語の1プレイ分）なので、
+ * バインド変数（1文100個）に収まる。
+ */
+export async function reportPrompts(
+  db: Db,
+  input: { promptIds: string[]; reason: PromptReportReason; userId: string },
+): Promise<number> {
+  const ids = [...new Set(input.promptIds)];
+  if (ids.length === 0) return 0;
+  const result = await db
+    .update(prompts)
+    .set({
+      reportedAt: sql`(unixepoch())`,
+      reportedBy: input.userId,
+      reportReason: input.reason,
+    })
+    .where(and(inArray(prompts.id, ids), isNull(prompts.reportedAt)));
+  return result.meta.changes ?? 0;
+}
+
+export interface ReportedPrompt {
+  id: string;
+  themeId: string;
+  themeKind: ThemeKind;
+  themeName: string;
+  form: PromptForm;
+  text: string;
+  readingKana: string;
+  reportedAt: number;
+  reportedBy: string | null;
+  reportReason: PromptReportReason | null;
+}
+
+/** 管理画面の報告キュー。既定の取得件数 */
+export const REPORTED_PROMPT_LIMIT_DEFAULT = 50;
+
+/**
+ * 報告で外れているお題を、新しい報告から返す。**管理画面専用。**
+ * `prompts_reported`（報告中の行だけの部分インデックス）で引くので、全お題を走査しない。
+ */
+export async function listReportedPrompts(
+  db: Db,
+  page: { limit: number; cursor: number },
+): Promise<{ prompts: ReportedPrompt[]; nextCursor: number | null }> {
+  const rows = await db
+    .select({
+      id: prompts.id,
+      themeId: prompts.themeId,
+      themeKind: themes.kind,
+      themeName: themes.name,
+      form: prompts.form,
+      text: prompts.text,
+      readingKana: prompts.readingKana,
+      reportedAt: sql<number>`${prompts.reportedAt}`,
+      reportedBy: prompts.reportedBy,
+      reportReason: prompts.reportReason,
+    })
+    .from(prompts)
+    .innerJoin(themes, eq(themes.id, prompts.themeId))
+    .where(sql`${prompts.reportedAt} IS NOT NULL`)
+    .orderBy(desc(prompts.reportedAt), desc(prompts.id))
+    .limit(page.limit + 1)
+    .offset(page.cursor);
+
+  const hasMore = rows.length > page.limit;
+  return {
+    prompts: hasMore ? rows.slice(0, page.limit) : rows,
+    nextCursor: hasMore ? page.cursor + page.limit : null,
+  };
+}
+
+/**
+ * 報告を取り消して配信に戻す。報告中でなければ何もせず false を返す
+ * （二重操作・存在しない id を区別しない。どちらも「戻せる報告が無い」）。
+ *
+ * 戻したお題は連番の位置に戻るので、以降のお題が1つずつ後ろへずれる（外したときの逆）。
+ */
+export async function restoreReportedPrompt(db: Db, promptId: string): Promise<boolean> {
+  const result = await db
+    .update(prompts)
+    .set({ reportedAt: null, reportedBy: null, reportReason: null })
+    .where(and(eq(prompts.id, promptId), sql`${prompts.reportedAt} IS NOT NULL`));
+  return (result.meta.changes ?? 0) > 0;
 }

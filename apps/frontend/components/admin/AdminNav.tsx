@@ -7,7 +7,8 @@ import { usePathname } from "next/navigation";
  * 現在のセクションは `aria-current="page"` と色で示す。
  */
 const ADMIN_TABS = [
-  { href: "/admin/reports", label: "報告" },
+  { href: "/admin/reports", label: "読みの報告" },
+  { href: "/admin/prompt-reports", label: "お題の報告" },
   { href: "/admin/themes", label: "テーマ" },
   { href: "/admin/users", label: "ユーザー" },
 ] as const;

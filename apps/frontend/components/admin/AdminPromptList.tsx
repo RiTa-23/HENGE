@@ -12,6 +12,8 @@ interface AdminPrompt {
   keystrokeCount: number;
   sequenceNumber: number;
   model: string | null;
+  /** 報告で配信から外れていればその時刻。外れていても一覧には出す */
+  reportedAt: number | null;
 }
 
 /**
@@ -204,7 +206,17 @@ export function AdminPromptList({ themeId }: { themeId: string }) {
                     {editError !== null && <p className="mt-1 text-xs text-shu">{editError}</p>}
                   </div>
                 ) : (
-                  prompt.text
+                  <>
+                    {prompt.text}
+                    {prompt.reportedAt !== null && (
+                      <a
+                        href="/admin/prompt-reports"
+                        className="ml-2 rounded border border-shu/60 px-2 py-0.5 font-gothic text-xs text-shu hover:bg-shu/10"
+                      >
+                        報告で非表示
+                      </a>
+                    )}
+                  </>
                 )}
               </td>
               <td className="py-3 pr-4 text-kinari/60">{prompt.readingKana}</td>

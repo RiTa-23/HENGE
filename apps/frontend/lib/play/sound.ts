@@ -7,33 +7,8 @@
  *
  * **鳴らすかどうかはここで決めない。** 消音の状態は画面が持ち、消音中は
  * `playHit()` / `playMiss()` を呼ばない。ここに状態を持つと、テストからも
- * 画面からも同じ値を2か所で見ることになる。
+ * 画面からも同じ値を2か所で見ることになる。消音の設定の保存は `prefs.ts`。
  */
-
-/** 消音の設定。**匿名ユーザーのデータをサーバーに持たない**（不変条件10） */
-const MUTED_KEY = "henge:muted";
-
-/** localStorage が使えない環境（プライベートウィンドウ等）でも落とさない */
-function storage(): Storage | null {
-  try {
-    return globalThis.localStorage ?? null;
-  } catch {
-    return null;
-  }
-}
-
-/** 既定は「鳴る」。読めなければ鳴る側に倒す */
-export function readMuted(): boolean {
-  return storage()?.getItem(MUTED_KEY) === "1";
-}
-
-export function writeMuted(muted: boolean): void {
-  try {
-    storage()?.setItem(MUTED_KEY, muted ? "1" : "0");
-  } catch {
-    // 容量超過・書き込み禁止。次に開いたとき既定に戻るだけで、プレイは続けられる
-  }
-}
 
 let context: AudioContext | null = null;
 let noiseBuffer: AudioBuffer | null = null;

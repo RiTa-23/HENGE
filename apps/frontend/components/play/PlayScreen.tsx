@@ -26,12 +26,14 @@ import { MatoBoard } from "./MatoBoard";
 import { ProgressDots } from "./ProgressDots";
 import { Result, type PlayStats } from "./Result";
 import { Scroll } from "./Scroll";
-import { SoundToggle } from "./SoundToggle";
+import { FingerGuide } from "./FingerGuide";
+import { SettingToggle } from "./SettingToggle";
 import { readJsonBody } from "@/lib/api/json";
 import { readOffset, writeOffset } from "@/lib/play/offset";
 import { mergeMissedKeys } from "@/lib/play/misses";
 import { addTally, EMPTY_TALLY, findTargets, type TargetTally } from "@/lib/practice/targets";
-import { playHit, playMiss, primeAudio, readMuted, writeMuted } from "@/lib/play/sound";
+import { readFingerGuide, readMuted, writeFingerGuide, writeMuted } from "@/lib/play/prefs";
+import { playHit, playMiss, primeAudio } from "@/lib/play/sound";
 import { detailHref, formColor, formLabel, kindLabel, listHref } from "@/lib/ui/kind";
 
 interface Prompt {
@@ -197,6 +199,8 @@ export function PlayScreen({
    * 出力と食い違って hydration が壊れる）。
    */
   const [muted, setMuted] = useState(false);
+  /** 運指ガイド（押す指）を出すか。muted と同じく描画してから読む */
+  const [fingerGuide, setFingerGuide] = useState(true);
   const missTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const startedAt = useRef<number>(0);
   const surface = useRef<HTMLDivElement>(null);
@@ -344,7 +348,10 @@ export function PlayScreen({
     if (attempt > 0) void load();
   }, [load, attempt]);
 
-  useEffect(() => setMuted(readMuted()), []);
+  useEffect(() => {
+    setMuted(readMuted());
+    setFingerGuide(readFingerGuide());
+  }, []);
 
   useEffect(() => {
     loggedIn.current = authSession != null;
@@ -357,6 +364,31 @@ export function PlayScreen({
     // 鳴らす側へ戻したこの操作が、音を出せる状態にするきっかけになる
     if (!next) primeAudio();
   };
+
+  const toggleFingerGuide = () => {
+    const next = !fingerGuide;
+    setFingerGuide(next);
+    writeFingerGuide(next);
+  };
+
+  /**
+   * 設定のスイッチ。開始前とプレイ中で同じものを並べる。
+   * **運指は長文では出さない。** 長文はキーボードを出さないので、指だけ出しても
+   * どのキーの話か分からない
+   */
+  const settingToggles = (
+    <>
+      <SettingToggle label="音" ariaLabel="効果音" on={!muted} onToggle={toggleSound} />
+      {form !== "long" && (
+        <SettingToggle
+          label="指"
+          ariaLabel="押す指の表示"
+          on={fingerGuide}
+          onToggle={toggleFingerGuide}
+        />
+      )}
+    </>
+  );
 
   // 予約を残したまま画面を離れない
   useEffect(() => {
@@ -535,9 +567,7 @@ export function PlayScreen({
             押すまでお題は消費されません。
           </p>
 
-          <div className="mt-8 flex justify-center">
-            <SoundToggle muted={muted} onToggle={toggleSound} />
-          </div>
+          <div className="mt-8 flex flex-wrap justify-center gap-2">{settingToggles}</div>
         </div>
 
         {/* 離脱の導線は枠の外に置く。枠の中は「開始」に関することだけ。
@@ -690,6 +720,7 @@ export function PlayScreen({
 
   const prompt = phase.session.prompts[promptIndex];
   if (prompt === undefined) return null;
+  const nextKey = nextKeyOf(progress);
 
   return (
     // **`<input>` / `<textarea>` を使わない。** 編集可能な要素があるとIMEが
@@ -717,8 +748,8 @@ export function PlayScreen({
               <span className={formColor(form).text}>{formLabel(form)}</span>
             </span>
           </div>
-          {/* 音の入/切も、やめるボタンと同じ理由でこの中に置く */}
-          <SoundToggle muted={muted} onToggle={toggleSound} />
+          {/* 設定の入/切も、やめるボタンと同じ理由でこの中に置く */}
+          <div className="flex items-center gap-2">{settingToggles}</div>
           {/*
             打鍵を拾う要素の中に置く。外に出すと、押した時点でフォーカスが
             surface から外れ、onBlur の当て直しと競合する。
@@ -778,8 +809,9 @@ export function PlayScreen({
             </div>
           </div>
 
-          <div className="border-t border-kin/40 pt-6">
-            <Keyboard nextKey={nextKeyOf(progress)} missKey={missKey} />
+          <div className="flex flex-col gap-5 border-t border-kin/40 pt-6">
+            <Keyboard nextKey={nextKey} missKey={missKey} />
+            {fingerGuide && <FingerGuide nextKey={nextKey} />}
           </div>
         </>
       )}

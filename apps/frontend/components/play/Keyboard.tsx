@@ -1,3 +1,5 @@
+import { fingerPlan, type Hand } from "@/lib/play/fingers";
+
 /**
  * キーボード表示。**4段＋Shift**（数字段・QWERTY3段・両端のShift）。
  * アルファベット3段では `！`（Shift+`1`）・`？`（Shift+`/`）・`ー`（`-`）が打てない。
@@ -68,7 +70,10 @@ interface KeyboardProps {
 }
 
 export function Keyboard({ nextKey, missKey = null }: KeyboardProps) {
-  const needsShift = nextKey?.shift ?? false;
+  // **光らせる Shift は押すキーと反対側の1つだけ**（`！` なら右、`？` なら左）。
+  // 両方光らせると、運指ガイドの「反対の手の小指で Shift」と食い違う
+  const shiftHand: Hand | null =
+    nextKey === null ? null : (fingerPlan(nextKey.key, nextKey.shift)?.shift?.hand ?? null);
 
   return (
     <div className="flex flex-col items-center gap-1.5">
@@ -80,9 +85,11 @@ export function Keyboard({ nextKey, missKey = null }: KeyboardProps) {
             // 次に打つキーになる**ことがある（`し` の `h` を先に打ってから `s`
             // を打つと、次は `h`）。ここでミスを優先すると、いま押すべきキーが
             // 赤いままになり、この画面で消したかった混同がそのまま起きる
+            // Shift は左右に1つずつ。行頭が左、行末が右
+            const side: Hand = keyIndex === 0 ? "left" : "right";
             const state =
               key === "Shift"
-                ? needsShift
+                ? side === shiftHand
                   ? "modifier"
                   : "idle"
                 : key === nextKey?.key

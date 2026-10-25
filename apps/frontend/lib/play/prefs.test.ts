@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it } from "bun:test";
-import { readMuted, writeMuted } from "./sound";
+import { readFingerGuide, readMuted, writeFingerGuide, writeMuted } from "./prefs";
 
 /**
  * bun のテスト環境には localStorage が無いので最小限の実装を置く
@@ -50,5 +50,31 @@ describe("効果音の消音設定", () => {
     localStorage.setItem("henge:muted", "にんじゃ");
 
     expect(readMuted()).toBe(false);
+  });
+});
+
+describe("運指ガイドの表示設定", () => {
+  // 既定で隠すと、指が出せること自体が伝わらない
+  it("何も保存していなければ出す", () => {
+    expect(readFingerGuide()).toBe(true);
+  });
+
+  it("隠したことを覚える", () => {
+    writeFingerGuide(false);
+
+    expect(readFingerGuide()).toBe(false);
+  });
+
+  it("出す側に戻したことも覚える", () => {
+    writeFingerGuide(false);
+    writeFingerGuide(true);
+
+    expect(readFingerGuide()).toBe(true);
+  });
+
+  it("読めない値は出す側に倒す", () => {
+    localStorage.setItem("henge:finger-guide", "にんじゃ");
+
+    expect(readFingerGuide()).toBe(true);
   });
 });

@@ -26,6 +26,11 @@ const ANCHOR_RATIO = 0.3;
  * 1行のまま `overflow: hidden` の窓に入れ、現在位置が窓の3割の位置に来るように
  * `transform` でずらす（画像のイメージ）。`useLayoutEffect` で測るのは、描画の後に
  * ずらすと1フレームだけ位置がずれて見えるため。
+ *
+ * `offsetLeft` は offsetParent（位置指定された最寄りの祖先）からの距離なので、
+ * **トラックを `relative` にして基準をトラックに固定する。** 固定しないと、まだ
+ * `transform` の無い初回だけページの端からの距離を測り、打ち始めの位置が窓の
+ * 外へずれる（`transform` が付くとトラックが基準になり、2回目から直って見える）。
  */
 function useSlide(currentIndex: number) {
   const window = useRef<HTMLDivElement>(null);
@@ -105,7 +110,7 @@ export function LongScroll({ text, kanaUnits, progress, upper = false }: LongScr
         <div ref={slide.window} className="overflow-hidden">
           <p
             ref={slide.track}
-            className="flex font-mono text-xl tracking-[0.22em] whitespace-nowrap transition-transform duration-150 ease-out motion-reduce:transition-none"
+            className="relative flex font-mono text-xl tracking-[0.22em] whitespace-nowrap transition-transform duration-150 ease-out motion-reduce:transition-none"
           >
             {columns.map(({ segment, unitIndex, start }) => (
               <span key={unitIndex} className="flex w-[2.75em] shrink-0 flex-col items-center">

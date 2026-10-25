@@ -1,4 +1,4 @@
-import { isHiraganaOnly, playStatsRejection } from "@henge/shared";
+import { constraintCharRejection, playStatsRejection } from "@henge/shared";
 import { z } from "zod";
 
 /**
@@ -12,11 +12,12 @@ export const themeNameSchema = z
     z.object({ kind: z.literal("theme"), name: z.string().trim().min(1).max(30) }),
     z.object({ kind: z.literal("constraint"), name: z.string().trim().min(1).max(4) }),
   ])
-  // NFC正規化はバリデーションより先に行う必要があるため、isHiraganaOnly の中で行っている
-  .refine(
-    (value) => value.kind !== "constraint" || isHiraganaOnly(value.name),
-    "最適化する音はひらがなだけを指定できます",
-  );
+  // NFC正規化はバリデーションより先に行う必要があるため、constraintCharRejection の中で行っている
+  .superRefine((value, ctx) => {
+    if (value.kind !== "constraint") return;
+    const rejection = constraintCharRejection(value.name);
+    if (rejection !== null) ctx.addIssue({ code: "custom", message: rejection });
+  });
 
 /** 匿名時のオフセット。改ざんは許容するが、範囲外の値は弾く */
 const offsetSchema = z.number().int().min(0).max(100_000);

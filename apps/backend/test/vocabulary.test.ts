@@ -12,7 +12,7 @@ const rows = VOCABULARY_TSV.split("\n").map((line) => line.split("\t"));
 
 describe("共通語彙リスト（vocabulary.generated.ts）", () => {
   it("語数は上限まで（膨らむと Worker のメモリを気にし始めることになる）", () => {
-    // 2026-10-25 の生成で 28,748語（excluded.tsv で 2,017語を外した後）。超えたら選び方を見直す
+    // 2026-10-25 の生成で 28,703語（excluded.tsv で 2,062語を外した後）。超えたら選び方を見直す
     expect(vocabularySize()).toBeLessThanOrEqual(50_000);
     expect(vocabularySize()).toBeGreaterThan(10_000);
   });
@@ -69,6 +69,7 @@ describe("共通語彙リスト（vocabulary.generated.ts）", () => {
       "リバタリアニズム",
       "アルディージャ",
       "座薬",
+      "流産",
       "鐘楼",
     ]) {
       expect(texts.has(word)).toBe(false);

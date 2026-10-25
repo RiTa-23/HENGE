@@ -446,7 +446,7 @@ export function PlayScreen({
         <SettingToggle
           icon={<FingerIcon className="size-4" />}
           label="運指"
-          ariaLabel="押す指の表示"
+          ariaLabel="運指（押す指の表示）"
           on={fingerGuide}
           onToggle={toggleFingerGuide}
         />

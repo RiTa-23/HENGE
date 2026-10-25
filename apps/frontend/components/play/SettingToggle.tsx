@@ -27,7 +27,10 @@ export function SettingToggle({
   icon: ReactNode;
   /** スイッチの横に出す短い名前（「効果音」） */
   label: string;
-  /** 読み上げ用の名前（「効果音」） */
+  /**
+   * 読み上げ用の名前。**`label` の文字をそのまま含める**（「運指（押す指の表示）」）。
+   * 音声操作は画面に見えている名前で押すので、含まないと「運指」と言っても当たらない
+   */
   ariaLabel: string;
   on: boolean;
   onToggle: () => void;

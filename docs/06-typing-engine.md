@@ -31,6 +31,7 @@
 | かな | 候補 |
 |---|---|
 | しゃ / しゅ / しょ | `sha`・`sya` / `shu`・`syu` / `sho`・`syo` |
+| しぇ | `she`・`sye` |
 | ちゃ / ちゅ / ちょ | `cha`・`tya`・`cya` / `chu`・`tyu`・`cyu` / `cho`・`tyo`・`cyo` |
 | じゃ / じゅ / じょ | `ja`・`zya`・`jya` / `ju`・`zyu`・`jyu` / `jo`・`zyo`・`jyo` |
 | きゃ・にゃ・ひゃ・みゃ・りゃ 等 | `kya` / `nya` / `hya` / `mya` / `rya`（1系統のみ） |
@@ -61,6 +62,7 @@
 | ふぁ / ふぃ / ふぇ / ふぉ | `fa` / `fi` / `fe` / `fo` |
 | じぇ / ぢぇ / ちぇ | `je`・`zye`・`jye` / `dye` / `che`・`tye`・`cye` |
 | てぃ / でぃ | `thi` / `dhi` |
+| てゅ / でゅ | `thu` / `dhu` |
 | うぁ / うぃ / うぇ / うぉ | `wha` / `wi`・`whi` / `we`・`whe` / `who` |
 | ゔ | `vu` |
 

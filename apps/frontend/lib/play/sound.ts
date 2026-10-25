@@ -203,9 +203,6 @@ export function playMiss(): void {
   thud.stop(now + 0.1);
 }
 
-/** 煙が噴き出すまで（秒）。鈴の「チリン」を先に聞かせる。演出の煙（`.smoke__puff`）と揃える */
-const SMOKE_AT = 0.08;
-
 /**
  * 鈴の音を1つ鳴らす。**倍音を整数倍にしない**（整数倍だと電子音の和音に聞こえる）。
  * 金属の鳴りは基音に対して約2.3倍の上音が強く出るので、それを小さく重ねる。
@@ -226,10 +223,11 @@ function bell(ctx: AudioContext, hz: number, peak: number, at: number): void {
 }
 
 /**
- * テーマの完了音。忍術の「ドロン」。**鈴が鳴って（チリン）、煙が噴き出す（ボフッ）。**
- * 紹介動画の演出に合わせてある。
+ * テーマの完了音。忍術の「ドロン」。**打ち終えた瞬間に煙が噴き出し（ボフッ）、鈴が鳴る（チリン）。**
+ * 紹介動画の演出に合わせてある。**頭に待ち時間を置かない**（演出の煙も打ち終えた瞬間に
+ * 噴き出す。遅らせると、次のお題が見えてから鳴っているように聞こえる）。
  *
- * - 鈴: 高い音を2つ、わずかにずらして鳴らす（約2.9kHz → 4kHz）。打ち終えた合図
+ * - 鈴: 高い音を2つ、わずかにずらして鳴らす（約2.9kHz → 4kHz）。煙の上に乗せる
  * - ド: 三角波を低く落とす。打鍵音の胴より低く長い（区切りだと分かる重さ）
  * - 煙: 雑音を低域通過に通し、通す帯域を高 → 低へ下げる。煙が広がって
  *   薄まっていく見立てで、明るい「ぼわっ」から暗く消える
@@ -246,15 +244,14 @@ export function playDoron(): void {
   bell(ctx, 2900, 0.035, now);
   bell(ctx, 4000, 0.025, now + 0.05);
 
-  const at = now + SMOKE_AT;
   const don = ctx.createOscillator();
   don.type = "triangle";
-  don.frequency.setValueAtTime(150, at);
-  don.frequency.exponentialRampToValueAtTime(52, at + 0.22);
-  const donGain = envelope(ctx, 0.22, 0.004, 0.26, at);
+  don.frequency.setValueAtTime(150, now);
+  don.frequency.exponentialRampToValueAtTime(52, now + 0.22);
+  const donGain = envelope(ctx, 0.22, 0.004, 0.26, now);
   don.connect(donGain).connect(ctx.destination);
-  don.start(at);
-  don.stop(at + 0.3);
+  don.start(now);
+  don.stop(now + 0.3);
 
   const smoke = ctx.createBufferSource();
   smoke.buffer = noise(ctx);
@@ -263,16 +260,19 @@ export function playDoron(): void {
   const low = ctx.createBiquadFilter();
   low.type = "lowpass";
   low.Q.value = 2;
-  low.frequency.setValueAtTime(2600, at);
-  low.frequency.exponentialRampToValueAtTime(260, at + 0.46);
-  const smokeGain = envelope(ctx, 0.32, 0.03, 0.45, at);
+  low.frequency.setValueAtTime(2600, now);
+  low.frequency.exponentialRampToValueAtTime(260, now + 0.46);
+  const smokeGain = envelope(ctx, 0.32, 0.015, 0.45, now);
   smoke.connect(low).connect(smokeGain).connect(ctx.destination);
-  smoke.start(at, Math.random() * 0.15);
-  smoke.stop(at + 0.5);
+  smoke.start(now, Math.random() * 0.15);
+  smoke.stop(now + 0.5);
 }
 
-/** 手裏剣が的に届くまで（秒）。演出の飛ぶ長さ（`.strike__shuriken`）と揃える */
-const STRIKE_AT = 0.14;
+/**
+ * 手裏剣が的に届くまで（秒）。演出の飛ぶ長さ（`.strike__shuriken`）と揃える。
+ * **短く保つ。** 打ち終えてから刺さるまでが長いと、刺さる前に次のお題が見えてしまう
+ */
+const STRIKE_AT = 0.08;
 
 /** 刺さる音。打鍵音より低く太く、板の鳴りを長めに残す */
 const BOARD: Clack = {

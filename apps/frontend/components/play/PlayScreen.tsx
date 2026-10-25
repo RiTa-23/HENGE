@@ -198,6 +198,14 @@ export function PlayScreen({
    * 打つたびに出たり消えたりすると、打鍵に気を取られて読めない
    */
   const [imeDetected, setImeDetected] = useState(false);
+  /**
+   * 直前に打ち終えたお題と、打ち終えた時点の進み。切り替わりの演出で**写しとして
+   * 一瞬だけ上に重ねる**（PromptChange.tsx）。打鍵の状態は次のお題へすぐ進めるので、
+   * 写しが無いと次のお題が先に見えて、演出があとから追いかけてくる
+   */
+  const [finished, setFinished] = useState<{ prompt: Prompt; progress: TypingProgress } | null>(
+    null,
+  );
   /** 直前に打ち間違えたキー。キーボード上で少しのあいだ赤くする */
   const [missKey, setMissKey] = useState<string | null>(null);
   /**
@@ -237,6 +245,7 @@ export function PlayScreen({
     setStats({ hits: 0, misses: 0, elapsedMs: 0 });
     setMissedKeys(new Map());
     setTargetTally(EMPTY_TALLY);
+    setFinished(null);
     startedAt.current = performance.now();
     setProgress(startTyping(session.prompts[0]?.readingRoman ?? []));
     setPhase({ name: "playing", session });
@@ -517,6 +526,7 @@ export function PlayScreen({
     }
 
     setStats({ hits, misses, elapsedMs: 0 });
+    if (finishedPrompt !== undefined) setFinished({ prompt: finishedPrompt, progress: next });
     setPromptIndex(upcoming);
     // 撒菱は次の問題で消える（新しい TypingProgress を作り直すため）
     setProgress(startTyping(phase.session.prompts[upcoming]?.readingRoman ?? []));
@@ -705,6 +715,22 @@ export function PlayScreen({
   const prompt = phase.session.prompts[promptIndex];
   if (prompt === undefined) return null;
 
+  /** 載せる物体だけをモードで分ける。中身（PromptLines）は共通。切り替わりの写しも同じ物体で描く */
+  const board = (shown: Prompt, shownProgress: TypingProgress) => {
+    const kanaUnits = splitKanaUnits(shown.readingKana);
+    return kind === "constraint" ? (
+      <MatoBoard
+        text={shown.text}
+        kanaUnits={kanaUnits}
+        progress={shownProgress}
+        // 最適化する音は themeName（最適化練習ではテーマ名＝音）
+        targets={findTargets(kanaUnits, themeName)}
+      />
+    ) : (
+      <Scroll text={shown.text} kanaUnits={kanaUnits} progress={shownProgress} />
+    );
+  };
+
   return (
     // **`<input>` / `<textarea>` を使わない。** 編集可能な要素があるとIMEが
     // 介入して打鍵を拾えなくなる（不変条件7）
@@ -775,26 +801,17 @@ export function PlayScreen({
             <div
               key={promptIndex}
               className={`relative mx-auto w-full max-w-3xl ${
-                promptIndex === 0 ? "" : kind === "constraint" ? "strike-shake" : "smoke-reveal"
+                promptIndex > 0 && kind === "constraint" ? "strike-shake" : ""
               }`}
             >
-              {/* 載せる物体だけをモードで分ける。中身（PromptLines）は共通 */}
-              {kind === "constraint" ? (
-                <MatoBoard
-                  text={prompt.text}
-                  kanaUnits={splitKanaUnits(prompt.readingKana)}
-                  progress={progress}
-                  // 最適化する音は themeName（最適化練習ではテーマ名＝音）
-                  targets={findTargets(splitKanaUnits(prompt.readingKana), themeName)}
-                />
-              ) : (
-                <Scroll
-                  text={prompt.text}
-                  kanaUnits={splitKanaUnits(prompt.readingKana)}
-                  progress={progress}
-                />
-              )}
-              {promptIndex > 0 && (kind === "constraint" ? <ShurikenStrike /> : <SmokePuff />)}
+              {board(prompt, progress)}
+              {promptIndex > 0 &&
+                finished !== null &&
+                (kind === "constraint" ? (
+                  <ShurikenStrike previous={board(finished.prompt, finished.progress)} />
+                ) : (
+                  <SmokePuff previous={board(finished.prompt, finished.progress)} />
+                ))}
             </div>
 
             <div className="flex items-center justify-between">

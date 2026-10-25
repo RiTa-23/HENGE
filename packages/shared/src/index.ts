@@ -1,6 +1,7 @@
 export { PING, ping } from "./ping";
 export { nextResetAt, quotaResetAt, usageDateKey } from "./usage-window";
 export {
+  constraintCharRejection,
   isHiraganaOnly,
   normalizeConstraintChar,
   normalizeName,
@@ -27,8 +28,10 @@ export {
   UnsupportedKanaError,
 } from "./typing/index";
 export {
+  type ConstraintSpan,
   containsKanji,
   countConstraint,
+  findConstraintSpans,
   countSentenceEnds,
   includesConstraint,
   isHiraganaOnlyWord,

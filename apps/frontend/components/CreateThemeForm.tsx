@@ -1,6 +1,6 @@
 "use client";
 
-import { isApiError, isHiraganaOnly, type ThemeKind } from "@henge/shared";
+import { constraintCharRejection, isApiError, type ThemeKind } from "@henge/shared";
 import { useEffect, useState } from "react";
 import { authClient } from "@/lib/api/auth-client";
 import { LoginRequired } from "@/components/LoginRequired";
@@ -37,13 +37,12 @@ const COPY = {
     submit: "この音で作る",
     back: "別の音を指定する",
     /**
-     * **ひらがな以外はここで止める。** サーバーも `VALIDATION_ERROR` で弾くが、
-     * 送ってしまうと `GENERATION_RATE_LIMIT`（5回/60秒）を1つ消費するため、
-     * 打ち間違いの数回で `RATE_LIMITED` に落ちる。判定規則そのものは
-     * `packages/shared` の `isHiraganaOnly` を共有していて、二重定義ではない
+     * **ひらがな以外・小書きのかなで始まる音はここで止める。** サーバーも
+     * `VALIDATION_ERROR` で弾くが、送ってしまうと `GENERATION_RATE_LIMIT`（5回/60秒）を
+     * 1つ消費するため、打ち間違いの数回で `RATE_LIMITED` に落ちる。判定規則そのものは
+     * `packages/shared` の `constraintCharRejection` を共有していて、二重定義ではない
      */
-    validate: (name: string): string | null =>
-      isHiraganaOnly(name) ? null : "最適化する音はひらがなだけを指定できます",
+    validate: (name: string): string | null => constraintCharRejection(name),
   },
 } as const satisfies Record<ThemeKind, unknown>;
 

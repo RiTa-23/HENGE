@@ -35,6 +35,18 @@ describe("themeNameSchema", () => {
     }
   });
 
+  test("小書きのかなで始まる音は弾く（「ゃ」は「きゃ」の一部として打ち、単独では現れない）", () => {
+    for (const name of ["ゃ", "ぃ", "ょう", "ぁい"]) {
+      const parsed = themeNameSchema.safeParse({ kind: "constraint", name });
+      expect(parsed.success).toBe(false);
+      expect(parsed.error?.issues[0]?.message).toContain("小さいかな");
+    }
+    // 前のかなと続けて書けば通る。「っ」は次のかなに付くので弾かない
+    for (const name of ["きゃ", "でぃ", "っ", "かっ"]) {
+      expect(themeNameSchema.safeParse({ kind: "constraint", name }).success).toBe(true);
+    }
+  });
+
   test("結合濁点で書かれた「が」を弾かない（NFC正規化を先に行っている）", () => {
     expect(themeNameSchema.safeParse({ kind: "constraint", name: "が" }).success).toBe(true);
   });

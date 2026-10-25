@@ -1,7 +1,7 @@
 # 最適化練習の共通語彙リスト
 
 `apps/backend/src/generation/vocabulary.generated.ts` の作り方。最適化ごとの語彙は、作成時に
-このリストから読みの部分一致で選ぶ（`apps/backend/src/generation/vocabulary.ts`）。設計は
+このリストから、読みに指定の連接を打鍵の単位で含む語を選ぶ（`apps/backend/src/generation/vocabulary.ts`）。設計は
 `docs/05-generation.md` の「最適化練習の語彙」。
 
 **作り直すのは、選び方・NG 語（`packages/shared/src/generation/ng-words.ts`）・外す語（`excluded.tsv`）を変えたときだけ。**

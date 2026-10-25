@@ -558,6 +558,55 @@ describe("POST /prompts/regenerate", () => {
     expect(await db.select().from(constraintVocabularies)).toHaveLength(0);
   });
 
+  /**
+   * 照合を打鍵の単位で見るようにする前に保存した語彙には、字面だけ当たる語（「で」に
+   * 「ディスク」= dhi）が入っている。渡しても検証で落ちるだけなので、読み出すときに外す
+   */
+  it("保存済みの語彙から、打鍵の単位では当たらない語を外してから渡す", async () => {
+    await seedUser("u1");
+    await db
+      .insert(themes)
+      .values({ id: "c1", kind: "constraint", name: "で", normalizedName: "で" });
+    const good = vocabularyFor("で").map((w): [string, string] => [w.text, w.reading]);
+    const stale = Array.from({ length: 300 }, (): [string, string] => ["ディスク", "でぃすく"]);
+    await db
+      .insert(constraintVocabularies)
+      .values({ themeId: "c1", wordsJson: JSON.stringify([...stale, ...good]) });
+    const heads = ["一", "二", "三", "四", "五", "六", "七", "八", "九", "十"];
+    stubGeneration([heads.map((n) => `${n}番の電車で出かける。`)], "でんしゃででかける");
+
+    const { status } = await post("/prompts/regenerate", { themeId: "c1", userId: "u1" });
+    expect(status).toBe(200);
+
+    const request = vi.mocked(env.AI.run).mock.calls[0]?.[1] as unknown as {
+      messages: { role: string; content: string }[];
+    };
+    const content = request.messages.find((m) => m.role === "user")?.content ?? "";
+    expect(content).toContain("語の組:");
+    expect(content).not.toContain("ディスク");
+  });
+
+  it("保存済みの語彙が、外した結果下限に届かなければ AI を呼ばずに失敗する", async () => {
+    await seedUser("u1");
+    await db
+      .insert(themes)
+      .values({ id: "c1", kind: "constraint", name: "で", normalizedName: "で" });
+    const stale = Array.from({ length: CONSTRAINT_VOCABULARY_MIN }, (_, i): [string, string] => [
+      `ディスク${i}`,
+      "でぃすく",
+    ]);
+    await db
+      .insert(constraintVocabularies)
+      .values({ themeId: "c1", wordsJson: JSON.stringify(stale) });
+    const run = vi.spyOn(env.AI, "run");
+
+    const { status, body } = await post("/prompts/regenerate", { themeId: "c1", userId: "u1" });
+
+    expect((body.error as { code: string }).code).toBe("GENERATION_FAILED");
+    expect(status).toBe(422);
+    expect(run).not.toHaveBeenCalled();
+  });
+
   it("単語も1件も作れなければ失敗として返す", async () => {
     await seedUser("u1");
     await db.insert(themes).values({

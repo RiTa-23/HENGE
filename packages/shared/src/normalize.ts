@@ -42,3 +42,25 @@ export function normalizeName(kind: ThemeKind, name: string): string {
 export function isHiraganaOnly(value: string): boolean {
   return /^[ぁ-ゖ]+$/u.test(value.normalize("NFC"));
 }
+
+/**
+ * 前のかなと1つの打鍵の単位になる小書きのかな（「きゃ」の「ゃ」、「でぃ」の「ぃ」）。
+ * 「っ」は入れない（前ではなく次のかなに付いて子音を重ねる）。
+ */
+const COMBINING_SMALL_KANA = /^[ぁぃぅぇぉゃゅょゎゕゖ]/u;
+
+/**
+ * 最適化する音として指定できないなら、その理由。指定できるなら null。
+ * 公開APIの入口（Zod）と作成フォームの事前検査が同じこれを使う。
+ *
+ * **小書きのかなで始まる音は断る。**「ゃ」は「きゃ」（`kya`）の一部として打ち、単独の
+ * 「ゃ」（`xya`）はほぼ現れない。判定は打鍵の単位で行う（`findConstraintSpans`）ので、
+ * 通すと語彙が見つからず「語彙が足りない」で断ることになり、理由が伝わらない。
+ */
+export function constraintCharRejection(value: string): string | null {
+  if (!isHiraganaOnly(value)) return "最適化する音はひらがなだけを指定できます";
+  if (COMBINING_SMALL_KANA.test(value.normalize("NFC"))) {
+    return "小さいかな（ゃ・ぃ など）は前のかなと続けて指定してください（例: きゃ・でぃ）";
+  }
+  return null;
+}

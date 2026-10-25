@@ -2,6 +2,7 @@ import { describe, expect, test } from "bun:test";
 import {
   containsKanji,
   countConstraint,
+  findConstraintSpans,
   includesConstraint,
   isHiraganaOnlyWord,
   countSentenceEnds,
@@ -161,6 +162,102 @@ describe("countConstraint", () => {
   test("includesConstraint と食い違わない", () => {
     expect(includesConstraint("ざぜん", "ざ")).toBe(countConstraint("ざぜん", "ざ") > 0);
     expect(includesConstraint("しゅりけん", "ざ")).toBe(countConstraint("しゅりけん", "ざ") > 0);
+  });
+});
+
+/**
+ * 字面では含まれていても、打つときには別のかなになる箇所を数えない。
+ * 「で」の最適化に「でぃ」（`dhi`）、「き」の最適化に「きゃ」（`kya`）が混ざると、
+ * 練習したい連接を打たないお題が採用される。
+ */
+describe("打鍵の単位で照合する", () => {
+  test.each([
+    ["でぃすく", "で"], // でぃ = dhi
+    ["でゅえっと", "で"], // でゅ = dhu
+    ["きゃく", "き"], // きゃ = kya
+    ["きゅう", "き"],
+    ["きょう", "き"],
+    ["しゃつ", "し"], // しゃ = sha
+    ["しぇふ", "し"],
+    ["ちぇっく", "ち"],
+    ["じゃま", "じ"],
+    ["てぃっしゅ", "て"], // てぃ = thi
+    ["ふぁいる", "ふ"], // ふぁ = fa
+    ["うぉっか", "う"], // うぉ = who
+    ["つぁーり", "つ"], // つぁ = tsa
+    ["くぉーたー", "く"], // くぉ = qo
+    ["とぅーる", "と"], // とぅ = twu
+    ["ゔぁいおりん", "ゔ"], // ゔぁ = va
+    ["にゃんこ", "に"],
+    ["りょこう", "り"],
+    ["ぴょん", "ぴ"],
+  ])("「%s」に「%s」は当たらない（後ろの小書きと1単位になる）", (kana, constraint) => {
+    expect(includesConstraint(kana, constraint)).toBe(false);
+  });
+
+  test("2文字以上の音も、最後のかなが後ろの小書きと組むなら当たらない", () => {
+    // し / きゃ。「しき」の「き」は「きゃ」の一部
+    expect(includesConstraint("しきゃ", "しき")).toBe(false);
+    // でき / でぃ ではなく、で / き / でぃ。「でき」は当たる
+    expect(includesConstraint("できでぃ", "でき")).toBe(true);
+  });
+
+  test("小書きで始まる音は、前のかなと組んだ箇所に当たらない", () => {
+    expect(includesConstraint("きゃく", "ゃ")).toBe(false);
+    expect(includesConstraint("でぃすく", "ぃ")).toBe(false);
+    expect(includesConstraint("しゃしゃ", "ゃし")).toBe(false);
+  });
+
+  test("拗音・外来音そのものを指定すれば当たる", () => {
+    expect(includesConstraint("でぃすく", "でぃ")).toBe(true);
+    expect(includesConstraint("きゃく", "きゃ")).toBe(true);
+    expect(includesConstraint("しゃしん", "しゃし")).toBe(true);
+  });
+
+  test("同じ読みの中に単独の箇所があれば当たる", () => {
+    expect(includesConstraint("でぃすくで", "で")).toBe(true);
+    expect(countConstraint("きゃくのきもち", "き")).toBe(1);
+  });
+
+  test("小書きでも、前と組まないもの（打鍵表に無い組）は単独のかなとして当たる", () => {
+    // てゃ は打鍵表に無く、て / ゃ に切れる
+    expect(includesConstraint("てゃ", "て")).toBe(true);
+  });
+
+  test("「っ」の前後の音は変わらない（「っき」の「き」は ki のまま）", () => {
+    expect(includesConstraint("がっき", "き")).toBe(true);
+    expect(includesConstraint("はっぴょう", "っぴょ")).toBe(true);
+  });
+
+  test("最後が「っ」の音は、次のかなの子音を借りる箇所だけに当たる", () => {
+    expect(includesConstraint("きって", "きっ")).toBe(true); // kitte
+    expect(includesConstraint("きっぷ", "きっ")).toBe(true); // kippu
+    // 次が母音・記号・文末だと「っ」は ltu と単独で打つ
+    expect(includesConstraint("きっ", "きっ")).toBe(false);
+    expect(includesConstraint("きっ、", "きっ")).toBe(false);
+    expect(includesConstraint("きっあ", "きっ")).toBe(false);
+    expect(includesConstraint("きっっ", "きっ")).toBe(false);
+  });
+
+  test("「ん」は前後で n / nn が変わっても n から打つので区別しない", () => {
+    expect(includesConstraint("かんい", "かん")).toBe(true); // kanni
+    expect(includesConstraint("かんじ", "かん")).toBe(true); // kanji
+  });
+});
+
+describe("findConstraintSpans", () => {
+  test("かな単位の範囲を返す。拗音は1単位", () => {
+    // で / ぃ ではなく でぃ / す / く / で
+    expect(findConstraintSpans(["でぃ", "す", "く", "で"], "で")).toEqual([{ first: 3, last: 3 }]);
+    expect(findConstraintSpans(["し", "きゃ", "く"], "きゃく")).toEqual([{ first: 1, last: 2 }]);
+  });
+
+  test("重なりは数えない", () => {
+    expect(findConstraintSpans(["さ", "さ", "さ"], "ささ")).toEqual([{ first: 0, last: 1 }]);
+  });
+
+  test("空の指定は空（全部の位置に当てない）", () => {
+    expect(findConstraintSpans(["ざ"], "")).toEqual([]);
   });
 });
 

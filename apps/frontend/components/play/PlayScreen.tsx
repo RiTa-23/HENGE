@@ -24,6 +24,7 @@ import { Loading } from "./Loading";
 import { LongScroll } from "./LongScroll";
 import { MatoBoard } from "./MatoBoard";
 import { ProgressDots } from "./ProgressDots";
+import { ShurikenStrike, SmokePuff } from "./PromptChange";
 import { Result, type PlayStats } from "./Result";
 import { Scroll } from "./Scroll";
 import { SoundToggle } from "./SoundToggle";
@@ -31,7 +32,18 @@ import { readJsonBody } from "@/lib/api/json";
 import { readOffset, writeOffset } from "@/lib/play/offset";
 import { mergeMissedKeys } from "@/lib/play/misses";
 import { addTally, EMPTY_TALLY, findTargets, type TargetTally } from "@/lib/practice/targets";
-import { playHit, playMiss, primeAudio, readMuted, writeMuted } from "@/lib/play/sound";
+import {
+  playDoron,
+  playEnd,
+  playHit,
+  playMiss,
+  playResult,
+  playStart,
+  playStrike,
+  primeAudio,
+  readMuted,
+  writeMuted,
+} from "@/lib/play/sound";
 import { detailHref, formColor, formLabel, kindLabel, listHref } from "@/lib/ui/kind";
 
 interface Prompt {
@@ -59,6 +71,8 @@ type Phase =
   /** お題は手元にあるが、まだ見せていない。開始の合図を出している最中 */
   | { name: "starting"; session: SessionResponse }
   | { name: "playing"; session: SessionResponse }
+  /** 打ち終えた。終了の合図（「そこまで！」）を出している最中。計時はもう止まっている */
+  | { name: "finishing"; session: SessionResponse }
   | { name: "result"; session: SessionResponse };
 
 /**
@@ -83,6 +97,15 @@ const MISS_FLASH_MS = 450;
  * お題も合図が消えるまで出さない。見えていれば、待っているあいだに読めてしまう。
  */
 const START_CUE_MS = 900;
+
+/**
+ * 終了の合図（「そこまで！」）を出しておく長さ。出しきったら結果画面を
+ * 太鼓の「ドンッ」と同時に出す。
+ *
+ * **計時は最後の打鍵で止めてある**（合図のぶんは入らない）。開始の合図と同じく、
+ * ここを計時に含めると WPM が実際より低く出る。
+ */
+const END_CUE_MS = 900;
 
 /**
  * 次に打つキー。**巻物に出ているローマ字の、苦無が指す1文字だけ**を光らせる。
@@ -189,6 +212,14 @@ export function PlayScreen({
    * 打つたびに出たり消えたりすると、打鍵に気を取られて読めない
    */
   const [imeDetected, setImeDetected] = useState(false);
+  /**
+   * 直前に打ち終えたお題と、打ち終えた時点の進み。切り替わりの演出で**写しとして
+   * 一瞬だけ上に重ねる**（PromptChange.tsx）。打鍵の状態は次のお題へすぐ進めるので、
+   * 写しが無いと次のお題が先に見えて、演出があとから追いかけてくる
+   */
+  const [finished, setFinished] = useState<{ prompt: Prompt; progress: TypingProgress } | null>(
+    null,
+  );
   /** 直前に打ち間違えたキー。キーボード上で少しのあいだ赤くする */
   const [missKey, setMissKey] = useState<string | null>(null);
   /**
@@ -197,6 +228,12 @@ export function PlayScreen({
    * 出力と食い違って hydration が壊れる）。
    */
   const [muted, setMuted] = useState(false);
+  /**
+   * 消音の最新値。開始の合図の音は合図のタイマーと同じ effect で鳴らすので、
+   * deps に `muted` を入れると、合図の最中に音を切り替えただけで合図が出し直しになる
+   * （計時の始まりもずれる）。ref 経由で値だけを見る（`loggedIn` と同じ）
+   */
+  const mutedRef = useRef(false);
   const missTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const startedAt = useRef<number>(0);
   const surface = useRef<HTMLDivElement>(null);
@@ -228,6 +265,7 @@ export function PlayScreen({
     setStats({ hits: 0, misses: 0, elapsedMs: 0 });
     setMissedKeys(new Map());
     setTargetTally(EMPTY_TALLY);
+    setFinished(null);
     startedAt.current = performance.now();
     setProgress(startTyping(session.prompts[0]?.readingRoman ?? []));
     setPhase({ name: "playing", session });
@@ -347,6 +385,10 @@ export function PlayScreen({
   useEffect(() => setMuted(readMuted()), []);
 
   useEffect(() => {
+    mutedRef.current = muted;
+  }, [muted]);
+
+  useEffect(() => {
     loggedIn.current = authSession != null;
   }, [authSession]);
 
@@ -369,9 +411,21 @@ export function PlayScreen({
   // 開始の合図。出しきってから1問目を見せる（ここまで時間は数えない）
   useEffect(() => {
     if (phase.name !== "starting") return;
+    // 合図の文字が出るのと同時に鳴らす。音は開始の Space で起こしてある
+    if (!mutedRef.current) playStart();
     const timer = setTimeout(() => beginPlay(phase.session), START_CUE_MS);
     return () => clearTimeout(timer);
   }, [phase, beginPlay]);
+
+  // 終了の合図。出しきってから、太鼓の「ドンッ」と同時に結果画面を出す
+  useEffect(() => {
+    if (phase.name !== "finishing") return;
+    const timer = setTimeout(() => {
+      if (!mutedRef.current) playResult();
+      setPhase({ name: "result", session: phase.session });
+    }, END_CUE_MS);
+    return () => clearTimeout(timer);
+  }, [phase]);
 
   // 打鍵を拾う要素にフォーカスを当て続ける。外れると1打も拾えなくなる
   useEffect(() => {
@@ -476,7 +530,15 @@ export function PlayScreen({
     if (missed) flashMissKey(toNextKey(typed).key);
     if (!muted) {
       if (missed) playMiss();
-      else playHit();
+      // **最後の問題を打ち終えた打鍵は、終了の合図（「そこまで！」）の音。**
+      // 次のお題が無いので、切り替わりの音（煙／手裏剣）を鳴らすと「まだ続く」ように聞こえる
+      else if (next.finished && promptIndex + 1 >= phase.session.prompts.length) playEnd();
+      // **1問を打ち終えた打鍵は、打鍵音の代わりに完了音を鳴らす。** 重ねると完了音の頭が
+      // 濁る。音はモードで分ける（煙／手裏剣。演出と同じ）
+      else if (next.finished) {
+        if (kind === "constraint") playStrike();
+        else playDoron();
+      } else playHit();
     }
 
     if (!next.finished) {
@@ -497,12 +559,14 @@ export function PlayScreen({
     }
 
     if (upcoming >= phase.session.prompts.length) {
+      // 計時はここで止める。結果画面は終了の合図を挟んでから出す
       setStats({ hits, misses, elapsedMs: performance.now() - startedAt.current });
-      setPhase({ name: "result", session: phase.session });
+      setPhase({ name: "finishing", session: phase.session });
       return;
     }
 
     setStats({ hits, misses, elapsedMs: 0 });
+    if (finishedPrompt !== undefined) setFinished({ prompt: finishedPrompt, progress: next });
     setPromptIndex(upcoming);
     // 撒菱は次の問題で消える（新しい TypingProgress を作り直すため）
     setProgress(startTyping(phase.session.prompts[upcoming]?.readingRoman ?? []));
@@ -574,7 +638,17 @@ export function PlayScreen({
     return (
       <div className="flex min-h-dvh flex-col items-center justify-center gap-8 p-6">
         <p className="text-sm tracking-widest text-kinari/50">{themeName}</p>
-        <p className="start-cue font-mincho text-6xl tracking-widest text-shu">はじめ！</p>
+        <p className="cue font-mincho text-6xl tracking-widest text-shu">はじめ！</p>
+      </div>
+    );
+  }
+
+  if (phase.name === "finishing") {
+    // 開始の合図と同じ形。始まりと終わりを同じ見せ方で挟む
+    return (
+      <div className="flex min-h-dvh flex-col items-center justify-center gap-8 p-6">
+        <p className="text-sm tracking-widest text-kinari/50">{themeName}</p>
+        <p className="cue font-mincho text-6xl tracking-widest text-shu">そこまで！</p>
       </div>
     );
   }
@@ -669,27 +743,46 @@ export function PlayScreen({
 
   if (phase.name === "result") {
     return (
-      <Result
-        themeId={themeId}
-        detailHref={backToDetail}
-        stats={stats}
-        missedKeys={missedKeys}
-        targetTally={kind === "constraint" ? targetTally : undefined}
-        themeName={themeName}
-        onRetry={start}
-        listHref={backToList}
-        kind={kind}
-        form={form}
-        shareUrl={shareUrl}
-        prompts={phase.session.prompts}
-        reportOpen={reportOpen}
-        onReportOpenChange={setReportOpen}
-      />
+      // 太鼓の「ドンッ」と同時に、どんと出す（ninja.css の .result-enter）
+      <div className="result-enter">
+        <Result
+          themeId={themeId}
+          detailHref={backToDetail}
+          stats={stats}
+          missedKeys={missedKeys}
+          targetTally={kind === "constraint" ? targetTally : undefined}
+          themeName={themeName}
+          onRetry={start}
+          listHref={backToList}
+          kind={kind}
+          form={form}
+          shareUrl={shareUrl}
+          prompts={phase.session.prompts}
+          reportOpen={reportOpen}
+          onReportOpenChange={setReportOpen}
+        />
+      </div>
     );
   }
 
   const prompt = phase.session.prompts[promptIndex];
   if (prompt === undefined) return null;
+
+  /** 載せる物体だけをモードで分ける。中身（PromptLines）は共通。切り替わりの写しも同じ物体で描く */
+  const board = (shown: Prompt, shownProgress: TypingProgress) => {
+    const kanaUnits = splitKanaUnits(shown.readingKana);
+    return kind === "constraint" ? (
+      <MatoBoard
+        text={shown.text}
+        kanaUnits={kanaUnits}
+        progress={shownProgress}
+        // 最適化する音は themeName（最適化練習ではテーマ名＝音）
+        targets={findTargets(kanaUnits, themeName)}
+      />
+    ) : (
+      <Scroll text={shown.text} kanaUnits={kanaUnits} progress={shownProgress} />
+    );
+  };
 
   return (
     // **`<input>` / `<textarea>` を使わない。** 編集可能な要素があるとIMEが
@@ -753,22 +846,26 @@ export function PlayScreen({
       ) : (
         <>
           <div className="flex flex-1 flex-col justify-center gap-8 py-8">
-            {/* 載せる物体だけをモードで分ける。中身（PromptLines）は共通 */}
-            {kind === "constraint" ? (
-              <MatoBoard
-                text={prompt.text}
-                kanaUnits={splitKanaUnits(prompt.readingKana)}
-                progress={progress}
-                // 最適化する音は themeName（最適化練習ではテーマ名＝音）
-                targets={findTargets(splitKanaUnits(prompt.readingKana), themeName)}
-              />
-            ) : (
-              <Scroll
-                text={prompt.text}
-                kanaUnits={splitKanaUnits(prompt.readingKana)}
-                progress={progress}
-              />
-            )}
+            {/*
+              **問題ごとに作り直す**（key）。切り替わりの演出（煙／手裏剣）はCSSの
+              アニメーションで、作り直したときに1度だけ走る。1問目には出さない
+              （切り替わりではない。開始の合図がすでにある）
+            */}
+            <div
+              key={promptIndex}
+              className={`relative mx-auto w-full max-w-3xl ${
+                promptIndex > 0 && kind === "constraint" ? "strike-shake" : ""
+              }`}
+            >
+              {board(prompt, progress)}
+              {promptIndex > 0 &&
+                finished !== null &&
+                (kind === "constraint" ? (
+                  <ShurikenStrike previous={board(finished.prompt, finished.progress)} />
+                ) : (
+                  <SmokePuff previous={board(finished.prompt, finished.progress)} />
+                ))}
+            </div>
 
             <div className="flex items-center justify-between">
               <ProgressDots current={promptIndex} total={phase.session.prompts.length} />

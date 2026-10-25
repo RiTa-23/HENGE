@@ -143,6 +143,20 @@ describe("外来語のかな", () => {
     expect(accepts("うぉ", 0, "ulo")).toBe(true);
   });
 
+  // 「シェア」「シェフ」など頻出なのに、し + ぇ に分解されて sye / she で打てなかった
+  test("しぇ は she / sye、分解入力もできる", () => {
+    expect(accepts("しぇ", 0, "she")).toBe(true);
+    expect(accepts("しぇ", 0, "sye")).toBe(true);
+    expect(accepts("しぇ", 0, "sixe")).toBe(true);
+  });
+
+  // 「デュエット」「プロデュース」など。てぃ / でぃ と同じく th / dh 系で打てる
+  test("でゅ は dhu、てゅ は thu、分解入力もできる", () => {
+    expect(accepts("でゅ", 0, "dhu")).toBe(true);
+    expect(accepts("でゅ", 0, "dexyu")).toBe(true);
+    expect(accepts("てゅ", 0, "thu")).toBe(true);
+  });
+
   test("ぢぇ は dye", () => {
     expect(accepts("ぢぇ", 0, "dye")).toBe(true);
   });

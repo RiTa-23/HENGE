@@ -30,7 +30,7 @@ export function SettingToggle({
       aria-checked={on}
       onClick={onToggle}
       aria-label={ariaLabel}
-      className="flex items-center gap-2 rounded-full border border-kinari/15 px-3 py-1.5 text-xs tracking-widest text-kinari/60 transition-colors hover:border-kin hover:text-kinari"
+      className="flex shrink-0 items-center gap-2 whitespace-nowrap rounded-full border border-kinari/15 px-3 py-1.5 text-xs tracking-widest text-kinari/60 transition-colors hover:border-kin hover:text-kinari"
     >
       {label}
       <span

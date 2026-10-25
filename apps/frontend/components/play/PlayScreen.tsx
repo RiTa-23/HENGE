@@ -770,8 +770,6 @@ export function PlayScreen({
               <span className={formColor(form).text}>{formLabel(form)}</span>
             </span>
           </div>
-          {/* 設定の入/切も、やめるボタンと同じ理由でこの中に置く */}
-          <div className="flex items-center gap-2">{settingToggles}</div>
           {/*
             打鍵を拾う要素の中に置く。外に出すと、押した時点でフォーカスが
             surface から外れ、onBlur の当て直しと競合する。
@@ -788,6 +786,13 @@ export function PlayScreen({
           </button>
         </div>
       </header>
+
+      {/*
+        設定の入/切も、やめるボタンと同じ理由で surface の中に置く。
+        **ヘッダーとは別の行にする。** 3つをヘッダーに並べると幅が足りず、
+        テーマ名・形式・やめるボタンが1文字ずつ縦に折り返す
+      */}
+      <div className="mt-3 flex flex-wrap justify-end gap-2">{settingToggles}</div>
 
       {form === "long" ? (
         /*

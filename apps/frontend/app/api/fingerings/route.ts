@@ -6,7 +6,7 @@ import { limitFingeringPost } from "@/lib/api/rate-limit";
 import { fingeringListQuerySchema, fingeringPostSchema } from "@/lib/api/schema";
 import { currentSession } from "@/lib/api/session";
 import { betaLimitation } from "@/lib/beta/beta";
-import { decodeFingering, encodeFingering, isDefaultFingering } from "@/lib/practice/fingering";
+import { canonicalFingering, decodeFingering, isDefaultFingering } from "@/lib/practice/fingering";
 
 export const dynamic = "force-dynamic";
 
@@ -96,10 +96,10 @@ export async function POST(request: Request) {
       json: {
         themeId,
         userId: session.user.id,
-        // **検証した運指から作り直して送る。** 同じ運指は同じ文字列になり、重複の判定
-        // （一意制約）が効く。送られてきた JSON をそのまま保存すると、キーの順や余計な
-        // 項目の違いで同じ運指が別物として残る
-        fingering: encodeFingering(decoded),
+        // **検証した運指から作り直して送る**（標準の単位も埋める）。同じ運指は同じ文字列に
+        // なり、重複の判定（一意制約）が効く。送られてきた JSON をそのまま保存すると、
+        // キーの順・余計な項目・null と標準の書き分けで、同じ運指が別物として残る
+        fingering: canonicalFingering(theme.name, decoded),
         note: note === undefined || note === "" ? null : note,
       },
     }),

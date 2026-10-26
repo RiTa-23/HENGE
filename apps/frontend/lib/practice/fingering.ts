@@ -139,6 +139,17 @@ export function encodeFingering(fingering: Fingering): StoredFingering {
   };
 }
 
+/**
+ * サーバーに保存する形。**決めていない単位（null）を標準運指で埋めてから**直す。
+ *
+ * 同じ運指は必ず同じ文字列にするため。「でき」の「で」を null と書いても、標準の打ち方と
+ * 指で書いても画面に出る運指は同じなのに、そのまま直すと別の文字列になり、投稿の重複
+ * （`fingering_posts` の一意制約）をすり抜ける。「ん」「っ」は決められないので null のまま
+ */
+export function canonicalFingering(sound: string, fingering: Fingering): StoredFingering {
+  return encodeFingering(resolveFingering(sound, fingering));
+}
+
 function decodeFinger(value: unknown): Finger | null {
   if (typeof value !== "string") return null;
   const [hand, finger] = value.split("-");

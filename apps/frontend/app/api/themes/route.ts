@@ -5,7 +5,7 @@ import { limitGeneration } from "@/lib/api/rate-limit";
 import { themeListQuerySchema, themeNameSchema } from "@/lib/api/schema";
 import { currentUserId } from "@/lib/api/session";
 import { betaLimitation } from "@/lib/beta/beta";
-import { decodeFingering, encodeFingering, isDefaultFingering } from "@/lib/practice/fingering";
+import { canonicalFingering, decodeFingering, isDefaultFingering } from "@/lib/practice/fingering";
 
 export const dynamic = "force-dynamic";
 
@@ -73,7 +73,7 @@ export async function POST(request: Request) {
   const defaultFingering =
     fingering === null || isDefaultFingering(name, fingering)
       ? undefined
-      : encodeFingering(fingering);
+      : canonicalFingering(name, fingering);
 
   const res = await client.themes.$post({ json: { kind, name, userId, defaultFingering } });
   const body = await res.json();

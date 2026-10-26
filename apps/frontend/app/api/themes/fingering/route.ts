@@ -5,7 +5,7 @@ import { denyIfCannotEditFingering } from "@/lib/api/fingering-guard";
 import { defaultFingeringSchema } from "@/lib/api/schema";
 import { currentSession } from "@/lib/api/session";
 import { betaLimitation } from "@/lib/beta/beta";
-import { decodeFingering, encodeFingering, isDefaultFingering } from "@/lib/practice/fingering";
+import { canonicalFingering, decodeFingering, isDefaultFingering } from "@/lib/practice/fingering";
 
 export const dynamic = "force-dynamic";
 
@@ -49,7 +49,9 @@ export async function PUT(request: Request) {
     return errorResponse("VALIDATION_ERROR", "運指が最適化する音と合いません");
   }
   const defaultFingering =
-    decoded === null || isDefaultFingering(theme.name, decoded) ? null : encodeFingering(decoded);
+    decoded === null || isDefaultFingering(theme.name, decoded)
+      ? null
+      : canonicalFingering(theme.name, decoded);
 
   return relay(
     await client.themes["default-fingering"].$put({ json: { themeId, defaultFingering } }),

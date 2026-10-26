@@ -181,7 +181,7 @@ D1のCASCADEはD1の中でしか効かない。KVを消し忘れると「削除�
 | `id` | TEXT | PK | UUID |
 | `theme_id` | TEXT | NOT NULL, FK→`themes.id` ON DELETE CASCADE | 最適化（`kind: 'constraint'`）だけ |
 | `user_id` | TEXT | NOT NULL, FK→`user.id` ON DELETE CASCADE | 投稿者。退会したら投稿ごと消える |
-| `fingering_json` | TEXT | NOT NULL | 運指。形は `default_fingering_json` と同じ。**検証した運指から作り直した JSON**（`encodeFingering`）なので、同じ運指なら同じ文字列 |
+| `fingering_json` | TEXT | NOT NULL | 運指。形は `default_fingering_json` と同じ。**検証した運指から、決めていない単位を標準で埋めて作り直した JSON**（`canonicalFingering`）なので、同じ運指なら同じ文字列 |
 | `note` | TEXT | NULL可 | 任意の説明文（60文字まで） |
 | `created_at` | INTEGER | NOT NULL | unixepoch |
 

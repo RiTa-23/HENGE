@@ -3,9 +3,9 @@ import { notFound } from "next/navigation";
 import { AdjustingView } from "@/components/Adjusting";
 import { DetailMato } from "@/components/DetailScroll";
 import { FingeringEditor } from "@/components/FingeringEditor";
-import { FormButton } from "@/components/FormButton";
 import { RankingBoard } from "@/components/RankingBoard";
 import { PracticeMark } from "@/components/ModeMark";
+import { SealButton } from "@/components/SealButton";
 import { SiteFooter } from "@/components/SiteFooter";
 import { SiteHeader } from "@/components/SiteHeader";
 import { betaLimitedPage } from "@/lib/api/admin-page";
@@ -83,12 +83,10 @@ export default async function PracticeDetailPage({
             { label: "プレイ", value: theme.totalPlayCount, unit: "回" },
           ]}
           actions={
-            <FormButton
-              form="sentence"
-              size="lg"
-              label="打つ"
+            // 形式が1つなので木札ではなく朱印（`SealButton`）。「生成困難」は印をくすませて示す
+            <SealButton
               href={playHref("constraint", theme.name)}
-              // 「生成困難」は札を暗くして示す
+              note={`「${theme.name}」の運指は下で決められます`}
               difficult={theme.generationStatus === "difficult"}
             />
           }

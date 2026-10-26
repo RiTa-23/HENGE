@@ -2,9 +2,9 @@ import { MIX_NAME } from "@henge/shared";
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import { DetailScroll } from "@/components/DetailScroll";
-import { FormButton } from "@/components/FormButton";
 import { MixMark } from "@/components/ModeMark";
 import { RankingBoard } from "@/components/RankingBoard";
+import { SealButton } from "@/components/SealButton";
 import { SiteFooter } from "@/components/SiteFooter";
 import { SiteHeader } from "@/components/SiteHeader";
 import { listRankings } from "@/lib/api/rankings";
@@ -56,10 +56,8 @@ export default async function MixDetailPage() {
             { label: "プレイ", value: theme.totalPlayCount, unit: "回" },
           ]}
           actions={
-            <FormButton
-              form="sentence"
-              size="lg"
-              label="打つ"
+            // 形式が1つなので木札ではなく朱印（`SealButton`）
+            <SealButton
               href={playHref("mix", theme.name)}
               difficult={theme.generationStatus === "difficult"}
             />

@@ -62,6 +62,7 @@ import {
   primeAudio,
 } from "@/lib/play/sound";
 import { detailHref, formColor, formLabel, kindLabel, listHref } from "@/lib/ui/kind";
+import { isPlayStartSpace, TEXT_ENTRY_SELECTOR } from "@/lib/ui/shortcut";
 
 interface Prompt {
   id: string;
@@ -557,8 +558,11 @@ export function PlayScreen({
   useEffect(() => {
     if (phase.name !== "ready") return;
     const onKey = (event: KeyboardEvent) => {
-      // key と code の両方を見る。配列やIMEの状態によって key が空になることがある
-      if (event.key !== " " && event.code !== "Space") return;
+      // 運指の投稿の説明文など、文字の入力中の Space（日本語入力の変換を含む）は奪わない
+      const target = event.target as HTMLElement | null;
+      const targetIsTextEntry = target?.closest?.(TEXT_ENTRY_SELECTOR) != null;
+      const { key, code, isComposing } = event;
+      if (!isPlayStartSpace({ key, code, isComposing, targetIsTextEntry })) return;
       // スペースでの画面スクロールを止める
       event.preventDefault();
       // **音はユーザー操作の中で起こす。** 操作を伴わずに作った AudioContext は
@@ -587,7 +591,7 @@ export function PlayScreen({
       if (reportOpen) return;
       // input 等にフォーカスがあるときのキーはショートカットにしない（フォーム入力を奪わない）
       const target = event.target as HTMLElement | null;
-      if (target?.closest("input, textarea, select, [contenteditable=true]")) return;
+      if (target?.closest(TEXT_ENTRY_SELECTOR)) return;
       // **修飾キーとの同時押しは拾わない。** `Cmd+R` / `Ctrl+R` のリロードを奪う
       if (event.ctrlKey || event.metaKey || event.altKey) return;
       // key と code の両方を見る。配列やIMEの状態によって key が空になることがある

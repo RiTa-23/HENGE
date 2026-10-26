@@ -1,5 +1,5 @@
 import { describe, expect, it } from "bun:test";
-import { isStartSpace } from "./shortcut";
+import { isPlayStartSpace, isStartSpace } from "./shortcut";
 
 const space = {
   key: " ",
@@ -39,4 +39,26 @@ describe("isStartSpace", () => {
       expect(isStartSpace({ ...space, [modifier]: true })).toBe(false);
     },
   );
+});
+
+describe("isPlayStartSpace", () => {
+  const ready = { key: " ", code: "Space", isComposing: false, targetIsTextEntry: false };
+
+  it("入力欄の外の Space は開始にする（ボタンにフォーカスがあっても）", () => {
+    expect(isPlayStartSpace(ready)).toBe(true);
+    expect(isPlayStartSpace({ ...ready, key: "" })).toBe(true);
+  });
+
+  // 運指の投稿の説明文を書いている途中で始まると、入力が消える
+  it("入力欄にフォーカスがあるときは奪わない", () => {
+    expect(isPlayStartSpace({ ...ready, targetIsTextEntry: true })).toBe(false);
+  });
+
+  it("日本語入力の変換中（Space で変換）は奪わない", () => {
+    expect(isPlayStartSpace({ ...ready, key: "Process", isComposing: true })).toBe(false);
+  });
+
+  it("Space 以外は拾わない", () => {
+    expect(isPlayStartSpace({ ...ready, key: "a", code: "KeyA" })).toBe(false);
+  });
 });

@@ -74,7 +74,7 @@ export function keyState(key: string, nextKey: NextKey | null, missKey: string |
 
 function keyClass(state: KeyState): string {
   const base =
-    "flex h-11 min-w-11 items-center justify-center rounded-md border px-3 font-mono text-sm transition-colors";
+    "flex h-11 min-w-11 items-center justify-center rounded-md border px-3 font-mono text-sm transition-colors short:h-9";
   if (state === "next") {
     return `${base} border-daidai bg-daidai font-bold text-sumi shadow-[0_0_12px_var(--color-daidai)]`;
   }

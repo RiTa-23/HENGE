@@ -95,7 +95,7 @@ export function LongScroll({ text, kanaUnits, progress, upper = false }: LongScr
     <div className="scroll scroll--long mx-auto w-full max-w-4xl">
       <div className="scroll__roller" />
 
-      <div className="scroll__sheet flex min-h-[60vh] flex-col px-5 py-8 sm:px-12 sm:py-10">
+      <div className="scroll__sheet flex min-h-[60vh] flex-col px-5 py-8 sm:px-12 sm:py-10 short:min-h-[50vh] short:sm:py-7">
         {/* 本文。左揃えで行間を広く取り、読みながら打てるようにする */}
         <p className="flex-1 font-mincho text-xl leading-loose tracking-[0.04em] text-kinari sm:text-2xl">
           {text}

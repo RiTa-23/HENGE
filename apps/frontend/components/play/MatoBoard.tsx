@@ -16,7 +16,7 @@ import "./ninja.css";
  */
 export function MatoBoard(props: PromptLinesProps) {
   return (
-    <div className="mato mx-auto flex min-h-60 w-full max-w-3xl flex-col items-center justify-center gap-5 px-8 py-12">
+    <div className="mato mx-auto flex min-h-60 w-full max-w-3xl flex-col items-center justify-center gap-5 px-8 py-12 short:min-h-48 short:py-7">
       <PromptLines {...props} />
     </div>
   );

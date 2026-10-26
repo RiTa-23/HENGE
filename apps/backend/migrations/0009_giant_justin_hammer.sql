@@ -1,0 +1,1 @@
+ALTER TABLE `themes` ADD `default_fingering_json` text;

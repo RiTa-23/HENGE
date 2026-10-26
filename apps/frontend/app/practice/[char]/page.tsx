@@ -1,17 +1,20 @@
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import { AdjustingView } from "@/components/Adjusting";
+import { DefaultFingeringEditor } from "@/components/DefaultFingeringEditor";
 import { DetailMato } from "@/components/DetailScroll";
-import { FingeringEditor } from "@/components/FingeringEditor";
+import { FingeringPanel } from "@/components/FingeringPanel";
 import { RankingBoard } from "@/components/RankingBoard";
 import { PracticeMark } from "@/components/ModeMark";
 import { SealButton } from "@/components/SealButton";
 import { SiteFooter } from "@/components/SiteFooter";
 import { SiteHeader } from "@/components/SiteHeader";
 import { betaLimitedPage } from "@/lib/api/admin-page";
+import { defaultFingeringEditable } from "@/lib/api/fingering";
 import { ogFields, pageTitle } from "@/lib/og";
 import { listRankings } from "@/lib/api/rankings";
 import { decodePageParam, findTheme } from "@/lib/api/themes";
+import { decodeFingering } from "@/lib/practice/fingering";
 import { adjustingMetadata } from "@/lib/beta/beta";
 import { playHref } from "@/lib/ui/kind";
 
@@ -58,6 +61,12 @@ export default async function PracticeDetailPage({
   const theme = await findTheme("constraint", char);
   if (theme === null) notFound();
 
+  // 作成者が決めた運指。音と照らして形が合わなければ標準運指に倒す
+  const defaultFingering = decodeFingering(theme.defaultFingering, theme.name);
+  // 既定の運指を変えられるのは作成者と運営だけ。守っているのは公開API（PUT /api/themes/fingering）で、
+  // ここは欄を出すかどうか
+  const editable = await defaultFingeringEditable(theme.id);
+
   // 最適化する音は短文だけなので、ランキングも1つ
   const entries = await listRankings(theme.id, "sentence");
 
@@ -102,12 +111,41 @@ export default async function PracticeDetailPage({
           </h2>
           <p className="mt-2 text-sm leading-relaxed text-kinari/60">
             「{theme.name}」を打つ打ち方と指を決めると、プレイ中の的の箇所でその打ち方と指が出ます。
-            決めなければ標準の運指です。設定はこの端末に保存されます。
+            {defaultFingering === null
+              ? "決めなければ標準の運指です。"
+              : "決めなければ、この練習を作った人が決めた運指です。"}
+            設定はこの端末に保存されます。下の「みんなの運指」から、ほかの人が投稿した運指を選ぶこともできます。
           </p>
           <div className="mt-6 rounded-lg border border-kinari/15 bg-kinari/5 p-6">
-            <FingeringEditor sound={theme.name} />
+            <FingeringPanel themeId={theme.id} sound={theme.name} base={defaultFingering} />
           </div>
         </section>
+
+        {/*
+          この練習の既定の運指（作成者と運営だけ）。遊ぶ人向けの欄とは分ける。
+          こちらは全員に効くサーバーの値、上はこの端末だけの値
+        */}
+        {editable && (
+          <section aria-labelledby="default-fingering-heading" className="mt-12">
+            <h2
+              id="default-fingering-heading"
+              className="font-mincho text-xl tracking-wide text-kinari"
+            >
+              この練習の既定の運指
+            </h2>
+            <p className="mt-2 text-sm leading-relaxed text-kinari/60">
+              この最適化を作った人と運営だけが変えられます。ここで決めた運指が、遊ぶ人全員の既定になります
+              （自分の運指を決めている人には、そちらが優先されます）。
+            </p>
+            <div className="mt-6 rounded-lg border border-kin/40 bg-kinari/5 p-6">
+              <DefaultFingeringEditor
+                themeId={theme.id}
+                sound={theme.name}
+                current={defaultFingering}
+              />
+            </div>
+          </section>
+        )}
 
         <RankingBoard boards={[{ form: "sentence", entries }]} />
 

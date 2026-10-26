@@ -21,6 +21,9 @@ import type { TargetSpan } from "./targets";
  * 「き」なら `ki` を `k`（右 人差し指）・`i`（右 中指）で打つ、のように。
  */
 
+/** 運指の投稿に添える説明文の上限（文字数）。入力欄と公開APIの検証で同じ値を使う */
+export const FINGERING_NOTE_MAX = 60;
+
 /** かな1単位の運指。`fingers` は `roman` の1文字ずつに対応する */
 export interface UnitFingering {
   roman: string;
@@ -85,20 +88,27 @@ function sameFinger(a: Finger, b: Finger): boolean {
   return a.hand === b.hand && a.finger === b.finger;
 }
 
-/** 既定の運指（table.ts の先頭の打ち方を標準運指で）と同じか */
-export function isDefaultFingering(sound: string, fingering: Fingering): boolean {
-  const defaults = resolveFingering(sound, null).units;
-  return fingering.units.every((unit, i) => {
-    const base = defaults[i];
-    if (unit === null || base == null) return unit === null && base == null;
+/** 2つの運指が画面に同じ運指を出すか。null（決めていない）は既定（標準運指）として比べる */
+export function sameFingering(sound: string, a: Fingering | null, b: Fingering | null): boolean {
+  const left = resolveFingering(sound, a).units;
+  const right = resolveFingering(sound, b).units;
+  return left.every((unit, i) => {
+    const other = right[i];
+    if (unit == null || other == null) return unit == null && other == null;
     return (
-      unit.roman === base.roman &&
+      unit.roman === other.roman &&
+      unit.fingers.length === other.fingers.length &&
       unit.fingers.every((f, j) => {
-        const standard = base.fingers[j];
-        return standard !== undefined && sameFinger(f, standard);
+        const g = other.fingers[j];
+        return g !== undefined && sameFinger(f, g);
       })
     );
   });
+}
+
+/** 既定の運指（table.ts の先頭の打ち方を標準運指で）と同じか */
+export function isDefaultFingering(sound: string, fingering: Fingering): boolean {
+  return sameFingering(sound, fingering, null);
 }
 
 // ---- 保存 ----
@@ -111,12 +121,15 @@ function keyOf(sound: string): string {
   return `henge:fingering:${normalizeConstraintChar(sound)}`;
 }
 
-/** 保存の形。指は `"right-index"` のような文字列で持つ */
-interface Stored {
+/**
+ * 保存の形。指は `"right-index"` のような文字列で持つ。
+ * localStorage と、最適化の既定の運指（`themes.default_fingering_json`）で同じ形
+ */
+export interface StoredFingering {
   units: ({ roman: string; fingers: string[] } | null)[];
 }
 
-function encode(fingering: Fingering): Stored {
+export function encodeFingering(fingering: Fingering): StoredFingering {
   return {
     units: fingering.units.map((unit) =>
       unit === null
@@ -124,6 +137,17 @@ function encode(fingering: Fingering): Stored {
         : { roman: unit.roman, fingers: unit.fingers.map((f) => `${f.hand}-${f.finger}`) },
     ),
   };
+}
+
+/**
+ * サーバーに保存する形。**決めていない単位（null）を標準運指で埋めてから**直す。
+ *
+ * 同じ運指は必ず同じ文字列にするため。「でき」の「で」を null と書いても、標準の打ち方と
+ * 指で書いても画面に出る運指は同じなのに、そのまま直すと別の文字列になり、投稿の重複
+ * （`fingering_posts` の一意制約）をすり抜ける。「ん」「っ」は決められないので null のまま
+ */
+export function canonicalFingering(sound: string, fingering: Fingering): StoredFingering {
+  return encodeFingering(resolveFingering(sound, fingering));
 }
 
 function decodeFinger(value: unknown): Finger | null {
@@ -140,15 +164,10 @@ function decodeFinger(value: unknown): Finger | null {
  * 音の切り方と合わない（単位の数が違う）・その単位で打てない打ち方・文字数と指の数が
  * 合わない、のどれかでも捨てる。半端に読むと、ある文字だけ指が出ないような、
  * 画面から原因の見えない壊れ方になる。
+ *
+ * 最適化の既定の運指（サーバーから JSON のまま届く）と、作成時の入力検証もこれで読む。
  */
-export function parseFingering(raw: string | null, sound: string): Fingering | null {
-  if (raw === null) return null;
-  let value: unknown;
-  try {
-    value = JSON.parse(raw);
-  } catch {
-    return null;
-  }
+export function decodeFingering(value: unknown, sound: string): Fingering | null {
   const units = fingeringUnits(sound);
   const stored = (value as { units?: unknown } | null)?.units;
   if (!Array.isArray(stored) || stored.length !== units.length) return null;
@@ -160,7 +179,7 @@ export function parseFingering(raw: string | null, sound: string): Fingering | n
       parsed.push(null);
       continue;
     }
-    const { roman, fingers } = entry as { roman?: unknown; fingers?: unknown };
+    const { roman, fingers } = (entry ?? {}) as { roman?: unknown; fingers?: unknown };
     if (typeof roman !== "string" || !romanChoices(unit).includes(roman)) return null;
     if (!Array.isArray(fingers) || fingers.length !== roman.length) return null;
     const decoded = fingers.map(decodeFinger);
@@ -170,18 +189,38 @@ export function parseFingering(raw: string | null, sound: string): Fingering | n
   return { units: parsed };
 }
 
+/** localStorage の文字列を読む。JSON として読めなければ null */
+export function parseFingering(raw: string | null, sound: string): Fingering | null {
+  if (raw === null) return null;
+  try {
+    return decodeFingering(JSON.parse(raw), sound);
+  } catch {
+    return null;
+  }
+}
+
 /** 音 `sound` の運指。決めていなければ null */
 export function readFingering(sound: string): Fingering | null {
   return parseFingering(storage()?.getItem(keyOf(sound)) ?? null, sound);
 }
 
-/** 保存する。**既定と同じなら消す**（「標準に戻す」も null を渡す） */
-export function writeFingering(sound: string, fingering: Fingering | null): void {
+/**
+ * 保存する。**既定と同じなら消す**（「既定に戻す」も null を渡す）。
+ *
+ * 既定は、その最適化の作成者が決めた運指（`base`）。無ければ標準運指。
+ * 作成者の運指がある練習で標準運指を選んだときは、消さずに保存する
+ * （消すと作成者の運指に戻ってしまう）
+ */
+export function writeFingering(
+  sound: string,
+  fingering: Fingering | null,
+  base: Fingering | null = null,
+): void {
   try {
-    if (fingering === null || isDefaultFingering(sound, fingering)) {
+    if (fingering === null || sameFingering(sound, fingering, base)) {
       storage()?.removeItem(keyOf(sound));
     } else {
-      storage()?.setItem(keyOf(sound), JSON.stringify(encode(fingering)));
+      storage()?.setItem(keyOf(sound), JSON.stringify(encodeFingering(fingering)));
     }
   } catch {
     // 容量超過・書き込み禁止。次に開いたとき標準に戻るだけで、プレイは続けられる

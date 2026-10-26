@@ -16,7 +16,7 @@ import {
   type TypingProgress,
 } from "@henge/shared";
 import { useCallback, useEffect, useRef, useState } from "react";
-import { FingeringEditor } from "@/components/FingeringEditor";
+import { FingeringPanel } from "@/components/FingeringPanel";
 import { FitScreen } from "@/components/FitScreen";
 import { FormMark } from "@/components/FormMark";
 import { Logo } from "@/components/Logo";
@@ -40,6 +40,7 @@ import {
   chosenFingerAt,
   chosenRomans,
   type Fingering,
+  isDefaultFingering,
   readFingering,
 } from "@/lib/practice/fingering";
 import {
@@ -61,6 +62,7 @@ import {
   primeAudio,
 } from "@/lib/play/sound";
 import { detailHref, formColor, formLabel, kindLabel, listHref } from "@/lib/ui/kind";
+import { isPlayStartSpace, TEXT_ENTRY_SELECTOR } from "@/lib/ui/shortcut";
 
 interface Prompt {
   id: string;
@@ -182,6 +184,7 @@ export function PlayScreen({
   poolEmpty,
   shareUrl,
   beta = false,
+  defaultFingering = null,
 }: {
   themeId: string;
   themeName: string;
@@ -201,6 +204,11 @@ export function PlayScreen({
   shareUrl: string;
   /** ベータ運用の間だけロゴの横に「ベータ版」を出す。判定はサーバー側（lib/beta/beta.ts） */
   beta?: boolean;
+  /**
+   * 最適化の既定の運指（作成者が作成時に決めたもの）。この端末で決めた運指が無ければ
+   * これを使う。無ければ null で、標準運指
+   */
+  defaultFingering?: Fingering | null;
 }) {
   const { data: authSession } = authClient.useSession();
   const backToList = listHref(kind);
@@ -433,8 +441,11 @@ export function PlayScreen({
   }, []);
 
   useEffect(() => {
-    if (kind === "constraint") changeFingering(readFingering(themeName));
-  }, [kind, themeName]);
+    if (kind !== "constraint") return;
+    // この端末で決めた運指 → 作成者の運指 → 標準運指 の順
+    const showing = readFingering(themeName) ?? defaultFingering;
+    changeFingering(showing === null || isDefaultFingering(themeName, showing) ? null : showing);
+  }, [kind, themeName, defaultFingering]);
 
   useEffect(() => {
     mutedRef.current = muted;
@@ -547,8 +558,11 @@ export function PlayScreen({
   useEffect(() => {
     if (phase.name !== "ready") return;
     const onKey = (event: KeyboardEvent) => {
-      // key と code の両方を見る。配列やIMEの状態によって key が空になることがある
-      if (event.key !== " " && event.code !== "Space") return;
+      // 運指の投稿の説明文など、文字の入力中の Space（日本語入力の変換を含む）は奪わない
+      const target = event.target as HTMLElement | null;
+      const targetIsTextEntry = target?.closest?.(TEXT_ENTRY_SELECTOR) != null;
+      const { key, code, isComposing } = event;
+      if (!isPlayStartSpace({ key, code, isComposing, targetIsTextEntry })) return;
       // スペースでの画面スクロールを止める
       event.preventDefault();
       // **音はユーザー操作の中で起こす。** 操作を伴わずに作った AudioContext は
@@ -577,7 +591,7 @@ export function PlayScreen({
       if (reportOpen) return;
       // input 等にフォーカスがあるときのキーはショートカットにしない（フォーム入力を奪わない）
       const target = event.target as HTMLElement | null;
-      if (target?.closest("input, textarea, select, [contenteditable=true]")) return;
+      if (target?.closest(TEXT_ENTRY_SELECTOR)) return;
       // **修飾キーとの同時押しは拾わない。** `Cmd+R` / `Ctrl+R` のリロードを奪う
       if (event.ctrlKey || event.metaKey || event.altKey) return;
       // key と code の両方を見る。配列やIMEの状態によって key が空になることがある
@@ -727,7 +741,12 @@ export function PlayScreen({
                     </span>
                   </summary>
                   <div className="mt-5">
-                    <FingeringEditor sound={themeName} onChange={changeFingering} />
+                    <FingeringPanel
+                      themeId={themeId}
+                      sound={themeName}
+                      base={defaultFingering}
+                      onChange={changeFingering}
+                    />
                   </div>
                 </details>
               )}

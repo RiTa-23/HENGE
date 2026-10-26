@@ -5,9 +5,11 @@ import {
   findOrCreateMixTheme,
   findOrCreateMixThemes,
   findThemeByName,
+  getThemeCreator,
   getThemeDetail,
   LIST_LIMIT_DEFAULT,
   listThemes,
+  setDefaultFingering,
 } from "../db/themes";
 import { fail } from "../http/error";
 
@@ -55,4 +57,24 @@ export const themeRoutes = new Hono<{ Bindings: Env }>()
     const theme = await getThemeDetail(createDb(c.env.DB), c.req.param("id"));
     if (theme === null) return fail(c, "NOT_FOUND", "テーマが見つかりません");
     return c.json({ theme });
+  })
+  // 作成者。**公開APIで中継しない**（利用者のIDを出さない）。既定の運指を変えてよいかを
+  // Next.js 側で判定するためだけに使う
+  .get("/themes/:id/creator", async (c) => {
+    const found = await getThemeCreator(createDb(c.env.DB), c.req.param("id"));
+    if (found === undefined) return fail(c, "NOT_FOUND", "テーマが見つかりません");
+    return c.json(found);
+  })
+  // 最適化の既定の運指を書き換える。**作成者か運営かの判定は Next.js 側で済んでいる**。
+  // 運指の形も Next.js 側で音と照らしてある
+  .put("/themes/default-fingering", async (c) => {
+    const { themeId: id, defaultFingering } = await c.req.json<{
+      themeId: string;
+      defaultFingering: unknown;
+    }>();
+    const db = createDb(c.env.DB);
+    if (!(await setDefaultFingering(db, id, defaultFingering))) {
+      return fail(c, "NOT_FOUND", "最適化が見つかりません");
+    }
+    return c.json({ theme: await getThemeDetail(db, id) });
   });

@@ -376,6 +376,54 @@ describe("POST /themes（最適化の語彙）", () => {
     expect(await getUsage(db, "u1")).toEqual({ count: 0, neurons: 0 });
   });
 
+  it("作成時に決めた運指を既定の運指として保存し、詳細で返す", async () => {
+    await seedUser("u1");
+    const heads = ["一", "二", "三", "四", "五", "六", "七", "八", "九", "十"];
+    stubGeneration([heads.map((n) => `${n}番の座席に座る。`)], "ざせきにすわる");
+    const fingering = { units: [{ roman: "za", fingers: ["left-ring", "left-pinky"] }] };
+
+    const { body } = await post("/themes", {
+      kind: "constraint",
+      name: "ざ",
+      userId: "u1",
+      defaultFingering: fingering,
+    });
+
+    expect(body.created).toBe(true);
+    expect((body.theme as { defaultFingering: unknown }).defaultFingering).toEqual(fingering);
+  });
+
+  it("既存と一致したときは、既定の運指を書き換えない", async () => {
+    const original = { units: [{ roman: "za", fingers: ["left-ring", "left-pinky"] }] };
+    await db.insert(themes).values({
+      id: "t1",
+      kind: "constraint",
+      name: "ざ",
+      normalizedName: "ざ",
+      defaultFingeringJson: JSON.stringify(original),
+    });
+
+    const { body } = await post("/themes", {
+      kind: "constraint",
+      name: "ざ",
+      userId: "u1",
+      defaultFingering: { units: [{ roman: "za", fingers: ["left-middle", "left-pinky"] }] },
+    });
+
+    expect(body.created).toBe(false);
+    expect((body.theme as { defaultFingering: unknown }).defaultFingering).toEqual(original);
+  });
+
+  it("運指を決めずに作れば、既定の運指は null", async () => {
+    await seedUser("u1");
+    const heads = ["一", "二", "三", "四", "五", "六", "七", "八", "九", "十"];
+    stubGeneration([heads.map((n) => `${n}番の座席に座る。`)], "ざせきにすわる");
+
+    const { body } = await post("/themes", { kind: "constraint", name: "ざ", userId: "u1" });
+
+    expect((body.theme as { defaultFingering: unknown }).defaultFingering).toBeNull();
+  });
+
   it("テーマでは語彙を保存しない", async () => {
     await seedUser("u1");
     stubValidGeneration();

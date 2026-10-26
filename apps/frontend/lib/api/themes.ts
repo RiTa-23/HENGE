@@ -12,9 +12,14 @@ export interface ThemeDetail {
   wordGenerationStatus: "ok" | "difficult";
   longGenerationStatus: "ok" | "difficult";
   createdAt: number;
+  /**
+   * 最適化の既定の運指（作成者が決めたもの）。保存した JSON のまま届くので、
+   * 使う側で `decodeFingering` に音と一緒に通す。決めていなければ null
+   */
+  defaultFingering: unknown;
 }
 
-export interface ThemeSummary extends Omit<ThemeDetail, "promptCounts"> {}
+export interface ThemeSummary extends Omit<ThemeDetail, "promptCounts" | "defaultFingering"> {}
 
 /**
  * 表示名からテーマを1件引く。サーバーコンポーネント用。

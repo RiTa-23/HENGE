@@ -52,6 +52,15 @@ export const themes = sqliteTable(
     longGenerationStatus: text("long_generation_status", { enum: ["ok", "difficult"] })
       .notNull()
       .default("ok"),
+    /**
+     * 最適化（`kind: 'constraint'`）の既定の運指。作成者が作成時に決めたもの。
+     * `{ units: ({ roman, fingers: ["right-index", …] } | null)[] }` の JSON。
+     *
+     * 標準運指のままなら NULL。テーマでは常に NULL。利用者がその端末で決めた運指
+     * （localStorage）があればそちらが勝つ（docs/07-ui.md「最適化の運指」）。
+     * 検証は Next.js 側で済ませてあり、ここでは中身を解釈しない
+     */
+    defaultFingeringJson: text("default_fingering_json"),
     /** 人気順ソート用。プレイ開始のたび+1 */
     totalPlayCount: integer("total_play_count").notNull().default(0),
     createdAt: integer("created_at")
@@ -267,6 +276,73 @@ export const readingReports = sqliteTable(
   (t) => [
     // 承認画面（pending一覧）とワークフロー（approved取得）の両方が status で絞る
     index("reading_reports_status").on(t.status, desc(t.createdAt)),
+  ],
+);
+
+/**
+ * 最適化の運指の投稿。**誰でも（ログインしていてユーザー名を決めた人）投稿できる。**
+ *
+ * 最適化の既定の運指（`themes.default_fingering_json`。作成者と運営が決める）とは別物で、
+ * プレイヤーはこの一覧から選んで自分の運指（localStorage）に写す（docs/07-ui.md）。
+ *
+ * - **同じ運指は1件だけ**（`theme_id` × `fingering_json` の一意制約）。JSON は Next.js 側で
+ *   検証済みの運指から作り直した形（`encodeFingering`）なので、同じ運指なら同じ文字列になる
+ * - 1人1つの最適化につき5件まで（`FINGERING_POSTS_PER_USER`。Hono 側で数える）
+ * - 名前は持たない。表示時に `user.display_name` を結合する（ランキングと同じ）。
+ *   投稿者が退会したら投稿ごと消える
+ */
+export const fingeringPosts = sqliteTable(
+  "fingering_posts",
+  {
+    id: text("id").primaryKey(),
+    themeId: text("theme_id")
+      .notNull()
+      .references(() => themes.id, { onDelete: "cascade" }),
+    userId: text("user_id")
+      .notNull()
+      .references(() => user.id, { onDelete: "cascade" }),
+    /** `{ units: ({ roman, fingers: ["right-index", …] } | null)[] }` の JSON（既定の運指と同じ形） */
+    fingeringJson: text("fingering_json").notNull(),
+    /** 任意の説明文（60文字まで）。無ければ NULL */
+    note: text("note"),
+    createdAt: integer("created_at")
+      .notNull()
+      .default(sql`(unixepoch())`),
+  },
+  (t) => [
+    uniqueIndex("fingering_posts_theme_fingering").on(t.themeId, t.fingeringJson),
+    // 1人あたりの投稿数を数える
+    index("fingering_posts_user_theme").on(t.userId, t.themeId),
+  ],
+);
+
+/**
+ * 投稿の「選んだ人」。**ログインユーザーが、その最適化について最後に選んだ投稿**を
+ * 1人1行で持つ（主キーが `user_id` × `theme_id`）。一覧の並び順（選んだ人数の多い順）に使う。
+ *
+ * いいね・お気に入りではない（MVP のスコープ外）。別の投稿を選び直せば票が移る。
+ * 匿名は数えない（匿名ユーザーのデータをサーバーに持たない＝不変条件10）。
+ */
+export const fingeringPicks = sqliteTable(
+  "fingering_picks",
+  {
+    userId: text("user_id")
+      .notNull()
+      .references(() => user.id, { onDelete: "cascade" }),
+    themeId: text("theme_id")
+      .notNull()
+      .references(() => themes.id, { onDelete: "cascade" }),
+    postId: text("post_id")
+      .notNull()
+      .references(() => fingeringPosts.id, { onDelete: "cascade" }),
+    updatedAt: integer("updated_at")
+      .notNull()
+      .default(sql`(unixepoch())`),
+  },
+  (t) => [
+    primaryKey({ columns: [t.userId, t.themeId] }),
+    // 投稿ごとの人数を数える
+    index("fingering_picks_post").on(t.postId),
   ],
 );
 

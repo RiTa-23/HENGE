@@ -12,6 +12,9 @@ import {
   chosenFingerAt,
   chosenRomans,
   type Fingering,
+  canonicalFingering,
+  decodeFingering,
+  encodeFingering,
   isDefaultFingering,
   parseFingering,
   readFingering,
@@ -118,6 +121,61 @@ describe("保存と読み出し", () => {
     writeFingering("き", KI);
     writeFingering("き", null);
     expect(readFingering("き")).toBeNull();
+  });
+
+  describe("作成者の運指（既定の運指）がある練習", () => {
+    it("作成者の運指と同じなら消す", () => {
+      writeFingering("き", KI, KI);
+      expect(globalThis.localStorage.getItem("henge:fingering:き")).toBeNull();
+    });
+
+    // 消すと作成者の運指に戻ってしまい、標準運指で打ちたい人が選べなくなる
+    it("標準運指を選んだら消さずに残す", () => {
+      const standard = resolveFingering("き", null);
+      writeFingering("き", standard, KI);
+      expect(readFingering("き")).toEqual(standard);
+    });
+  });
+
+  describe("サーバーに保存する形", () => {
+    // null と標準の書き分けで別の文字列になると、投稿の重複（一意制約）をすり抜ける
+    it("決めていない単位を標準で埋め、同じ運指は同じ形にする", () => {
+      const deki = (de: Fingering["units"][number]): Fingering => ({
+        units: [de, { roman: "ki", fingers: [RIGHT_INDEX, RIGHT_MIDDLE] }],
+      });
+      const standardDe = resolveFingering("で", null).units[0] ?? null;
+      expect(JSON.stringify(canonicalFingering("でき", deki(null)))).toBe(
+        JSON.stringify(canonicalFingering("でき", deki(standardDe))),
+      );
+      expect(canonicalFingering("でき", deki(null)).units[0]).toEqual({
+        roman: "de",
+        fingers: ["left-middle", "left-middle"],
+      });
+    });
+
+    it("「ん」は決められないので null のまま", () => {
+      const decoded = decodeFingering({ units: [null, null] }, "きん");
+      expect(decoded).not.toBeNull();
+      expect(canonicalFingering("きん", decoded as Fingering).units[1]).toBeNull();
+    });
+  });
+
+  describe("サーバーから届いた運指（JSON のまま）", () => {
+    it("保存の形に直したものを読み戻せる", () => {
+      expect(decodeFingering(encodeFingering(KI), "き")).toEqual(KI);
+    });
+
+    it.each([
+      ["null", null],
+      ["音と単位の数が違う", { units: [] }],
+      [
+        "その音で打てない打ち方",
+        { units: [{ roman: "zi", fingers: ["left-ring", "right-middle"] }] },
+      ],
+      ["単位が null でもオブジェクトでもない", { units: [1] }],
+    ])("%s なら null", (_, value) => {
+      expect(decodeFingering(value, "き")).toBeNull();
+    });
   });
 
   describe("形が合わなければ全体を捨てる", () => {

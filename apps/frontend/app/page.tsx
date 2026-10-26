@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { HeroLogo } from "@/components/HeroLogo";
+import { MixCard } from "@/components/MixCard";
 import { PracticeMark, ThemeMark } from "@/components/ModeMark";
 import { SiteFooter } from "@/components/SiteFooter";
 import { SiteHeader } from "@/components/SiteHeader";
@@ -61,9 +62,13 @@ export default async function HomePage() {
           </p>
         </section>
 
+        {/* **選ばずに始めたい人の入口を先に置く。** テーマも音も決めていない人が、
+            2つのモードの説明を読む前にそのまま打ち始められる（ごちゃまぜ） */}
+        <MixCard className="mt-14" />
+
         {/* 2つのモードは排他。トップで並べて、どちらから入るかだけ選ばせる。
             紋（ModeMark）はモチーフの流用ではなく新しい線画（docs/07-ui.md） */}
-        <div className="mt-14 grid gap-4 sm:grid-cols-2">
+        <div className="mt-4 grid gap-4 sm:grid-cols-2">
           <a
             href="/themes"
             className="group rounded-md border border-kinari/15 bg-kinari/5 px-8 py-7 transition-colors hover:border-shu/60"

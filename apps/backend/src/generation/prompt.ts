@@ -249,9 +249,10 @@ export function buildGenerationPrompt(input: {
     return { system: SYSTEM_LONG, user: lines.join("\n") };
   }
 
-  if (input.kind === "constraint") {
+  // **ごちゃまぜも同じ指示**（渡す語が最適化の語彙か、共通リスト全体からかの違いだけ）
+  if (input.kind !== "theme") {
     const groups = input.wordGroups ?? [];
-    if (groups.length === 0) throw new Error("最適化の生成には語の組が要る");
+    if (groups.length === 0) throw new Error("最適化・ごちゃまぜの生成には語の組が要る");
     const lines = [
       "次の各行に並べた語を使って、自然な短文を1つずつ作ってください。",
       "",

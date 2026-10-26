@@ -156,7 +156,8 @@ export interface GenerateBatchInput {
   existing: string[];
   model: ModelId;
   /**
-   * 最適化の語彙（`constraint_vocabularies`）。**最適化では必須。** 生成の最初にシャッフルし、
+   * 最適化の語彙（`constraint_vocabularies`）、またはごちゃまぜの語彙（`mixVocabulary`）。
+   * **最適化・ごちゃまぜでは必須。** 生成の最初にシャッフルし、
    * ラウンドごとに続きの語を組にしてモデルに渡す（1回の生成の中で語が重ならない）。
    * 空なら AI を呼ばずに終わる（作れるものが無いのにニューロンを使わない）
    */
@@ -212,8 +213,11 @@ export async function generateBatch(env: Env, input: GenerateBatchInput): Promis
 
   const requested = requestCount(input.form);
   const wordsPerSentence = input.wordsPerSentence ?? CONSTRAINT_WORDS_PER_SENTENCE;
-  const words = input.kind === "constraint" ? shuffle(input.vocabulary ?? [], input.random) : [];
-  if (input.kind === "constraint" && words.length === 0) {
+  // **ごちゃまぜも最適化と同じ流れ**（語彙をシャッフルして2語ずつ組にして渡す）。
+  // 違うのは語彙の出どころと、検証で指定の連接を見ないことだけ
+  const usesWords = input.kind !== "theme";
+  const words = usesWords ? shuffle(input.vocabulary ?? [], input.random) : [];
+  if (usesWords && words.length === 0) {
     return { valid, rejected, rounds: 0, neurons: 0, reachedTarget: false };
   }
 
@@ -231,7 +235,7 @@ export async function generateBatch(env: Env, input: GenerateBatchInput): Promis
       name: input.name,
       count: requested,
       existing: input.existing,
-      ...(input.kind === "constraint"
+      ...(usesWords
         ? { wordGroups: wordGroupsFor(words, round, requested, wordsPerSentence), wordsPerSentence }
         : {}),
       metadata: {

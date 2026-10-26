@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { MixCard } from "@/components/MixCard";
 import { ModeTabs } from "@/components/ModeTabs";
 import { SiteFooter } from "@/components/SiteFooter";
 import { SiteHeader } from "@/components/SiteHeader";
@@ -44,6 +45,9 @@ export default async function ThemesPage({
         <div className="mt-8">
           <ModeTabs current="theme" />
         </div>
+
+        {/* テーマを選びかねている人の逃げ道。一覧を眺める前に置く */}
+        <MixCard className="mt-10" />
 
         <div className="mt-10 flex gap-2">
           {tabs.map((tab) => (

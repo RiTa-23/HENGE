@@ -1,4 +1,4 @@
-import { normalizeName, type PromptForm, type ThemeKind } from "@henge/shared";
+import { MIX_NAME, normalizeName, type PromptForm, type ThemeKind } from "@henge/shared";
 import { and, desc, eq, sql } from "drizzle-orm";
 import type { Db } from "./client";
 import { prompts, themes } from "./schema";
@@ -134,6 +134,37 @@ export async function findThemeByName(
     .where(and(eq(themes.kind, kind), eq(themes.normalizedName, normalizeName(kind, name))))
     .limit(1);
   return row ?? null;
+}
+
+/**
+ * ごちゃまぜの行を引く。**無ければ作る**（お題0件のまま）。
+ *
+ * ごちゃまぜは利用者が作るものではなく、サイトに1つだけある入口なので、作成の操作
+ * （`POST /themes`）を通さない。通すと、ベータ版で新規作成を弾いている利用者
+ * （`betaLimitation`）が誰も最初の10問を作れない。お題はプレイ画面の「作る」
+ * （`POST /prompts/regenerate`）と補充で積む。
+ *
+ * **お題0件の行を先に作るが、不変条件5（テーマ行はお題と同じバッチで挿入）の理由には
+ * 当たらない。** あの条件が防いでいるのは「公開一覧にお題ゼロのテーマが残る」ことで、
+ * ごちゃまぜは公開一覧（`kind` で絞る）に出ない。管理画面で消しても、次に引かれたときに
+ * 作り直される。
+ */
+export async function findOrCreateMixTheme(db: Db): Promise<ThemeSummary> {
+  const found = await findThemeByName(db, "mix", MIX_NAME);
+  if (found !== null) return found;
+  // 同時に2つ来ても一意制約 `(kind, normalized_name)` で1行に収まる
+  await db
+    .insert(themes)
+    .values({
+      id: crypto.randomUUID(),
+      kind: "mix",
+      name: MIX_NAME,
+      normalizedName: normalizeName("mix", MIX_NAME),
+    })
+    .onConflictDoNothing();
+  const created = await findThemeByName(db, "mix", MIX_NAME);
+  if (created === null) throw new Error("ごちゃまぜの行を作れなかった");
+  return created;
 }
 
 export interface ThemeDetail extends ThemeSummary {

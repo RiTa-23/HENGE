@@ -38,6 +38,34 @@ beforeEach(async () => {
   await db.delete(user);
 });
 
+describe("GET /themes（ごちゃまぜ）", () => {
+  it("行が無ければ作り、お題0件のまま返す", async () => {
+    const { status, body } = await get(`/themes?kind=mix&name=${encodeURIComponent("ごちゃまぜ")}`);
+    expect(status).toBe(200);
+    const found = body.themes as { kind: string; name: string }[];
+    expect(found).toHaveLength(1);
+    expect(found[0]).toMatchObject({ kind: "mix", name: "ごちゃまぜ" });
+    expect(await db.select().from(themes)).toHaveLength(1);
+    expect(await db.select().from(prompts)).toHaveLength(0);
+  });
+
+  it("何度引いても1行のまま（名前を問わず同じ行を返す）", async () => {
+    const first = await get("/themes?kind=mix");
+    const second = await get(`/themes?kind=mix&name=${encodeURIComponent("ほかの名前")}`);
+
+    const id = (first.body.themes as { id: string }[])[0]?.id;
+    expect((second.body.themes as { id: string }[])[0]?.id).toBe(id);
+    expect(await db.select().from(themes)).toHaveLength(1);
+  });
+
+  it("テーマ・最適化の一覧には出ない（公開一覧にお題0件の行を出さない）", async () => {
+    await get("/themes?kind=mix");
+
+    expect((await get("/themes?kind=theme")).body.themes).toEqual([]);
+    expect((await get("/themes?kind=constraint")).body.themes).toEqual([]);
+  });
+});
+
 describe("GET /themes", () => {
   it("kind で絞り込む（テーマと含む文字は同じテーブル）", async () => {
     await seedTheme({ id: "t1", kind: "theme", name: "ざ", normalizedName: "ざ" });

@@ -1,9 +1,10 @@
-import { includesConstraint } from "@henge/shared";
+import { includesConstraint, type ThemeKind } from "@henge/shared";
 import { eq } from "drizzle-orm";
 import type { Db } from "./client";
 import { constraintVocabularies } from "./schema";
 import {
   CONSTRAINT_VOCABULARY_MIN,
+  mixVocabulary,
   vocabularyFor,
   type VocabularyWord,
 } from "../generation/vocabulary";
@@ -61,4 +62,18 @@ export async function loadConstraintVocabulary(
   // 補充と同期再生成が同時に来ても、どちらも同じ語彙を作るので先に入った方が残ればよい
   await constraintVocabularyInsert(db, theme.id, words).onConflictDoNothing();
   return words;
+}
+
+/**
+ * 生成に渡す語彙。**最適化とごちゃまぜは語を渡して文を作らせる**（`generateBatch` の
+ * `vocabulary`）。テーマは語を渡さないので undefined。補充と同期再生成で同じ分岐を
+ * 書かないためにここへ寄せる。
+ */
+export async function loadGenerationVocabulary(
+  db: Db,
+  theme: { id: string; kind: ThemeKind; name: string },
+): Promise<VocabularyWord[] | undefined> {
+  if (theme.kind === "constraint") return await loadConstraintVocabulary(db, theme);
+  if (theme.kind === "mix") return mixVocabulary();
+  return undefined;
 }

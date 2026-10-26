@@ -15,6 +15,9 @@ interface CreatedTheme {
   neuronsRemaining?: number;
 }
 
+/** 利用者が作れる種別。ごちゃまぜは1つだけで、作る操作が無い */
+type CreatableKind = Exclude<ThemeKind, "mix">;
+
 /**
  * `kind` ごとに変わるのは**文言と入力の制限だけ**。作成の流れ（ログイン確認 →
  * 生成待ち → 結果）はテーマも最適化する音も同じなので、フォームを2組持たない。
@@ -44,7 +47,7 @@ const COPY = {
      */
     validate: (name: string): string | null => constraintCharRejection(name),
   },
-} as const satisfies Record<ThemeKind, unknown>;
+} as const satisfies Record<CreatableKind, unknown>;
 
 /**
  * テーマ／最適化する音の作成。生成を伴うので認証が要る。
@@ -56,7 +59,7 @@ export function CreateThemeForm({
   kind,
   initialName = "",
 }: {
-  kind: ThemeKind;
+  kind: CreatableKind;
   /** プリセットから飛んできたときに埋めておく文字 */
   initialName?: string;
 }) {

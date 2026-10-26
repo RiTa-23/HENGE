@@ -10,7 +10,7 @@ interface DetailProps {
   description: ReactNode;
   /** 在庫・プレイ回数など。値は等幅・金で出す（「生成困難」は数字ではなく札の側に出す） */
   stats: { label: string; value: number; unit?: string }[];
-  /** 「打つ」札（木札）。横に並べて折り目の線に吊るす */
+  /** 「打つ」ボタン。テーマは形式ごとの木札（`FormButton`）、形式が1つのモードは朱印（`SealButton`） */
   actions: ReactNode;
 }
 
@@ -87,7 +87,7 @@ function DetailBody({ mark, eyebrow, title, description, stats, actions }: Detai
         ))}
       </dl>
 
-      {/* 木札は在庫の下に**中央揃えで**並べる。上下左右の余白を揃える
+      {/* 木札・朱印は在庫の下に**中央揃えで**並べる。上下左右の余白を揃える
           （右上に寄せて線に結わえる形も試したが、隅に固まって見えた） */}
       <div className="mt-12 flex flex-wrap justify-center gap-8">{actions}</div>
     </>

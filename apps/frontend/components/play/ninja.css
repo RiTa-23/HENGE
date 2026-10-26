@@ -820,3 +820,126 @@
     transition: none;
   }
 }
+
+/* ---- 朱印（形式が1つのモードの「打つ」） -----------------------------------
+ * 最適化練習・ごちゃまぜの詳細ページの「打つ」（`SealButton`）。**朱の面に「打」を
+ * 白く抜いた印（白文印）。** 木札は形式を選ぶための札で、1枚だけだと吊るし忘れに
+ * 見える。印は1つ押すのが自然な道具で、「ボタンを押す＝判を押す」が重なる。
+ *
+ * 押すと沈んで持ち上がり、紙に印影（`.seal__print`）が残ってからプレイへ移る。
+ */
+.seal {
+  position: relative;
+  width: 6.5rem;
+  height: 6.5rem;
+}
+
+/* 印の面と印影で共通の形。少し傾けて、押した手の跡に見せる */
+.seal__face,
+.seal__print {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  border-radius: 5px;
+  transform: rotate(-4deg);
+  font-family: var(--font-mincho);
+  font-size: 3.2rem;
+  line-height: 1;
+}
+
+.seal__face {
+  background: var(--color-shu);
+  color: var(--color-kinari);
+  /* 外の縁（暗い朱）→ 朱の余白 → 細い白の内枠。印の枠線の見立て */
+  box-shadow:
+    inset 0 0 0 3px color-mix(in oklab, var(--color-shu) 70%, var(--color-sumi)),
+    inset 0 0 0 7px var(--color-shu),
+    inset 0 0 0 8px color-mix(in oklab, var(--color-kinari) 70%, var(--color-shu)),
+    0 6px 14px color-mix(in oklab, var(--color-sumi) 70%, transparent);
+  transition:
+    transform 0.18s ease,
+    box-shadow 0.18s ease;
+}
+
+/* 持ち上げて、押せることを示す */
+.seal__face:hover,
+.seal__face:focus-visible {
+  outline: none;
+  transform: translateY(-4px) rotate(-4deg);
+  box-shadow:
+    inset 0 0 0 3px color-mix(in oklab, var(--color-shu) 70%, var(--color-sumi)),
+    inset 0 0 0 7px var(--color-shu),
+    inset 0 0 0 8px color-mix(in oklab, var(--color-kinari) 70%, var(--color-shu)),
+    0 14px 22px color-mix(in oklab, var(--color-sumi) 80%, transparent);
+}
+
+/* フォーカスの輪は印の外に金で出す（朱の面の上では見えない） */
+.seal__face:focus-visible {
+  box-shadow:
+    inset 0 0 0 3px color-mix(in oklab, var(--color-shu) 70%, var(--color-sumi)),
+    inset 0 0 0 7px var(--color-shu),
+    inset 0 0 0 8px color-mix(in oklab, var(--color-kinari) 70%, var(--color-shu)),
+    0 0 0 3px var(--color-kin);
+}
+
+/* 紙に残る印影。押すまでは見えない。朱肉のかすれを薄い斑で出す */
+.seal__print {
+  color: color-mix(in oklab, var(--color-kinari) 82%, var(--color-shu));
+  background:
+    radial-gradient(
+      circle at 30% 25%,
+      transparent 0 18%,
+      color-mix(in oklab, var(--color-shu) 18%, transparent) 19% 20%,
+      transparent 21%
+    ),
+    color-mix(in oklab, var(--color-shu) 72%, transparent);
+  box-shadow: inset 0 0 0 4px color-mix(in oklab, var(--color-shu) 60%, var(--color-sumi));
+  opacity: 0;
+}
+
+.seal--pressed .seal__face {
+  animation: seal-stamp 0.9s ease forwards;
+}
+
+.seal--pressed .seal__print {
+  animation: seal-print 0.9s ease forwards;
+}
+
+@keyframes seal-stamp {
+  0% {
+    transform: translateY(-4px) rotate(-4deg) scale(1);
+    opacity: 1;
+  }
+  35%,
+  55% {
+    transform: translateY(3px) rotate(-4deg) scale(0.94);
+    opacity: 1;
+  }
+  100% {
+    transform: translateY(-46px) rotate(-10deg) scale(1.02);
+    opacity: 0;
+  }
+}
+
+@keyframes seal-print {
+  0%,
+  45% {
+    opacity: 0;
+  }
+  60%,
+  100% {
+    opacity: 0.95;
+  }
+}
+
+/* 「生成困難」。木札（`.kifuda--difficult`）と同じく、くすませて古く見せる */
+.seal--difficult .seal__face {
+  filter: grayscale(0.85) brightness(0.62);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .seal__face {
+    transition: none;
+  }
+}

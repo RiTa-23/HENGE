@@ -1,6 +1,7 @@
 import { describe, expect, test } from "bun:test";
 import {
   isHiraganaOnly,
+  mixWordsPerSentence,
   normalizeConstraintChar,
   normalizeName,
   normalizeThemeName,
@@ -82,5 +83,21 @@ describe("isHiraganaOnly", () => {
 
   test("ひらがなと他の文字が混ざっていても弾く", () => {
     expect(isHiraganaOnly("あザ")).toBe(false);
+  });
+});
+
+describe("mixWordsPerSentence", () => {
+  test("おまかせは1語、ごちゃまぜ（カオスモード）は2語", () => {
+    expect(mixWordsPerSentence("おまかせ")).toBe(1);
+    expect(mixWordsPerSentence("ごちゃまぜ")).toBe(2);
+  });
+
+  test("結合濁点の表記でも同じモードに当てる（NFC で揃える）", () => {
+    expect(mixWordsPerSentence("こ\u3099ちゃまぜ")).toBe(2);
+  });
+
+  test("知らない名前は null（その名前の行を作らせない）", () => {
+    expect(mixWordsPerSentence("ざ")).toBeNull();
+    expect(mixWordsPerSentence("")).toBeNull();
   });
 });

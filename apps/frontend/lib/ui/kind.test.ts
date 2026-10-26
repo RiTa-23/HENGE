@@ -50,18 +50,17 @@ describe("detailHref", () => {
   });
 });
 
-describe("ごちゃまぜのURL", () => {
+describe("おまかせ・ごちゃまぜのURL", () => {
   it("プレイは kind=mix を付ける", () => {
-    expect(playHref("mix", "ごちゃまぜ")).toBe(
-      `/play/${encodeURIComponent("ごちゃまぜ")}?kind=mix`,
-    );
+    expect(playHref("mix", "おまかせ")).toBe(`/play/${encodeURIComponent("おまかせ")}?kind=mix`);
   });
 
-  it("詳細は名前を持たない /mix、一覧はお題一覧", () => {
-    expect(detailHref("mix", "ごちゃまぜ")).toBe("/mix");
-    expect(rankingHref("mix", "ごちゃまぜ")).toBe("/mix#ranking");
+  it("詳細は /mix/[name]、一覧はお題一覧", () => {
+    const segment = encodeURIComponent("ごちゃまぜ");
+    expect(detailHref("mix", "ごちゃまぜ")).toBe(`/mix/${segment}`);
+    expect(rankingHref("mix", "ごちゃまぜ")).toBe(`/mix/${segment}#ranking`);
     expect(listHref("mix")).toBe("/themes");
-    expect(kindLabel("mix")).toBe("ごちゃまぜ");
+    expect(kindLabel("mix")).toBe("このモード");
   });
 });
 

@@ -14,6 +14,7 @@ import {
   isTypableText,
   isTypableWord,
   LONG_SENTENCE_MIN,
+  mixWordsPerSentence,
   type PromptForm,
   type ThemeKind,
 } from "@henge/shared";
@@ -156,13 +157,16 @@ export interface GenerateBatchInput {
   existing: string[];
   model: ModelId;
   /**
-   * 最適化の語彙（`constraint_vocabularies`）、またはごちゃまぜの語彙（`mixVocabulary`）。
-   * **最適化・ごちゃまぜでは必須。** 生成の最初にシャッフルし、
+   * 最適化の語彙（`constraint_vocabularies`）、またはおまかせ・ごちゃまぜの語彙
+   * （`mixVocabulary`）。**語を渡すモードでは必須。** 生成の最初にシャッフルし、
    * ラウンドごとに続きの語を組にしてモデルに渡す（1回の生成の中で語が重ならない）。
    * 空なら AI を呼ばずに終わる（作れるものが無いのにニューロンを使わない）
    */
   vocabulary?: VocabularyWord[];
-  /** 1文に渡す語の数。省略時は `CONSTRAINT_WORDS_PER_SENTENCE`（測定のときだけ指定する） */
+  /**
+   * 1文に渡す語の数。省略時は、おまかせ・ごちゃまぜなら名前で決まる数（`mixWordsPerSentence`）、
+   * 最適化なら `CONSTRAINT_WORDS_PER_SENTENCE`（測定のときだけ指定する）
+   */
   wordsPerSentence?: WordsPerSentence;
   /** シャッフルに使う乱数。テストで固定するときだけ渡す */
   random?: () => number;
@@ -212,8 +216,12 @@ export async function generateBatch(env: Env, input: GenerateBatchInput): Promis
   let neurons = 0;
 
   const requested = requestCount(input.form);
-  const wordsPerSentence = input.wordsPerSentence ?? CONSTRAINT_WORDS_PER_SENTENCE;
-  // **ごちゃまぜも最適化と同じ流れ**（語彙をシャッフルして2語ずつ組にして渡す）。
+  // 語を選んで作るモード（おまかせ・ごちゃまぜ）は、名前で語の数が決まる（`MIX_MODES`）
+  const wordsPerSentence =
+    input.wordsPerSentence ??
+    (input.kind === "mix" ? mixWordsPerSentence(input.name) : null) ??
+    CONSTRAINT_WORDS_PER_SENTENCE;
+  // **おまかせ・ごちゃまぜも最適化と同じ流れ**（語彙をシャッフルして組にして渡す）。
   // 違うのは語彙の出どころと、検証で指定の連接を見ないことだけ
   const usesWords = input.kind !== "theme";
   const words = usesWords ? shuffle(input.vocabulary ?? [], input.random) : [];

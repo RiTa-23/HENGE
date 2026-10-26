@@ -3,6 +3,25 @@ import { z } from "zod";
 import { decodeFingering } from "@/lib/practice/fingering";
 
 /**
+ * 最適化の運指（保存の形。`StoredFingering`）の大枠。**音と合うかはここでは見ない**ので、
+ * 使う側で `decodeFingering` に音と一緒に通す（音はテーマ名か、themeId から引いた名前）
+ */
+const storedFingeringSchema = z.object({
+  units: z
+    .array(z.object({ roman: z.string().max(8), fingers: z.array(z.string()).max(8) }).nullable())
+    .max(4),
+});
+
+/**
+ * 最適化の既定の運指を後から変える（`PUT /api/themes/fingering`）。
+ * `fingering: null` は既定を外す（標準運指に戻す）
+ */
+export const defaultFingeringSchema = z.object({
+  themeId: z.string().min(1),
+  fingering: storedFingeringSchema.nullable(),
+});
+
+/**
  * 入力検証は**公開APIの入口でだけ**行う。Hono側では行わない。
  *
  * `kind` によって許可する入力が変わる。最適化する音がひらがな限定なのは、
@@ -18,17 +37,7 @@ export const themeNameSchema = z
        * 作成時に決めた運指。その最適化の既定の運指になる（docs/07-ui.md「最適化の運指」）。
        * 形はここでは大枠だけ見て、音と合うかは下の superRefine で `decodeFingering` に通す
        */
-      fingering: z
-        .object({
-          units: z
-            .array(
-              z
-                .object({ roman: z.string().max(8), fingers: z.array(z.string()).max(8) })
-                .nullable(),
-            )
-            .max(4),
-        })
-        .optional(),
+      fingering: storedFingeringSchema.optional(),
     }),
   ])
   // NFC正規化はバリデーションより先に行う必要があるため、constraintCharRejection の中で行っている

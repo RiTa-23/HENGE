@@ -199,6 +199,41 @@ export async function getThemeDetail(db: Db, id: string): Promise<ThemeDetail | 
   };
 }
 
+/**
+ * 作成者のユーザーID。運営投入分・作成者が退会したテーマは null。テーマが無ければ undefined。
+ *
+ * **公開の詳細（`ThemeDetail`）には含めない。** 公開APIがそのまま中継するため、
+ * 含めると利用者のIDが誰にでも見える。既定の運指を変えてよいかの判定（Next.js 側）だけが使う
+ */
+export async function getThemeCreator(
+  db: Db,
+  id: string,
+): Promise<{ createdBy: string | null } | undefined> {
+  const [row] = await db
+    .select({ createdBy: themes.createdBy })
+    .from(themes)
+    .where(eq(themes.id, id))
+    .limit(1);
+  return row;
+}
+
+/**
+ * 最適化の既定の運指を書き換える。null で外す（標準運指に戻す）。
+ * **最適化（`'constraint'`）にしか書かない。** 書き換えたら true
+ */
+export async function setDefaultFingering(
+  db: Db,
+  id: string,
+  fingering: unknown,
+): Promise<boolean> {
+  const updated = await db
+    .update(themes)
+    .set({ defaultFingeringJson: fingering == null ? null : JSON.stringify(fingering) })
+    .where(and(eq(themes.id, id), eq(themes.kind, "constraint")))
+    .returning({ id: themes.id });
+  return updated.length > 0;
+}
+
 /** プレイ開始のたびに+1。人気順ソートの材料 */
 export async function incrementPlayCount(db: Db, themeId: string): Promise<void> {
   await db

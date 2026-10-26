@@ -1,6 +1,7 @@
 import { describe, expect, test } from "bun:test";
 import {
   adminPromptListQuerySchema,
+  defaultFingeringSchema,
   displayNameSchema,
   promptTextSchema,
   rankingRegisterSchema,
@@ -371,5 +372,21 @@ describe("readingReportActionSchema", () => {
       readingReportActionSchema.safeParse({ id: "r1", action: "approve", cost: -30000 }).success,
     ).toBe(false);
     expect(readingReportActionSchema.safeParse({ id: "r1", action: "apply" }).success).toBe(false);
+  });
+});
+
+describe("defaultFingeringSchema", () => {
+  const ki = { units: [{ roman: "ki", fingers: ["right-index", "right-middle"] }] };
+
+  test("運指か null（既定を外す）を受け付ける", () => {
+    expect(defaultFingeringSchema.safeParse({ themeId: "t1", fingering: ki }).success).toBe(true);
+    expect(defaultFingeringSchema.safeParse({ themeId: "t1", fingering: null }).success).toBe(true);
+  });
+
+  test("themeId が無い・運指の形が違うものは弾く", () => {
+    expect(defaultFingeringSchema.safeParse({ fingering: ki }).success).toBe(false);
+    expect(
+      defaultFingeringSchema.safeParse({ themeId: "t1", fingering: { units: "x" } }).success,
+    ).toBe(false);
   });
 });

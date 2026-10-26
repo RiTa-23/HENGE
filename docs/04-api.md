@@ -97,6 +97,25 @@
 - **既存と一致した（`created: false`）ときは何も変えない。** 最初に作った人の運指のまま
 - テーマ（`kind: "theme"`）に付けても読み捨てる
 - 詳細（`GET /themes/:id` の `theme.defaultFingering`）は保存した JSON をそのまま返す。決めていなければ `null`
+- 作成後に変えるのは `PUT /api/themes/fingering`（下）
+
+### PUT /api/themes/fingering
+
+最適化の既定の運指を後から変える。**変えられるのはその最適化の作成者と運営（`ADMIN_EMAILS`）だけ。**
+
+```jsonc
+// リクエスト。fingering: null で既定を外す（標準運指に戻す）
+{ "themeId": "...",
+  "fingering": { "units": [{ "roman": "ki", "fingers": ["right-index", "right-middle"] }] } }
+
+// レスポンス（POST /api/themes と同じ詳細）
+{ "theme": { "id": "...", "kind": "constraint", "name": "き", "defaultFingering": { ... }, ... } }
+```
+
+- 未ログインは `UNAUTHORIZED`。作成者でも運営でもなければ `FORBIDDEN`。**運営投入分（`created_by` が NULL）は運営だけ**（`null === null` で誰でも通さない）。判定は `lib/api/fingering-guard.ts`
+- ベータ版の非運営は `FORBIDDEN`（最適化練習ごと閉じているのに合わせる）
+- テーマ（`kind: "theme"`）は `VALIDATION_ERROR`。音と合わない運指も `VALIDATION_ERROR`。標準運指と同じなら外す（NULL）
+- **作成者のユーザーIDは公開の詳細に載せない。** 判定のために Hono の内部ルート（`GET /themes/:id/creator`）から引く。このルートは公開APIで中継しない
 
 ### POST /api/prompts/regenerate
 

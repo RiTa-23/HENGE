@@ -16,7 +16,7 @@ D1（SQLite）+ Drizzle ORM。Better Auth管理下のテーブル（`user` / `se
 | `generation_status` | TEXT | NOT NULL, default `'ok'` | `'ok'` / `'difficult'`。**短文プールの分** |
 | `word_generation_status` | TEXT | NOT NULL, default `'ok'` | 同上。**単語プールの分**。1本にまとめない（単語が作れないテーマで短文の補充まで止まる） |
 | `long_generation_status` | TEXT | NOT NULL, default `'ok'` | 同上。**長文プールの分** |
-| `default_fingering_json` | TEXT | NULL可 | 最適化（`'constraint'`）の既定の運指。作成者が作成時に決めたもの（`docs/07-ui.md`「最適化の運指」）。形は localStorage の `henge:fingering:<音>` と同じ JSON。標準運指のまま・テーマなら NULL。**テーマ行の列なので、お題10問と同じバッチに入る**（不変条件5） |
+| `default_fingering_json` | TEXT | NULL可 | 最適化（`'constraint'`）の既定の運指。作成者が作成時に決め、作成者と運営が後から変えられる（`docs/07-ui.md`「最適化の運指」・`docs/04-api.md` の `PUT /api/themes/fingering`）。形は localStorage の `henge:fingering:<音>` と同じ JSON。標準運指のまま・テーマなら NULL。**テーマ行の列なので、お題10問と同じバッチに入る**（不変条件5） |
 | `total_play_count` | INTEGER | NOT NULL, default 0 | 人気順ソート用。プレイ開始のたび+1 |
 | `created_at` | INTEGER | NOT NULL | unixepoch |
 

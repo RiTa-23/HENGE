@@ -190,3 +190,55 @@ describe("GET /users/themes", () => {
     expect(body.themes).toEqual([]);
   });
 });
+
+async function put(id: string, defaultFingering: unknown) {
+  const res = await SELF.fetch("http://backend/themes/default-fingering", {
+    method: "PUT",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({ themeId: id, defaultFingering }),
+  });
+  return { status: res.status, body: (await res.json()) as Record<string, unknown> };
+}
+
+describe("最適化の既定の運指を後から変える", () => {
+  const KI = { units: [{ roman: "ki", fingers: ["right-index", "right-middle"] }] };
+
+  it("作成者を返す。運営投入分は null", async () => {
+    await seedUser("u1");
+    await seedTheme({ id: "c1", kind: "constraint", createdBy: "u1" });
+    await seedTheme({ id: "c2", kind: "constraint" });
+
+    expect((await get("/themes/c1/creator")).body).toEqual({ createdBy: "u1" });
+    expect((await get("/themes/c2/creator")).body).toEqual({ createdBy: null });
+    expect((await get("/themes/none/creator")).status).toBe(404);
+  });
+
+  // 公開APIが詳細をそのまま中継するため、利用者のIDを載せない
+  it("公開の詳細には作成者を載せない", async () => {
+    await seedUser("u1");
+    await seedTheme({ id: "c1", kind: "constraint", createdBy: "u1" });
+
+    const theme = (await get("/themes/c1")).body.theme as Record<string, unknown>;
+    expect(theme).not.toHaveProperty("createdBy");
+  });
+
+  it("書き換えて詳細を返し、null で外せる", async () => {
+    await seedTheme({ id: "c1", kind: "constraint" });
+
+    const set = await put("c1", KI);
+    expect(set.status).toBe(200);
+    expect((set.body.theme as { defaultFingering: unknown }).defaultFingering).toEqual(KI);
+
+    const cleared = await put("c1", null);
+    expect((cleared.body.theme as { defaultFingering: unknown }).defaultFingering).toBeNull();
+  });
+
+  it("テーマ（kind: theme）や存在しないIDは書き換えずに NOT_FOUND", async () => {
+    await seedTheme({ id: "t1", kind: "theme" });
+
+    expect((await put("t1", KI)).status).toBe(404);
+    expect((await put("none", KI)).status).toBe(404);
+    const [row] = await db.select().from(themes);
+    expect(row?.defaultFingeringJson).toBeNull();
+  });
+});

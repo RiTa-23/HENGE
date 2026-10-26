@@ -1,6 +1,6 @@
 import { constraintCharRejection, playStatsRejection } from "@henge/shared";
 import { z } from "zod";
-import { decodeFingering } from "@/lib/practice/fingering";
+import { decodeFingering, FINGERING_NOTE_MAX } from "@/lib/practice/fingering";
 
 /**
  * 最適化の運指（保存の形。`StoredFingering`）の大枠。**音と合うかはここでは見ない**ので、
@@ -20,6 +20,22 @@ export const defaultFingeringSchema = z.object({
   themeId: z.string().min(1),
   fingering: storedFingeringSchema.nullable(),
 });
+
+/**
+ * 運指の投稿（`POST /api/fingerings`）。運指が音と合うかは、themeId から引いた音と照らして
+ * Route Handler で見る。説明文は前後の空白を落とし、空なら無し扱い
+ */
+export const fingeringPostSchema = z.object({
+  themeId: z.string().min(1),
+  fingering: storedFingeringSchema,
+  note: z.string().trim().max(FINGERING_NOTE_MAX).optional(),
+});
+
+/** 投稿一覧の取得（`GET /api/fingerings?themeId=`） */
+export const fingeringListQuerySchema = z.object({ themeId: z.string().min(1) });
+
+/** 投稿ID（パスパラメータ） */
+export const fingeringIdParamSchema = z.object({ id: z.string().min(1) });
 
 /**
  * 入力検証は**公開APIの入口でだけ**行う。Hono側では行わない。

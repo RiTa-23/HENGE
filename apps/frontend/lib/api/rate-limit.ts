@@ -71,3 +71,15 @@ export async function limitReadingReport(
   const { success } = await env.REPORT_RATE_LIMIT.limit({ key });
   return success ? null : errorResponse("RATE_LIMITED");
 }
+
+/**
+ * 運指の投稿（POST /api/fingerings）の連投を弾く。
+ *
+ * 1つの最適化に1人5件までという上限は Hono 側で数えているので、ここで効くのは
+ * 最適化をまたいだ連投（5回/60秒）。投稿は要認証なのでキーはユーザーID。
+ */
+export async function limitFingeringPost(userId: string): Promise<Response | null> {
+  const { env } = await getCloudflareContext({ async: true });
+  const { success } = await env.FINGERING_RATE_LIMIT.limit({ key: userId });
+  return success ? null : errorResponse("RATE_LIMITED");
+}

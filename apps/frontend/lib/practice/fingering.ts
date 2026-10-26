@@ -21,6 +21,9 @@ import type { TargetSpan } from "./targets";
  * 「き」なら `ki` を `k`（右 人差し指）・`i`（右 中指）で打つ、のように。
  */
 
+/** 運指の投稿に添える説明文の上限（文字数）。入力欄と公開APIの検証で同じ値を使う */
+export const FINGERING_NOTE_MAX = 60;
+
 /** かな1単位の運指。`fingers` は `roman` の1文字ずつに対応する */
 export interface UnitFingering {
   roman: string;

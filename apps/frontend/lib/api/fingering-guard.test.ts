@@ -1,5 +1,9 @@
 import { describe, expect, it } from "bun:test";
-import { canEditDefaultFingering, denyIfCannotEditFingering } from "./fingering-guard";
+import {
+  canDeleteFingeringPost,
+  canEditDefaultFingering,
+  denyIfCannotEditFingering,
+} from "./fingering-guard";
 
 const ADMINS = "rita@example.com";
 const admin = { user: { id: "admin", email: "rita@example.com" } };
@@ -55,5 +59,20 @@ describe("denyIfCannotEditFingering", () => {
     const denied = denyIfCannotEditFingering(stranger, "u1", ADMINS);
     expect(denied?.status).toBe(403);
     expect(await codeOf(denied as Response)).toBe("FORBIDDEN");
+  });
+});
+
+describe("canDeleteFingeringPost", () => {
+  it("投稿者本人は消せる", () => {
+    expect(canDeleteFingeringPost(creator, "u1", ADMINS)).toBe(true);
+  });
+
+  it("運営は他人の投稿も消せる", () => {
+    expect(canDeleteFingeringPost(admin, "u1", ADMINS)).toBe(true);
+  });
+
+  it("投稿者でも運営でもなければ消せない", () => {
+    expect(canDeleteFingeringPost(stranger, "u1", ADMINS)).toBe(false);
+    expect(canDeleteFingeringPost(null, "u1", ADMINS)).toBe(false);
   });
 });

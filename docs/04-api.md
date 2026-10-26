@@ -26,6 +26,11 @@
 | POST | `/api/prompts/regenerate` | 必須 | 枯渇時の同期再生成 |
 | GET | `/api/me` | 必須 | ユーザー情報・本日の残ニューロン |
 | POST | `/api/rankings` | 必須 | ランキングへの登録（ベストのときだけ書き換え） |
+| PUT | `/api/themes/fingering` | 作成者・運営 | 最適化の既定の運指を変える |
+| GET | `/api/fingerings?themeId=` | 不要 | 最適化の運指の投稿一覧（選んだ人数の多い順） |
+| POST | `/api/fingerings` | 必須（ユーザー名あり） | 運指の投稿 |
+| DELETE | `/api/fingerings/[id]` | 投稿者・運営 | 投稿の削除 |
+| PUT | `/api/fingerings/[id]/pick` | 必須 | この投稿を選んだ、の記録（1人1つの最適化につき1票） |
 | GET | `/api/admin/themes` | 管理者 | 管理用一覧 |
 | DELETE | `/api/admin/themes/[id]` | 管理者 | 削除（prompts・KVも連鎖） |
 | GET | `/api/admin/themes/[id]/prompts` | 管理者 | テーマ1つ分のお題一覧（管理用） |
@@ -116,6 +121,32 @@
 - ベータ版の非運営は `FORBIDDEN`（最適化練習ごと閉じているのに合わせる）
 - テーマ（`kind: "theme"`）は `VALIDATION_ERROR`。音と合わない運指も `VALIDATION_ERROR`。標準運指と同じなら外す（NULL）
 - **作成者のユーザーIDは公開の詳細に載せない。** 判定のために Hono の内部ルート（`GET /themes/:id/creator`）から引く。このルートは公開APIで中継しない
+
+### 運指の投稿（/api/fingerings）
+
+最適化の運指を、ログインユーザーなら誰でも投稿でき、プレイヤーは一覧から選んで自分の運指に写せる（`docs/07-ui.md`「運指の投稿」）。既定の運指（`PUT /api/themes/fingering`）とは別物。
+
+```jsonc
+// GET /api/fingerings?themeId=... のレスポンス。選んだ人数の多い順、同数なら新しい順。最大50件
+{ "posts": [
+  { "id": "...", "displayName": "しのび", "note": "k を人差し指で取る",
+    "fingering": { "units": [{ "roman": "ki", "fingers": ["right-index", "right-ring"] }] },
+    "pickCount": 3, "createdAt": 1793000000,
+    "mine": false,       // ログイン中の自分の投稿か
+    "deletable": false } // 消せるか（投稿者本人か運営）
+] }
+
+// POST /api/fingerings のリクエスト。note は任意（前後の空白を落として60文字まで）
+{ "themeId": "...", "fingering": { "units": [...] }, "note": "..." }
+```
+
+- **投稿者のユーザーIDは返さない。** `mine` / `deletable` に畳む（判定は Next.js 側。`lib/api/fingering-guard.ts`）。名前は `user.display_name` のいまの値
+- 投稿は**ユーザー名が決まっていることが条件**（`FORBIDDEN`。一覧に名前を出すため。ランキングと同じ）。ベータ版の非運営は `FORBIDDEN`
+- 運指は最適化する音と照らし、合わなければ `VALIDATION_ERROR`。**標準運指そのものは `VALIDATION_ERROR`**（最適化ではない）。テーマ（`kind: "theme"`）にも投稿できない
+- **同じ運指は誰の投稿でも1件だけ**（`VALIDATION_ERROR`「同じ運指が既に投稿されています」）。保存する JSON は検証した運指から作り直す（`encodeFingering`）ので、キーの順や余計な項目の違いで同じ運指がすり抜けない
+- **1人1つの最適化につき5件まで**（`VALIDATION_ERROR`）。最適化をまたいだ連投は `FINGERING_RATE_LIMIT` で弾く
+- 削除は投稿者本人か運営。消すと、その投稿を選んだ記録も消える
+- **選んだ記録（`/pick`）はログインユーザーだけ。** 匿名は数えない（不変条件10）。運指の適用そのものはクライアントの localStorage で済ませてあり、ここは数えるだけ。選び直せば票が移る
 
 ### POST /api/prompts/regenerate
 
@@ -287,6 +318,13 @@
 | GET | `/usage/:userId` | 当日の `{ count, neurons }`（Next.js側の判定の材料）。**上限値はHono側に持たない** |
 | GET | `/rankings` | テーマ×形式の上位100件（`themeId` / `form` をクエリで受ける）。`displayName` を結合して返す |
 | POST | `/rankings` | 記録の登録。生の値からスコアを計算し、ベストのときだけ書き換え、101位以下を消す。**そのプールを遊んだ記録が無ければ `FORBIDDEN`** |
+| GET | `/themes/:id/creator` | 作成者のユーザーID。既定の運指を変えてよいかの判定用。**公開APIで中継しない** |
+| PUT | `/themes/default-fingering` | 最適化の既定の運指を書き換える（`themeId` は本文） |
+| GET | `/fingerings` | 運指の投稿一覧（`themeId` をクエリで受ける）。投稿者の `userId` を含む（Next.js 側で畳む） |
+| GET | `/fingerings/:id` | 投稿1件の持ち主と最適化。削除の判定用 |
+| POST | `/fingerings` | 投稿。同じ運指・1人5件超えは `VALIDATION_ERROR` |
+| DELETE | `/fingerings/:id` | 投稿の削除 |
+| PUT | `/fingerings/picks` | 選んだ投稿の記録（`userId` × 最適化で1行。上書き） |
 | GET | `/users/themes` | ある利用者が作ったテーマ／含む文字の一覧（`userId` / `limit` / `cursor` をクエリで受ける）。`kind` で絞らず作成順。マイページ用 |
 | GET | `/admin/themes` | 管理用一覧 |
 | DELETE | `/admin/themes/:id` | 削除 |
@@ -367,6 +405,7 @@ Cloudflare の Rate Limiting binding（`GENERATION_RATE_LIMIT`、Next.js Worker 
 | `REFILL_RATE_LIMIT` | `POST /api/sessions/start`（ログイン時のみ） | ユーザーID | 10回 / 60秒 | **`allowRefill: false`。429は返さない** |
 | `RANKING_RATE_LIMIT` | `POST /api/rankings` | ユーザーID | 10回 / 60秒 | `RATE_LIMITED`(429) |
 | `REPORT_RATE_LIMIT` | `POST /api/reading-reports` | ユーザーID、匿名は接続元IP | 5回 / 60秒 | `RATE_LIMITED`(429) |
+| `FINGERING_RATE_LIMIT` | `POST /api/fingerings` | ユーザーID | 5回 / 60秒 | `RATE_LIMITED`(429) |
 
 - キーをIPにしないのは、共有回線の背後にいる別のユーザーを巻き添えにする理由が無いため。匿名の `sessions/start` は補充をキックしないので判定自体を行わない
 - **例外は読み違い報告。** 匿名でも送れる書き込み口で、ユーザーIDが無いのでIPで数える。1回で最大15件まとめて送れるため、共有回線でも人の操作で上限に届くことはまず無い

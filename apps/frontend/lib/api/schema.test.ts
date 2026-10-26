@@ -2,6 +2,7 @@ import { describe, expect, test } from "bun:test";
 import {
   adminPromptListQuerySchema,
   defaultFingeringSchema,
+  fingeringPostSchema,
   displayNameSchema,
   promptTextSchema,
   rankingRegisterSchema,
@@ -388,5 +389,31 @@ describe("defaultFingeringSchema", () => {
     expect(
       defaultFingeringSchema.safeParse({ themeId: "t1", fingering: { units: "x" } }).success,
     ).toBe(false);
+  });
+});
+
+describe("fingeringPostSchema", () => {
+  const ki = { units: [{ roman: "ki", fingers: ["right-index", "right-ring"] }] };
+
+  test("説明文は任意で、前後の空白を落として60文字まで", () => {
+    expect(fingeringPostSchema.safeParse({ themeId: "t1", fingering: ki }).success).toBe(true);
+    const parsed = fingeringPostSchema.safeParse({
+      themeId: "t1",
+      fingering: ki,
+      note: "  短く  ",
+    });
+    expect(parsed.data?.note).toBe("短く");
+    expect(
+      fingeringPostSchema.safeParse({ themeId: "t1", fingering: ki, note: "あ".repeat(60) })
+        .success,
+    ).toBe(true);
+    expect(
+      fingeringPostSchema.safeParse({ themeId: "t1", fingering: ki, note: "あ".repeat(61) })
+        .success,
+    ).toBe(false);
+  });
+
+  test("運指が無いものは弾く", () => {
+    expect(fingeringPostSchema.safeParse({ themeId: "t1" }).success).toBe(false);
   });
 });

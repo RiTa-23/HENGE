@@ -3,7 +3,7 @@ import { notFound } from "next/navigation";
 import { AdjustingView } from "@/components/Adjusting";
 import { DefaultFingeringEditor } from "@/components/DefaultFingeringEditor";
 import { DetailMato } from "@/components/DetailScroll";
-import { FingeringEditor } from "@/components/FingeringEditor";
+import { FingeringPanel } from "@/components/FingeringPanel";
 import { FormButton } from "@/components/FormButton";
 import { RankingBoard } from "@/components/RankingBoard";
 import { PracticeMark } from "@/components/ModeMark";
@@ -116,10 +116,10 @@ export default async function PracticeDetailPage({
             {defaultFingering === null
               ? "決めなければ標準の運指です。"
               : "決めなければ、この練習を作った人が決めた運指です。"}
-            設定はこの端末に保存されます。
+            設定はこの端末に保存されます。下の「みんなの運指」から、ほかの人が投稿した運指を選ぶこともできます。
           </p>
           <div className="mt-6 rounded-lg border border-kinari/15 bg-kinari/5 p-6">
-            <FingeringEditor sound={theme.name} base={defaultFingering} />
+            <FingeringPanel themeId={theme.id} sound={theme.name} base={defaultFingering} />
           </div>
         </section>
 

@@ -16,7 +16,7 @@ import {
   type TypingProgress,
 } from "@henge/shared";
 import { useCallback, useEffect, useRef, useState } from "react";
-import { FingeringEditor } from "@/components/FingeringEditor";
+import { FingeringPanel } from "@/components/FingeringPanel";
 import { FormMark } from "@/components/FormMark";
 import { Logo } from "@/components/Logo";
 import { authClient } from "@/lib/api/auth-client";
@@ -733,7 +733,8 @@ export function PlayScreen({
                 </span>
               </summary>
               <div className="mt-5">
-                <FingeringEditor
+                <FingeringPanel
+                  themeId={themeId}
                   sound={themeName}
                   base={defaultFingering}
                   onChange={changeFingering}

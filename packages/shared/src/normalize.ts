@@ -5,7 +5,18 @@
  * **アプリ側で計算して保存する**（クエリ時に正規化することはできない）。
  */
 
-export type ThemeKind = "theme" | "constraint";
+/**
+ * - `theme`: テーマモード（利用者が名前を付けたテーマ）
+ * - `constraint`: 最適化練習（指定の連接を含む文）
+ * - `mix`: ごちゃまぜ（共通語彙リストからランダムな2語を渡して作る文）。**行は1つだけ**（`MIX_NAME`）
+ */
+export type ThemeKind = "theme" | "constraint" | "mix";
+
+/**
+ * ごちゃまぜの表示名。**ごちゃまぜの行はこの名前の1行だけ**で、利用者が作ることはない
+ * （初めて引かれたときに Hono 側で作る。docs/05-generation.md の「ごちゃまぜ」）。
+ */
+export const MIX_NAME = "ごちゃまぜ";
 
 /**
  * テーマ名の正規化。
@@ -25,7 +36,10 @@ export function normalizeConstraintChar(char: string): string {
   return char.normalize("NFC");
 }
 
-/** kind に応じた正規化。`themes.normalized_name` と KVキーの両方でこれを使う。 */
+/**
+ * kind に応じた正規化。`themes.normalized_name` と KVキーの両方でこれを使う。
+ * ごちゃまぜは固定名なので、含む文字と同じ NFC だけでよい。
+ */
 export function normalizeName(kind: ThemeKind, name: string): string {
   return kind === "theme" ? normalizeThemeName(name) : normalizeConstraintChar(name);
 }

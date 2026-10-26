@@ -15,6 +15,7 @@ import { DEFAULT_MODEL, neuronsUsed } from "../src/generation/model";
 import {
   CONSTRAINT_VOCABULARY_MAX,
   CONSTRAINT_VOCABULARY_MIN,
+  mixVocabulary,
   vocabularyFor,
 } from "../src/generation/vocabulary";
 
@@ -510,6 +511,48 @@ describe("POST /prompts/regenerate", () => {
     // AI を呼んでいない（クォータを消費しない）
     expect(env.AI.run).not.toHaveBeenCalled();
     expect(await db.select().from(prompts)).toHaveLength(0);
+  });
+
+  it("ごちゃまぜに単語・長文は作れない", async () => {
+    await seedUser("u1");
+    await db
+      .insert(themes)
+      .values({ id: "m1", kind: "mix", name: "ごちゃまぜ", normalizedName: "ごちゃまぜ" });
+    stubValidGeneration();
+
+    const results = await Promise.all(
+      (["word", "long"] as const).map((form) =>
+        post("/prompts/regenerate", { themeId: "m1", userId: "u1", form }),
+      ),
+    );
+    for (const { status, body } of results) {
+      expect(status).toBe(400);
+      expect((body.error as { code: string }).code).toBe("VALIDATION_ERROR");
+    }
+    expect(env.AI.run).not.toHaveBeenCalled();
+  });
+
+  it("ごちゃまぜの短文は、共通リストの語を2語ずつ渡して作り、語彙を保存しない", async () => {
+    await seedUser("u1");
+    await db
+      .insert(themes)
+      .values({ id: "m1", kind: "mix", name: "ごちゃまぜ", normalizedName: "ごちゃまぜ" });
+    stubValidGeneration();
+
+    const { status, body } = await post("/prompts/regenerate", { themeId: "m1", userId: "u1" });
+    expect(status).toBe(200);
+    expect(body.added).toBeGreaterThanOrEqual(10);
+
+    const request = vi.mocked(env.AI.run).mock.calls[0]?.[1] as unknown as {
+      messages: { role: string; content: string }[];
+    };
+    const content = request.messages.find((m) => m.role === "user")?.content ?? "";
+    const passed = content.slice(content.indexOf("語の組:")).split("\n")[1]?.split("／") ?? [];
+    expect(passed).toHaveLength(2);
+    const known = new Set(mixVocabulary().map((w) => w.text));
+    for (const word of passed) expect(known.has(word)).toBe(true);
+    // 5000語の JSON を D1 に持たない（毎回共通リストから取る）
+    expect(await db.select().from(constraintVocabularies)).toHaveLength(0);
   });
 
   it("語彙の無い既存の最適化は、再生成のときに語彙を作って保存し、その語をモデルに渡す", async () => {

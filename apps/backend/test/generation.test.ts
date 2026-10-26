@@ -22,7 +22,7 @@ import {
   parseGeneratedBlocks,
   parseGeneratedLines,
 } from "../src/generation/prompt";
-import { vocabularyFor } from "../src/generation/vocabulary";
+import { MIX_VOCABULARY_SIZE, mixVocabulary, vocabularyFor } from "../src/generation/vocabulary";
 import { fromSingle, type GetReading } from "./fake-readings";
 
 describe("parseGeneratedLines", () => {
@@ -159,6 +159,55 @@ describe("最適化の生成（語を渡して文を作らせる）", () => {
     });
     expect(user).toContain("2語以上");
     expect(user).toContain("座席／雑誌／財産");
+  });
+});
+
+describe("ごちゃまぜの生成（最適化と同じく語を渡して文を作らせる）", () => {
+  it("共通リストの上から MIX_VOCABULARY_SIZE 語を使う", () => {
+    const words = mixVocabulary();
+    expect(words).toHaveLength(MIX_VOCABULARY_SIZE);
+    // よく使われる順の先頭から取る（珍しい語の組で文が不自然にならないように）
+    expect(words.slice(0, 3).map((w) => w.text)).toEqual(["自分", "時間", "思う"]);
+    for (const word of words) {
+      expect(word.text.length).toBeGreaterThan(0);
+      expect(word.reading.length).toBeGreaterThan(0);
+    }
+  });
+
+  it("語彙から2語ずつ組にしてプロンプトに載せる", async () => {
+    const prompts: string[] = [];
+    await generateBatch(
+      envCapturingPrompts([[], []], prompts),
+      input({ kind: "mix", name: "ごちゃまぜ", target: 1, vocabulary: mixVocabulary() }),
+    );
+
+    const words = wordsInPrompt(prompts[0] ?? "");
+    expect(words).toHaveLength(N_REQUEST * 2);
+    const known = new Set(mixVocabulary().map((w) => w.text));
+    for (const word of words) expect(known.has(word)).toBe(true);
+    // 名前は語ではないので載せない（テーマのように「ごちゃまぜ」に沿わせない）
+    expect(prompts[0]).not.toContain("ごちゃまぜ");
+  });
+
+  it("指定の連接を見ない（読みに何が入っていても constraint で却下しない）", async () => {
+    const result = await generateBatch(
+      envWithAiResponses([["座禅を組む。", "静寂が満ちる。"], []]),
+      input({ kind: "mix", name: "ごちゃまぜ", target: 2, vocabulary: mixVocabulary() }),
+    );
+
+    expect(result.rejected.constraint).toBe(0);
+    expect(result.valid.map((v) => v.text)).toEqual(["座禅を組む。", "静寂が満ちる。"]);
+  });
+
+  it("語彙が空なら AI を呼ばずに終わる（ニューロンを使わない）", async () => {
+    const prompts: string[] = [];
+    const result = await generateBatch(
+      envCapturingPrompts([[], []], prompts),
+      input({ kind: "mix", name: "ごちゃまぜ", target: 1, vocabulary: [] }),
+    );
+
+    expect(prompts).toHaveLength(0);
+    expect(result).toMatchObject({ rounds: 0, neurons: 0, reachedTarget: false });
   });
 });
 

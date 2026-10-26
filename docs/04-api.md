@@ -101,7 +101,7 @@
 
 既存と一致した場合は**エラーにせず既存テーマを返す**。クォータも消費しない。
 
-**最適化練習（`kind: 'constraint'`）に `sentence` 以外の形式を指定すると `VALIDATION_ERROR`。** 単語・長文はテーマだけ（`docs/05-generation.md`）。
+**最適化練習（`kind: 'constraint'`）・ごちゃまぜ（`kind: 'mix'`）に `sentence` 以外の形式を指定すると `VALIDATION_ERROR`。** 単語・長文はテーマだけ（`docs/05-generation.md`）。
 
 表示名の正規化は Hono 側で行う。呼び出し側で正規化すると、規則が2か所に分かれて必ずずれる。
 
@@ -246,7 +246,7 @@
 
 | Method | Path | 説明 |
 |---|---|---|
-| GET | `/themes` | 一覧（kind / sort / limit / cursor）。`name` を渡すと表示名で1件引く |
+| GET | `/themes` | 一覧（kind / sort / limit / cursor）。`name` を渡すと表示名で1件引く。**`kind=mix` はごちゃまぜの1行を返し、無ければお題0件で作る**（`name` は見ない。`docs/05-generation.md`） |
 | GET | `/themes/:id` | 単体取得 |
 | POST | `/sessions/start` | 1プレイ分の取得＋オフセット更新＋補充要否判定 |
 | POST | `/themes` | 作成＋初回10問の同期生成 |

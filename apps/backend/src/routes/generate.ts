@@ -24,6 +24,11 @@ interface CreateBody {
   kind: ThemeKind;
   name: string;
   userId: string;
+  /**
+   * 最適化の既定の運指。Next.js 側で音と照らして検証し、標準運指と同じなら外してある。
+   * **既存と一致したときは使わない**（最初に作った人の運指のまま）
+   */
+  defaultFingering?: unknown;
 }
 
 interface RegenerateBody {
@@ -116,7 +121,18 @@ export const generateRoutes = new Hono<{ Bindings: Env }>()
 
     await insertThemeWithPrompts(
       db,
-      { id: themeId, kind: body.kind, name: body.name, normalizedName, createdBy: body.userId },
+      {
+        id: themeId,
+        kind: body.kind,
+        name: body.name,
+        normalizedName,
+        createdBy: body.userId,
+        // テーマ行の列なので、お題と同じバッチに入る（不変条件5）
+        defaultFingeringJson:
+          body.kind === "constraint" && body.defaultFingering != null
+            ? JSON.stringify(body.defaultFingering)
+            : null,
+      },
       result.valid,
       model,
       vocabulary,

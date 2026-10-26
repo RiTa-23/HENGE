@@ -139,6 +139,21 @@ export async function findThemeByName(
 export interface ThemeDetail extends ThemeSummary {
   /** 形式ごとの在庫数 */
   promptCounts: PromptCounts;
+  /**
+   * 最適化の既定の運指（作成者が決めたもの）。保存したときの JSON をそのまま返す。
+   * 決めていない・テーマなら null。形の検査は使う側（Next.js）で音と照らして行う
+   */
+  defaultFingering: unknown;
+}
+
+/** 保存した JSON を返す。壊れていれば決めていない扱いにする（プレイは標準運指で続けられる） */
+function parseStoredJson(json: string | null): unknown {
+  if (json === null) return null;
+  try {
+    return JSON.parse(json) as unknown;
+  } catch {
+    return null;
+  }
 }
 
 /**
@@ -165,6 +180,7 @@ export async function getThemeDetail(db: Db, id: string): Promise<ThemeDetail | 
       generationStatus: themes.generationStatus,
       wordGenerationStatus: themes.wordGenerationStatus,
       longGenerationStatus: themes.longGenerationStatus,
+      defaultFingeringJson: themes.defaultFingeringJson,
       sentenceCount: promptCountColumns.sentence,
       wordCount: promptCountColumns.word,
       longCount: promptCountColumns.long,
@@ -175,10 +191,11 @@ export async function getThemeDetail(db: Db, id: string): Promise<ThemeDetail | 
     .groupBy(themes.id)
     .limit(1);
   if (row === undefined) return null;
-  const { sentenceCount, wordCount, longCount, ...theme } = row;
+  const { sentenceCount, wordCount, longCount, defaultFingeringJson, ...theme } = row;
   return {
     ...theme,
     promptCounts: { sentence: sentenceCount, word: wordCount, long: longCount },
+    defaultFingering: parseStoredJson(defaultFingeringJson),
   };
 }
 

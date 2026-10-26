@@ -151,6 +151,8 @@ export async function insertThemeWithPrompts(
     name: string;
     normalizedName: string;
     createdBy: string | null;
+    /** 最適化の既定の運指（JSON）。決めていない・テーマなら渡さない */
+    defaultFingeringJson?: string | null;
   },
   items: ValidPrompt[],
   model: string,

@@ -39,6 +39,7 @@ import {
   chosenFingerAt,
   chosenRomans,
   type Fingering,
+  isDefaultFingering,
   readFingering,
 } from "@/lib/practice/fingering";
 import {
@@ -181,6 +182,7 @@ export function PlayScreen({
   poolEmpty,
   shareUrl,
   beta = false,
+  defaultFingering = null,
 }: {
   themeId: string;
   themeName: string;
@@ -200,6 +202,11 @@ export function PlayScreen({
   shareUrl: string;
   /** ベータ運用の間だけロゴの横に「ベータ版」を出す。判定はサーバー側（lib/beta/beta.ts） */
   beta?: boolean;
+  /**
+   * 最適化の既定の運指（作成者が作成時に決めたもの）。この端末で決めた運指が無ければ
+   * これを使う。無ければ null で、標準運指
+   */
+  defaultFingering?: Fingering | null;
 }) {
   const { data: authSession } = authClient.useSession();
   const backToList = listHref(kind);
@@ -432,8 +439,11 @@ export function PlayScreen({
   }, []);
 
   useEffect(() => {
-    if (kind === "constraint") changeFingering(readFingering(themeName));
-  }, [kind, themeName]);
+    if (kind !== "constraint") return;
+    // この端末で決めた運指 → 作成者の運指 → 標準運指 の順
+    const showing = readFingering(themeName) ?? defaultFingering;
+    changeFingering(showing === null || isDefaultFingering(themeName, showing) ? null : showing);
+  }, [kind, themeName, defaultFingering]);
 
   useEffect(() => {
     mutedRef.current = muted;
@@ -723,7 +733,11 @@ export function PlayScreen({
                 </span>
               </summary>
               <div className="mt-5">
-                <FingeringEditor sound={themeName} onChange={changeFingering} />
+                <FingeringEditor
+                  sound={themeName}
+                  base={defaultFingering}
+                  onChange={changeFingering}
+                />
               </div>
             </details>
           )}

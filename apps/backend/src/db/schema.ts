@@ -50,6 +50,15 @@ export const themes = sqliteTable(
     longGenerationStatus: text("long_generation_status", { enum: ["ok", "difficult"] })
       .notNull()
       .default("ok"),
+    /**
+     * 最適化（`kind: 'constraint'`）の既定の運指。作成者が作成時に決めたもの。
+     * `{ units: ({ roman, fingers: ["right-index", …] } | null)[] }` の JSON。
+     *
+     * 標準運指のままなら NULL。テーマでは常に NULL。利用者がその端末で決めた運指
+     * （localStorage）があればそちらが勝つ（docs/07-ui.md「最適化の運指」）。
+     * 検証は Next.js 側で済ませてあり、ここでは中身を解釈しない
+     */
+    defaultFingeringJson: text("default_fingering_json"),
     /** 人気順ソート用。プレイ開始のたび+1 */
     totalPlayCount: integer("total_play_count").notNull().default(0),
     createdAt: integer("created_at")

@@ -12,6 +12,7 @@ import { betaLimitedPage } from "@/lib/api/admin-page";
 import { ogFields, pageTitle } from "@/lib/og";
 import { listRankings } from "@/lib/api/rankings";
 import { decodePageParam, findTheme } from "@/lib/api/themes";
+import { decodeFingering } from "@/lib/practice/fingering";
 import { adjustingMetadata } from "@/lib/beta/beta";
 import { playHref } from "@/lib/ui/kind";
 
@@ -57,6 +58,9 @@ export default async function PracticeDetailPage({
   // ここで kind を間違えるとテーマ側のプールを開いてしまう
   const theme = await findTheme("constraint", char);
   if (theme === null) notFound();
+
+  // 作成者が決めた運指。音と照らして形が合わなければ標準運指に倒す
+  const defaultFingering = decodeFingering(theme.defaultFingering, theme.name);
 
   // 最適化する音は短文だけなので、ランキングも1つ
   const entries = await listRankings(theme.id, "sentence");
@@ -104,10 +108,13 @@ export default async function PracticeDetailPage({
           </h2>
           <p className="mt-2 text-sm leading-relaxed text-kinari/60">
             「{theme.name}」を打つ打ち方と指を決めると、プレイ中の的の箇所でその打ち方と指が出ます。
-            決めなければ標準の運指です。設定はこの端末に保存されます。
+            {defaultFingering === null
+              ? "決めなければ標準の運指です。"
+              : "決めなければ、この練習を作った人が決めた運指です。"}
+            設定はこの端末に保存されます。
           </p>
           <div className="mt-6 rounded-lg border border-kinari/15 bg-kinari/5 p-6">
-            <FingeringEditor sound={theme.name} />
+            <FingeringEditor sound={theme.name} base={defaultFingering} />
           </div>
         </section>
 

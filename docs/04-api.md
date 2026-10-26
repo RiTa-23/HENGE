@@ -84,6 +84,20 @@
 
 **最適化練習で、読みに指定の連接を含む語が100語に届かなければ `GENERATION_FAILED`（422）。** 文言は「「を」を含む語彙が足りず、お題を作れません。別の音を指定してください」。**AI を呼ぶ前に断る**のでニューロンを消費しない。語彙は共通語彙リストから選ぶ（`docs/05-generation.md`）。届かないのは拗音の大半（にゃ・ひゃ・みゃ・りゃ など）、を・ぢ・づ・ゔ、2文字以上の連接の一部（でき・ぬの・ぺん）。
 
+**最適化練習では、作成時に運指を決めて送れる（任意）。** その最適化の既定の運指になる（`docs/07-ui.md`「最適化の運指」）。
+
+```jsonc
+{ "kind": "constraint", "name": "き",
+  "fingering": { "units": [{ "roman": "ki", "fingers": ["right-index", "right-middle"] }] } }
+```
+
+- `units` は最適化する音を打鍵の単位に切った並び（`splitKanaUnits`）と同じ長さ。決められない単位（「ん」「っ」）は `null`。指は `"<left|right>-<pinky|ring|middle|index|thumb>"`
+- **音と合わない運指は `VALIDATION_ERROR`**（単位の数が違う・その単位で打てない打ち方・文字数と指の数が違う）。黙って捨てると、作った人が意図した運指が残っていないことに気づけない
+- **標準運指と同じなら保存しない**（`themes.default_fingering_json` は NULL）
+- **既存と一致した（`created: false`）ときは何も変えない。** 最初に作った人の運指のまま
+- テーマ（`kind: "theme"`）に付けても読み捨てる
+- 詳細（`GET /themes/:id` の `theme.defaultFingering`）は保存した JSON をそのまま返す。決めていなければ `null`
+
 ### POST /api/prompts/regenerate
 
 ```jsonc

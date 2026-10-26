@@ -3,8 +3,10 @@
 import { constraintCharRejection, isApiError, type ThemeKind } from "@henge/shared";
 import { useEffect, useState } from "react";
 import { authClient } from "@/lib/api/auth-client";
+import { FingeringPicker } from "@/components/FingeringEditor";
 import { LoginRequired } from "@/components/LoginRequired";
 import { Shuriken } from "@/components/play/Shuriken";
+import { encodeFingering, type Fingering, isDefaultFingering } from "@/lib/practice/fingering";
 import { playHref } from "@/lib/ui/kind";
 
 interface CreatedTheme {
@@ -69,7 +71,15 @@ export function CreateThemeForm({
     name: string;
     created: boolean;
     neuronsRemaining?: number;
+    /** 運指を決めて送ったか。既存と一致したときに「運指は変えていない」と添える */
+    withFingering: boolean;
   } | null>(null);
+  /**
+   * 最適化の運指（作成時に決めると、その最適化の既定の運指になる）。
+   * **どの音について決めたかも持つ。** 音を打ち直すと切り方（単位の数）が変わるので、
+   * 別の音で決めた運指は使わない（標準運指から決め直し）
+   */
+  const [fingering, setFingering] = useState<{ sound: string; value: Fingering } | null>(null);
 
   /**
    * ブラウザバックで戻ってきたときに、生成中でもないのに手裏剣が回り続けるのを防ぐ。
@@ -89,11 +99,22 @@ export function CreateThemeForm({
 
   if (session === null) return <LoginRequired message="お題を作るにはログインが必要です。" />;
 
-  const create = async (trimmed: string) => {
+  const trimmed = name.trim();
+  /** 運指を決められるのは、最適化で、音として受け付けられる入力のときだけ */
+  const fingeringSound =
+    kind === "constraint" && trimmed !== "" && copy.validate(trimmed) === null ? trimmed : null;
+  const chosenFingering =
+    fingering !== null && fingering.sound === fingeringSound ? fingering.value : null;
+
+  const create = async (submitted: string, chosen: Fingering | null) => {
     const response = await fetch("/api/themes", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ kind, name: trimmed }),
+      body: JSON.stringify({
+        kind,
+        name: submitted,
+        ...(chosen === null ? {} : { fingering: encodeFingering(chosen) }),
+      }),
     });
     const body: unknown = await response.json();
 
@@ -114,13 +135,17 @@ export function CreateThemeForm({
     // 作った直後に遊びたいとは限らず、続けて別のお題を作りたいこともある。
     // 勝手に始めると、その時点でお題を1組消費してしまう
     const { theme, created: isNew, neuronsRemaining } = body as CreatedTheme;
-    setCreated({ name: theme.name, created: isNew, neuronsRemaining });
+    setCreated({
+      name: theme.name,
+      created: isNew,
+      neuronsRemaining,
+      withFingering: chosen !== null,
+    });
     setBusy(false);
   };
 
   const submit = (event: React.FormEvent) => {
     event.preventDefault();
-    const trimmed = name.trim();
     const invalid = copy.validate(trimmed);
     if (invalid !== null) {
       setError(invalid);
@@ -128,7 +153,7 @@ export function CreateThemeForm({
     }
     setBusy(true);
     setError(null);
-    void create(trimmed);
+    void create(trimmed, chosenFingering);
   };
 
   if (created !== null) {
@@ -141,6 +166,12 @@ export function CreateThemeForm({
         {!created.created && (
           <p className="mt-4 text-sm text-kinari/50">
             作り直していないので、ニューロンは消費していません。
+          </p>
+        )}
+        {/* 既存の運指は書き換えない（最初に作った人の運指のまま）。自分の運指は詳細ページで決められる */}
+        {!created.created && created.withFingering && (
+          <p className="mt-2 text-sm text-kinari/50">
+            運指も既にある設定のままです。自分の運指は、詳細ページやプレイの開始前に決められます。
           </p>
         )}
         {created.neuronsRemaining !== undefined && (
@@ -166,6 +197,7 @@ export function CreateThemeForm({
             onClick={() => {
               setCreated(null);
               setName("");
+              setFingering(null);
             }}
             className="rounded-md border border-kinari/20 px-8 py-3 tracking-widest text-kinari/80 transition-colors hover:border-kin hover:text-kinari"
           >
@@ -200,6 +232,39 @@ export function CreateThemeForm({
         placeholder={copy.placeholder}
         className="mt-3 w-full rounded-md border border-kinari/20 bg-kinari/5 px-4 py-3 text-kinari outline-none focus:border-kin"
       />
+
+      {/*
+        最適化の運指。**任意。** 決めると、この最適化を遊ぶ人の既定の運指になる
+        （各自がその端末で決め直せる）。音が決まるまでは単位に切れないので出さない
+      */}
+      {fingeringSound !== null && (
+        <details className="group mt-6">
+          <summary className="w-fit cursor-pointer list-none rounded-full border border-kinari/15 px-4 py-1.5 text-xs tracking-widest text-kinari/60 transition-colors hover:border-kin hover:text-kinari">
+            運指も決める（任意）
+            <span className="ml-2 text-kinari/40">
+              {chosenFingering === null ? "標準" : "最適化"}
+            </span>
+            <span className="ml-2 inline-block transition-transform group-open:rotate-180">▾</span>
+          </summary>
+          <p className="mt-4 text-sm leading-relaxed text-kinari/50">
+            決めた運指は、この最適化を遊ぶ人の既定の運指になります。遊ぶ人はそれぞれ自分の運指に変えられます。
+          </p>
+          <div className="mt-5 rounded-lg border border-kinari/15 bg-kinari/5 p-6">
+            <FingeringPicker
+              sound={fingeringSound}
+              value={chosenFingering}
+              onChange={(next) =>
+                // 標準運指と同じなら決めていない扱い（送っても保存されない）
+                setFingering(
+                  next === null || isDefaultFingering(fingeringSound, next)
+                    ? null
+                    : { sound: fingeringSound, value: next },
+                )
+              }
+            />
+          </div>
+        </details>
+      )}
 
       {error !== null && (
         <p className="mt-4 rounded-md border border-shu/50 bg-shu/10 px-4 py-3 text-sm text-kinari">

@@ -138,7 +138,7 @@ export const generateRoutes = new Hono<{ Bindings: Env }>()
 
     const form: PromptForm = body.form ?? "sentence";
 
-    // **単語・長文はテーマだけ。** 最適化練習（含む文字）・ごちゃまぜには付けない
+    // **単語・長文はテーマだけ。** 最適化練習（含む文字）・おまかせ・ごちゃまぜには付けない
     // （docs/05-generation.md）。URLを手で書けば `kind=constraint&form=long` の
     // プレイ画面まで辿り着けるので、作る口はここで塞ぐ。長文の指示は指定文字を
     // 入れさせないため、通すと偶然含んだ本だけのプールができる
@@ -146,7 +146,7 @@ export const generateRoutes = new Hono<{ Bindings: Env }>()
       return fail(
         c,
         "VALIDATION_ERROR",
-        `${theme.kind === "mix" ? "ごちゃまぜ" : "最適化練習"}で作れるのは短文だけです`,
+        `${theme.kind === "mix" ? theme.name : "最適化練習"}で作れるのは短文だけです`,
       );
     }
 

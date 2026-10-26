@@ -3,6 +3,7 @@ import { Hono } from "hono";
 import { createDb } from "../db/client";
 import {
   findOrCreateMixTheme,
+  findOrCreateMixThemes,
   findThemeByName,
   getThemeDetail,
   LIST_LIMIT_DEFAULT,
@@ -23,10 +24,14 @@ export const themeRoutes = new Hono<{ Bindings: Env }>()
     const name = c.req.query("name");
     const db = createDb(c.env.DB);
 
-    // ごちゃまぜは1行だけで、名前で選ぶものではない。**引かれたら無ければ作る**
-    // （`findOrCreateMixTheme`）。一覧も同じ1行を返す
+    // おまかせ・ごちゃまぜは決まった名前の行だけ。**引かれたら無ければ作る**
+    // （`findOrCreateMixTheme`）。知らない名前は作らずに空を返す。一覧は全モード
     if (kind === "mix") {
-      return c.json({ themes: [await findOrCreateMixTheme(db)], nextCursor: null });
+      if (name === undefined) {
+        return c.json({ themes: await findOrCreateMixThemes(db), nextCursor: null });
+      }
+      const found = await findOrCreateMixTheme(db, name);
+      return c.json({ themes: found === null ? [] : [found], nextCursor: null });
     }
 
     // 表示名での絞り込み。テーマ詳細ページ（/themes/[name]）の解決に使う

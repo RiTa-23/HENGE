@@ -182,8 +182,11 @@ function longRules(count: number): string[] {
  *
  * **2にする**（2026-10-24 の実測。docs/05-generation.md）。3語の案は「1語ずつ別の文にしてよい」と
  * 読まれ、10呼び出し中4回、組を無視して1語ごとに1文を書いた。
+ *
+ * 1 は最適化では使わない（1文に指定の音が1回しか入らない）。おまかせ（`kind: 'mix'`）が使う
+ * （`mixWordsPerSentence`）。
  */
-export type WordsPerSentence = 2 | 3;
+export type WordsPerSentence = 1 | 2 | 3;
 export const CONSTRAINT_WORDS_PER_SENTENCE: WordsPerSentence = 2;
 
 /**
@@ -200,9 +203,11 @@ export const CONSTRAINT_WORDS_PER_SENTENCE: WordsPerSentence = 2;
  */
 function constraintRules(wordsPerSentence: WordsPerSentence): string[] {
   return [
-    wordsPerSentence === 2
-      ? "- 各行の2語を、両方とも文の中で使う"
-      : "- 各行の3語のうち、自然に使える2語以上を文の中で使う。無理に3語すべてを入れない",
+    wordsPerSentence === 1
+      ? "- 各行の語を、文の中で使う"
+      : wordsPerSentence === 2
+        ? "- 各行の2語を、両方とも文の中で使う"
+        : "- 各行の3語のうち、自然に使える2語以上を文の中で使う。無理に3語すべてを入れない",
     "- 語は文に合わせて活用させたり、助詞を付けたりしてよい。ただし別の語に言い換えない",
     "- 語を並べるだけにせず、意味の通る自然な日本語の文にする",
     "- 語の組と同じ順に、上から1文ずつ出力する",
@@ -249,10 +254,10 @@ export function buildGenerationPrompt(input: {
     return { system: SYSTEM_LONG, user: lines.join("\n") };
   }
 
-  // **ごちゃまぜも同じ指示**（渡す語が最適化の語彙か、共通リスト全体からかの違いだけ）
+  // **おまかせ・ごちゃまぜも同じ指示**（渡す語が最適化の語彙か共通リストからかと、1文の語数の違いだけ）
   if (input.kind !== "theme") {
     const groups = input.wordGroups ?? [];
-    if (groups.length === 0) throw new Error("最適化・ごちゃまぜの生成には語の組が要る");
+    if (groups.length === 0) throw new Error("語を渡すモードの生成には語の組が要る");
     const lines = [
       "次の各行に並べた語を使って、自然な短文を1つずつ作ってください。",
       "",

@@ -3,7 +3,11 @@ export { nextResetAt, quotaResetAt, usageDateKey } from "./usage-window";
 export {
   constraintCharRejection,
   isHiraganaOnly,
-  MIX_NAME,
+  MIX_CHAOS_NAME,
+  MIX_MODES,
+  MIX_STANDARD_NAME,
+  type MixName,
+  mixWordsPerSentence,
   normalizeConstraintChar,
   normalizeName,
   normalizeThemeName,

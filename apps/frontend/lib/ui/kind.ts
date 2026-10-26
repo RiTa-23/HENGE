@@ -54,7 +54,7 @@ export function formLabel(form: PromptForm): string {
  *
  * 単語モードはテーマだけなので、`?kind=constraint&form=word` の組み合わせは
  * 画面から作られない（URLを手で書けば作れるが、単語プールが無いので枯渇になる）。
- * ごちゃまぜ（`?kind=mix`）も同じく短文だけ。
+ * おまかせ・ごちゃまぜ（`?kind=mix`）も同じく短文だけ。
  */
 export function playHref(kind: ThemeKind, name: string, form: PromptForm = "sentence"): string {
   const path = `/play/${encodeURIComponent(name)}`;
@@ -67,11 +67,11 @@ export function playHref(kind: ThemeKind, name: string, form: PromptForm = "sent
 
 /**
  * 一覧・詳細ページへのリンク。テーマは `/themes/[name]`、最適化する音は `/practice/[char]`。
- * ごちゃまぜは1つしか無いので名前を持たない `/mix`
+ * おまかせ・ごちゃまぜは `/mix/[name]`
  */
 export function detailHref(kind: ThemeKind, name: string): string {
-  if (kind === "mix") return "/mix";
   const segment = encodeURIComponent(name);
+  if (kind === "mix") return `/mix/${segment}`;
   return kind === "constraint" ? `/practice/${segment}` : `/themes/${segment}`;
 }
 
@@ -86,7 +86,7 @@ export function rankingHref(kind: ThemeKind, name: string, form: PromptForm = "s
 }
 
 /**
- * そのモードの一覧ページ。プレイ画面の「一覧に戻る」が使う。ごちゃまぜは
+ * そのモードの一覧ページ。プレイ画面の「一覧に戻る」が使う。おまかせ・ごちゃまぜは
  * お題一覧（`/themes`）の先頭に入口があるので、そこへ返す
  */
 export function listHref(kind: ThemeKind): string {
@@ -98,6 +98,7 @@ export function listHref(kind: ThemeKind): string {
  * （利用者が指定したのはテーマ名ではなく、最適化したい音のため）。
  */
 export function kindLabel(kind: ThemeKind): string {
-  if (kind === "mix") return "ごちゃまぜ";
+  // おまかせ・ごちゃまぜはモード名そのものが名前なので「このモード」と呼ぶ
+  if (kind === "mix") return "このモード";
   return kind === "constraint" ? "この音" : "このテーマ";
 }

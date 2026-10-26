@@ -49,18 +49,47 @@ describe("GET /themes（ごちゃまぜ）", () => {
     expect(await db.select().from(prompts)).toHaveLength(0);
   });
 
-  it("何度引いても1行のまま（名前を問わず同じ行を返す）", async () => {
-    const first = await get("/themes?kind=mix");
-    const second = await get(`/themes?kind=mix&name=${encodeURIComponent("ほかの名前")}`);
+  it("何度引いても名前ごとに1行のまま", async () => {
+    const path = `/themes?kind=mix&name=${encodeURIComponent("ごちゃまぜ")}`;
+    const first = await get(path);
+    const second = await get(path);
 
     const id = (first.body.themes as { id: string }[])[0]?.id;
     expect((second.body.themes as { id: string }[])[0]?.id).toBe(id);
     expect(await db.select().from(themes)).toHaveLength(1);
   });
 
+  it("おまかせとごちゃまぜは別の行（プールもランキングも別）", async () => {
+    const omakase = await get(`/themes?kind=mix&name=${encodeURIComponent("おまかせ")}`);
+    const gochamaze = await get(`/themes?kind=mix&name=${encodeURIComponent("ごちゃまぜ")}`);
+
+    const a = (omakase.body.themes as { id: string; name: string }[])[0];
+    const b = (gochamaze.body.themes as { id: string; name: string }[])[0];
+    expect(a?.name).toBe("おまかせ");
+    expect(b?.name).toBe("ごちゃまぜ");
+    expect(a?.id).not.toBe(b?.id);
+  });
+
+  it("知らない名前では行を作らない", async () => {
+    const { body } = await get(`/themes?kind=mix&name=${encodeURIComponent("ほかの名前")}`);
+
+    expect(body.themes).toEqual([]);
+    expect(await db.select().from(themes)).toHaveLength(0);
+  });
+
+  it("名前を付けなければ、全モードの行を返す", async () => {
+    const { body } = await get("/themes?kind=mix");
+
+    expect((body.themes as { name: string }[]).map((t) => t.name)).toEqual([
+      "おまかせ",
+      "ごちゃまぜ",
+    ]);
+  });
+
   it("テーマ・最適化の一覧には出ない（公開一覧にお題0件の行を出さない）", async () => {
     await get("/themes?kind=mix");
 
+    expect(await db.select().from(themes)).toHaveLength(2);
     expect((await get("/themes?kind=theme")).body.themes).toEqual([]);
     expect((await get("/themes?kind=constraint")).body.themes).toEqual([]);
   });

@@ -162,7 +162,33 @@ describe("最適化の生成（語を渡して文を作らせる）", () => {
   });
 });
 
-describe("ごちゃまぜの生成（最適化と同じく語を渡して文を作らせる）", () => {
+describe("おまかせ・ごちゃまぜの生成（最適化と同じく語を渡して文を作らせる）", () => {
+  it("おまかせは1文に1語を渡し、その語を使わせる", async () => {
+    const prompts: string[] = [];
+    await generateBatch(
+      envCapturingPrompts([[], []], prompts),
+      input({ kind: "mix", name: "おまかせ", target: 1, vocabulary: mixVocabulary() }),
+    );
+
+    const lines = groupLinesInPrompt(prompts[0] ?? "");
+    expect(lines).toHaveLength(N_REQUEST);
+    for (const line of lines) expect(line).not.toContain("／");
+    expect(prompts[0]).toContain("各行の語を、文の中で使う");
+  });
+
+  it("ごちゃまぜは1文に2語を渡し、両方を使わせる", async () => {
+    const prompts: string[] = [];
+    await generateBatch(
+      envCapturingPrompts([[], []], prompts),
+      input({ kind: "mix", name: "ごちゃまぜ", target: 1, vocabulary: mixVocabulary() }),
+    );
+
+    const lines = groupLinesInPrompt(prompts[0] ?? "");
+    expect(lines).toHaveLength(N_REQUEST);
+    for (const line of lines) expect(line.split("／")).toHaveLength(2);
+    expect(prompts[0]).toContain("各行の2語を、両方とも文の中で使う");
+  });
+
   it("共通リストの上から MIX_VOCABULARY_SIZE 語を使う", () => {
     const words = mixVocabulary();
     expect(words).toHaveLength(MIX_VOCABULARY_SIZE);
@@ -328,6 +354,15 @@ function envCapturingPrompts(rounds: string[][], prompts: string[]): Env {
     gateway: () => ({ patchLog: async () => {} }),
   };
   return { ...env, AI: ai } as unknown as Env;
+}
+
+/** プロンプトの「語の組:」以降の行（1行＝1文に渡す組） */
+function groupLinesInPrompt(prompt: string): string[] {
+  return prompt
+    .slice(prompt.indexOf("語の組:") + "語の組:".length)
+    .trim()
+    .split("\n")
+    .filter((line) => !line.startsWith("/"));
 }
 
 /** プロンプトの「語の組:」以降に並んだ語 */

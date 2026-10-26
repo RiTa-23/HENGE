@@ -8,15 +8,39 @@
 /**
  * - `theme`: テーマモード（利用者が名前を付けたテーマ）
  * - `constraint`: 最適化練習（指定の連接を含む文）
- * - `mix`: ごちゃまぜ（共通語彙リストからランダムな2語を渡して作る文）。**行は1つだけ**（`MIX_NAME`）
+ * - `mix`: 共通語彙リストからランダムに選んだ語で作る文。**行は `MIX_MODES` の名前の分だけ**
+ *   （おまかせ＝1語、ごちゃまぜ＝2語）
  */
 export type ThemeKind = "theme" | "constraint" | "mix";
 
 /**
- * ごちゃまぜの表示名。**ごちゃまぜの行はこの名前の1行だけ**で、利用者が作ることはない
- * （初めて引かれたときに Hono 側で作る。docs/05-generation.md の「ごちゃまぜ」）。
+ * 語を選んで作るモード（`kind: 'mix'`）の名前と、1文に渡す語の数。**行はこの名前の分だけ**で、
+ * 利用者が作ることはない（初めて引かれたときに Hono 側で作る。docs/05-generation.md の
+ * 「おまかせ・ごちゃまぜ」）。
+ *
+ * - おまかせ（1語）: 標準。1語から自然な文を作る。とりあえず遊びたい人の入口
+ * - ごちゃまぜ（2語）: カオスモード。つながらない2語を無理につなげた文になる
+ *
+ * **3語以上は入れていない。** 短文の打鍵数の上限（35打）に3語以上はまず収まらず、過去の実測で
+ * 3語を渡すと組を無視して1語ずつ別の文を書く形の崩れが出た（docs/05-generation.md）。
  */
-export const MIX_NAME = "ごちゃまぜ";
+export const MIX_MODES = [
+  { name: "おまかせ", wordsPerSentence: 1 },
+  { name: "ごちゃまぜ", wordsPerSentence: 2 },
+] as const;
+
+export type MixName = (typeof MIX_MODES)[number]["name"];
+
+/** 標準（とりあえず遊びたい人の入口） */
+export const MIX_STANDARD_NAME = "おまかせ" satisfies MixName;
+/** カオスモード */
+export const MIX_CHAOS_NAME = "ごちゃまぜ" satisfies MixName;
+
+/** その名前のモードで1文に渡す語の数。語を選んで作るモードの名前でなければ null */
+export function mixWordsPerSentence(name: string): 1 | 2 | null {
+  const normalized = normalizeConstraintChar(name);
+  return MIX_MODES.find((mode) => mode.name === normalized)?.wordsPerSentence ?? null;
+}
 
 /**
  * テーマ名の正規化。

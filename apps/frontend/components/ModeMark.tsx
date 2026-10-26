@@ -1,5 +1,5 @@
 /**
- * モード（テーマ／最適化／ごちゃまぜ）の紋。トップの選択カードに置く。
+ * モード（テーマ／最適化／おまかせ・ごちゃまぜ）の紋。トップの選択カードに置く。
  *
  * **プレイ画面のモチーフは流用しない。** 手裏剣＝スピナー、苦無＝次に打つ文字を
  * 指すキャレット、撒菱＝ミス、という意味が決まっている（docs/07-ui.md）。
@@ -76,12 +76,12 @@ export function PracticeMark({ className }: { className?: string }) {
 }
 
 /**
- * ごちゃまぜ。**賽子（さいころ）。** 選ばずに振って出た目で打つモード。
+ * おまかせ・ごちゃまぜ。**賽子（さいころ）。** 選ばずに振って出た目で打つモード。
  *
- * 語をランダムに選んで文を作る仕様とそのまま対応する。目は5つ（四隅と中心）にして、
- * 小さいサイズでも賽子と分かるようにする。
+ * 語をランダムに選んで文を作る仕様とそのまま対応する。**目の数でモードを分ける**:
+ * おまかせ（1語）は一の目、ごちゃまぜ（カオスモード）は五の目（四隅と中心）。
  */
-export function MixMark({ className }: { className?: string }) {
+export function MixMark({ className, pips }: { className?: string; pips: 1 | 5 }) {
   return (
     <svg
       viewBox="0 0 64 64"
@@ -96,11 +96,18 @@ export function MixMark({ className }: { className?: string }) {
       <rect x="8" y="8" width="48" height="48" rx="10" />
       {/* 目。塗りつぶして小さくても潰れないようにする */}
       <g fill="currentColor" stroke="none">
-        <circle cx="21" cy="21" r="4" />
-        <circle cx="43" cy="21" r="4" />
-        <circle cx="32" cy="32" r="4" />
-        <circle cx="21" cy="43" r="4" />
-        <circle cx="43" cy="43" r="4" />
+        {pips === 1 ? (
+          // 一の目は大きく1つ（本物の賽子と同じく、ほかの目より大きい）
+          <circle cx="32" cy="32" r="8" />
+        ) : (
+          <>
+            <circle cx="21" cy="21" r="4" />
+            <circle cx="43" cy="21" r="4" />
+            <circle cx="32" cy="32" r="4" />
+            <circle cx="21" cy="43" r="4" />
+            <circle cx="43" cy="43" r="4" />
+          </>
+        )}
       </g>
     </svg>
   );

@@ -65,7 +65,7 @@ export async function loadConstraintVocabulary(
 }
 
 /**
- * 生成に渡す語彙。**最適化とごちゃまぜは語を渡して文を作らせる**（`generateBatch` の
+ * 生成に渡す語彙。**最適化・おまかせ・ごちゃまぜは語を渡して文を作らせる**（`generateBatch` の
  * `vocabulary`）。テーマは語を渡さないので undefined。補充と同期再生成で同じ分岐を
  * 書かないためにここへ寄せる。
  */

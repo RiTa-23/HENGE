@@ -17,6 +17,7 @@ import {
 } from "@henge/shared";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { FingeringPanel } from "@/components/FingeringPanel";
+import { FitScreen } from "@/components/FitScreen";
 import { FormMark } from "@/components/FormMark";
 import { Logo } from "@/components/Logo";
 import { authClient } from "@/lib/api/auth-client";
@@ -686,77 +687,82 @@ export function PlayScreen({
 
   if (phase.name === "ready") {
     return (
-      <div className="flex min-h-dvh flex-col items-center justify-center gap-10 p-6">
-        <div className="w-full max-w-lg rounded-lg border border-kin/60 bg-kinari/5 px-10 py-16 text-center">
-          {/* 開始前に出すのはテーマ名だけ。総数を出しても遊べる残り数とは違ううえ、
+      // 運指の設定を開くと縦に伸びるので、開始前も画面に収める（FitScreen）
+      <div className="h-dvh">
+        <FitScreen>
+          <div className="flex min-h-dvh flex-col items-center justify-center gap-10 p-6 short:gap-6">
+            <div className="w-full max-w-lg rounded-lg border border-kin/60 bg-kinari/5 px-10 py-16 text-center short:py-10">
+              {/* 開始前に出すのはテーマ名だけ。総数を出しても遊べる残り数とは違ううえ、
               10問ひと組は例外なく成り立つので添えても情報が増えない */}
-          <h1 className="font-mincho text-4xl leading-snug tracking-wider text-kinari">
-            {themeName}
-          </h1>
-          {/* **どちらの形式を開いているかを出す。** 同じテーマ名で中身が変わるので、
+              <h1 className="font-mincho text-4xl leading-snug tracking-wider text-kinari">
+                {themeName}
+              </h1>
+              {/* **どちらの形式を開いているかを出す。** 同じテーマ名で中身が変わるので、
               名前だけだと単語のつもりで短文を始めてしまう */}
-          <p className="mt-4 flex items-center justify-center gap-2 text-sm tracking-widest text-kinari/50">
-            {/* 紋は一覧・詳細の「打つ」札と同じ（FormMark）。どの画面でも同じ印で形式を示す */}
-            <FormMark form={form} className={`size-4 ${formColor(form).text}`} />
-            {formLabel(form)}・{form === "long" ? "1本" : `${playSize(form)}問`}
-          </p>
+              <p className="mt-4 flex items-center justify-center gap-2 text-sm tracking-widest text-kinari/50">
+                {/* 紋は一覧・詳細の「打つ」札と同じ（FormMark）。どの画面でも同じ印で形式を示す */}
+                <FormMark form={form} className={`size-4 ${formColor(form).text}`} />
+                {formLabel(form)}・{form === "long" ? "1本" : `${playSize(form)}問`}
+              </p>
 
-          <p className="mt-14 flex items-center justify-center gap-3 text-kinari">
-            <span className="rounded-md border border-shu bg-shu/20 px-10 py-2 font-mono text-sm tracking-widest shadow-[0_0_10px_var(--color-shu)]">
-              Space
-            </span>
-            <span className="tracking-widest">で開始</span>
-          </p>
-          <p className="mt-4 text-xs leading-relaxed text-kinari/40">
-            押すまでお題は消費されません。
-          </p>
+              <p className="mt-14 flex items-center justify-center gap-3 text-kinari">
+                <span className="rounded-md border border-shu bg-shu/20 px-10 py-2 font-mono text-sm tracking-widest shadow-[0_0_10px_var(--color-shu)]">
+                  Space
+                </span>
+                <span className="tracking-widest">で開始</span>
+              </p>
+              <p className="mt-4 text-xs leading-relaxed text-kinari/40">
+                押すまでお題は消費されません。
+              </p>
 
-          {/* 開始前は縦に並べて幅を揃える。横に並べると枠の幅に収まらず2つと1つに割れ、
+              {/* 開始前は縦に並べて幅を揃える。横に並べると枠の幅に収まらず2つと1つに割れ、
               長さの違うスイッチが段違いに並ぶ */}
-          <div className="mx-auto mt-8 grid w-fit gap-2">{settingToggles}</div>
+              <div className="mx-auto mt-8 grid w-fit gap-2">{settingToggles}</div>
 
-          {/*
+              {/*
             最適化の運指。**打つ直前に決め直せるよう、開始前にも置く**（詳細ページと同じ設定）。
             畳んでおく。開けたままだと「Space で開始」が枠の下に押し出される。
             長文は最適化練習に無い（形式は短文だけ）が、キーボードを出さない形式では
             運指ガイドも出ないので、念のため形式でも絞る
           */}
-          {kind === "constraint" && form !== "long" && (
-            <details className="group mx-auto mt-6 w-fit">
-              <summary className="mx-auto w-fit cursor-pointer list-none rounded-full border border-kinari/15 px-4 py-1.5 text-xs tracking-widest text-kinari/60 transition-colors hover:border-kin hover:text-kinari">
-                運指を決める
-                <span className="ml-2 text-kinari/40">
-                  {fingering === null ? "標準" : "最適化"}
-                </span>
-                <span className="ml-2 inline-block transition-transform group-open:rotate-180">
-                  ▾
-                </span>
-              </summary>
-              <div className="mt-5">
-                <FingeringPanel
-                  themeId={themeId}
-                  sound={themeName}
-                  base={defaultFingering}
-                  onChange={changeFingering}
-                />
-              </div>
-            </details>
-          )}
-        </div>
+              {kind === "constraint" && form !== "long" && (
+                <details className="group mx-auto mt-6 w-fit">
+                  <summary className="mx-auto w-fit cursor-pointer list-none rounded-full border border-kinari/15 px-4 py-1.5 text-xs tracking-widest text-kinari/60 transition-colors hover:border-kin hover:text-kinari">
+                    運指を決める
+                    <span className="ml-2 text-kinari/40">
+                      {fingering === null ? "標準" : "最適化"}
+                    </span>
+                    <span className="ml-2 inline-block transition-transform group-open:rotate-180">
+                      ▾
+                    </span>
+                  </summary>
+                  <div className="mt-5">
+                    <FingeringPanel
+                      themeId={themeId}
+                      sound={themeName}
+                      base={defaultFingering}
+                      onChange={changeFingering}
+                    />
+                  </div>
+                </details>
+              )}
+            </div>
 
-        {/* 離脱の導線は枠の外に置く。枠の中は「開始」に関することだけ。
+            {/* 離脱の導線は枠の外に置く。枠の中は「開始」に関することだけ。
             詳細へ戻るは結果画面と同じ形（枠の下・一覧の下）に揃える */}
-        <div className="flex flex-col items-center gap-4">
-          <a
-            href={backToList}
-            className="rounded-md border border-kinari/20 px-8 py-2.5 tracking-widest text-kinari/80 transition-colors hover:border-kin hover:text-kinari"
-          >
-            一覧に戻る
-          </a>
-          <a href={backToDetail} className="tracking-widest text-kinari/50 hover:text-kinari">
-            「{themeName}」へ戻る
-          </a>
-        </div>
+            <div className="flex flex-col items-center gap-4">
+              <a
+                href={backToList}
+                className="rounded-md border border-kinari/20 px-8 py-2.5 tracking-widest text-kinari/80 transition-colors hover:border-kin hover:text-kinari"
+              >
+                一覧に戻る
+              </a>
+              <a href={backToDetail} className="tracking-widest text-kinari/50 hover:text-kinari">
+                「{themeName}」へ戻る
+              </a>
+            </div>
+          </div>
+        </FitScreen>
       </div>
     );
   }
@@ -810,7 +816,7 @@ export function PlayScreen({
 
     return (
       <div className="flex min-h-dvh items-center justify-center p-6">
-        <div className="w-full max-w-lg rounded-lg border border-kin/60 bg-kinari/5 px-10 py-12 text-center">
+        <div className="w-full max-w-lg rounded-lg border border-kin/60 bg-kinari/5 px-10 py-12 text-center short:py-8">
           <h1 className="font-mincho text-2xl tracking-widest text-kinari">{message}</h1>
 
           {canRegenerate && (
@@ -935,123 +941,131 @@ export function PlayScreen({
       tabIndex={0}
       onKeyDown={onKeyDown}
       onBlur={() => surface.current?.focus()}
-      className="mx-auto flex min-h-dvh w-full max-w-4xl flex-col px-8 py-6"
+      className="h-dvh"
     >
-      <header className="flex items-start justify-between border-b border-kin/40 pb-4">
-        <Logo beta={beta} />
-        <div className="flex items-center gap-5">
-          {/*
+      {/*
+        **1画面に収める。** 低い画面で巻物かキーボードが見切れると、打ちながら
+        スクロールすることになる（FitScreen）
+      */}
+      <FitScreen>
+        <div className="mx-auto flex min-h-dvh w-full max-w-4xl flex-col px-8 py-6 short:py-3">
+          <header className="flex items-start justify-between border-b border-kin/40 pb-4 short:pb-2">
+            <Logo beta={beta} />
+            <div className="flex items-center gap-5">
+              {/*
             テーマ名と形式は**表示であって操作ではない**のでチップにしない。
             打っている最中に見返る情報なので、操作ボタンより文字を大きく。
             形式は識別色（`formColor`＝札と紋と同じ色）で出す
           */}
-          <div className="flex items-baseline gap-2.5">
-            <span className="text-lg tracking-widest text-kinari">{themeName}</span>
-            <span className="flex items-center gap-1 text-sm tracking-widest">
-              <FormMark form={form} className={`size-3.5 ${formColor(form).text}`} />
-              <span className={formColor(form).text}>{formLabel(form)}</span>
-            </span>
-          </div>
-          {/*
+              <div className="flex items-baseline gap-2.5">
+                <span className="text-lg tracking-widest text-kinari">{themeName}</span>
+                <span className="flex items-center gap-1 text-sm tracking-widest">
+                  <FormMark form={form} className={`size-3.5 ${formColor(form).text}`} />
+                  <span className={formColor(form).text}>{formLabel(form)}</span>
+                </span>
+              </div>
+              {/*
             打鍵を拾う要素の中に置く。外に出すと、押した時点でフォーカスが
             surface から外れ、onBlur の当て直しと競合する。
             **朱は使わない。** 朱は「今すぐ打つべきもの」だけの色で、
             やめるボタンに使うとキーボードのハイライトと役割がぶつかる
           */}
-          <button
-            type="button"
-            onClick={quit}
-            className="rounded-full border border-kinari/15 px-4 py-1 text-xs tracking-widest text-kinari/50 transition-colors hover:border-kin hover:text-kinari"
-          >
-            やめる
-            <span className="ml-2 font-mono text-kinari/40">Esc</span>
-          </button>
-        </div>
-      </header>
+              <button
+                type="button"
+                onClick={quit}
+                className="rounded-full border border-kinari/15 px-4 py-1 text-xs tracking-widest text-kinari/50 transition-colors hover:border-kin hover:text-kinari"
+              >
+                やめる
+                <span className="ml-2 font-mono text-kinari/40">Esc</span>
+              </button>
+            </div>
+          </header>
 
-      {/*
+          {/*
         設定の入/切も、やめるボタンと同じ理由で surface の中に置く。
         **ヘッダーとは別の行にする。** 3つをヘッダーに並べると幅が足りず、
         テーマ名・形式・やめるボタンが1文字ずつ縦に折り返す
       */}
-      <div className="mt-3 flex flex-wrap justify-end gap-2">{settingToggles}</div>
+          <div className="mt-3 flex flex-wrap justify-end gap-2 short:mt-2">{settingToggles}</div>
 
-      {form === "long" ? (
-        /*
+          {form === "long" ? (
+            /*
           **長文はキーボードを出さない。** そのぶん巻物を縦に大きくし、紙の大半を本文で
           埋める（docs/07-ui.md）。進捗は問題数ではなく1本の中の打鍵の進みで示す
           （1プレイ1本なので進捗ドットは意味を持たない）
         */
-        <div className="flex flex-1 flex-col justify-center gap-6 py-6">
-          <LongScroll
-            text={prompt.text}
-            kanaUnits={splitKanaUnits(prompt.readingKana)}
-            progress={progress}
-            upper={romanUpper}
-          />
-          <LongProgress progress={progress} />
-        </div>
-      ) : (
-        <>
-          <div className="flex flex-1 flex-col justify-center gap-8 py-8">
-            {/*
+            <div className="flex flex-1 flex-col justify-center gap-6 py-6 short:gap-4 short:py-3">
+              <LongScroll
+                text={prompt.text}
+                kanaUnits={splitKanaUnits(prompt.readingKana)}
+                progress={progress}
+                upper={romanUpper}
+              />
+              <LongProgress progress={progress} />
+            </div>
+          ) : (
+            <>
+              <div className="flex flex-1 flex-col justify-center gap-8 py-8 short:gap-4 short:py-4">
+                {/*
               **問題ごとに作り直す**（key）。切り替わりの演出（煙／手裏剣）はCSSの
               アニメーションで、作り直したときに1度だけ走る。1問目には出さない
               （切り替わりではない。開始の合図がすでにある）
             */}
-            <div
-              key={promptIndex}
-              className={`relative mx-auto w-full max-w-3xl ${
-                promptIndex > 0 && kind === "constraint" ? "strike-shake" : ""
-              }`}
-            >
-              {board(prompt, progress)}
-              {promptIndex > 0 &&
-                finished !== null &&
-                (kind === "constraint" ? (
-                  <ShurikenStrike previous={board(finished.prompt, finished.progress)} />
-                ) : (
-                  <SmokePuff previous={board(finished.prompt, finished.progress)} />
-                ))}
-            </div>
+                <div
+                  key={promptIndex}
+                  className={`relative mx-auto w-full max-w-3xl ${
+                    promptIndex > 0 && kind === "constraint" ? "strike-shake" : ""
+                  }`}
+                >
+                  {board(prompt, progress)}
+                  {promptIndex > 0 &&
+                    finished !== null &&
+                    (kind === "constraint" ? (
+                      <ShurikenStrike previous={board(finished.prompt, finished.progress)} />
+                    ) : (
+                      <SmokePuff previous={board(finished.prompt, finished.progress)} />
+                    ))}
+                </div>
 
-            <div className="flex items-center justify-between">
-              <ProgressDots current={promptIndex} total={phase.session.prompts.length} />
-              <span className="font-mono text-sm text-kinari/50">
-                {promptIndex + 1}/{Math.min(phase.session.prompts.length, playSize(form))}
-              </span>
-            </div>
-          </div>
+                <div className="flex items-center justify-between">
+                  <ProgressDots current={promptIndex} total={phase.session.prompts.length} />
+                  <span className="font-mono text-sm text-kinari/50">
+                    {promptIndex + 1}/{Math.min(phase.session.prompts.length, playSize(form))}
+                  </span>
+                </div>
+              </div>
 
-          <div className="flex flex-col gap-5 border-t border-kin/40 pt-6">
-            <Keyboard nextKey={nextKey} missKey={missKey} />
-            {fingerGuide && (
-              <FingerGuide
-                nextKey={nextKey}
-                chosen={
-                  kind === "constraint"
-                    ? chosenFingerAt(
-                        progress,
-                        findTargets(splitKanaUnits(prompt.readingKana), themeName),
-                        fingering,
-                      )
-                    : null
-                }
-              />
-            )}
-          </div>
-        </>
-      )}
+              <div className="flex flex-col gap-5 border-t border-kin/40 pt-6 short:gap-3 short:pt-3">
+                <Keyboard nextKey={nextKey} missKey={missKey} />
+                {fingerGuide && (
+                  <FingerGuide
+                    nextKey={nextKey}
+                    chosen={
+                      kind === "constraint"
+                        ? chosenFingerAt(
+                            progress,
+                            findTargets(splitKanaUnits(prompt.readingKana), themeName),
+                            fingering,
+                          )
+                        : null
+                    }
+                  />
+                )}
+              </div>
+            </>
+          )}
 
-      {imeDetected && (
-        <p className="mt-4 rounded-md border border-shu/50 bg-shu/10 px-4 py-3 text-center text-sm text-kinari">
-          日本語入力のままです。<strong>英数入力に切り替えてください。</strong>
-        </p>
-      )}
+          {imeDetected && (
+            <p className="mt-4 rounded-md border border-shu/50 bg-shu/10 px-4 py-3 text-center text-sm text-kinari short:mt-2 short:py-2">
+              日本語入力のままです。<strong>英数入力に切り替えてください。</strong>
+            </p>
+          )}
 
-      <p className="mt-4 text-center font-mono text-xs text-kinari/40">
-        {romanDisplay(progress).cursor} 打目 ／ ミス {progress.missCount}
-      </p>
+          <p className="mt-4 text-center font-mono text-xs text-kinari/40 short:mt-2">
+            {romanDisplay(progress).cursor} 打目 ／ ミス {progress.missCount}
+          </p>
+        </div>
+      </FitScreen>
     </div>
   );
 }

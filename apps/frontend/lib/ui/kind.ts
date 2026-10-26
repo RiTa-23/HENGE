@@ -11,7 +11,8 @@ import { parsePromptForm, type PromptForm, type ThemeKind } from "@henge/shared"
 
 /** 既定は theme。未知の値も theme に倒す（存在しない kind でD1を引かせない） */
 export function parseThemeKind(value: string | undefined): ThemeKind {
-  return value === "constraint" ? "constraint" : "theme";
+  if (value === "constraint" || value === "mix") return value;
+  return "theme";
 }
 
 /**
@@ -53,18 +54,23 @@ export function formLabel(form: PromptForm): string {
  *
  * 単語モードはテーマだけなので、`?kind=constraint&form=word` の組み合わせは
  * 画面から作られない（URLを手で書けば作れるが、単語プールが無いので枯渇になる）。
+ * ごちゃまぜ（`?kind=mix`）も同じく短文だけ。
  */
 export function playHref(kind: ThemeKind, name: string, form: PromptForm = "sentence"): string {
   const path = `/play/${encodeURIComponent(name)}`;
   const query = [
-    ...(kind === "constraint" ? ["kind=constraint"] : []),
+    ...(kind === "theme" ? [] : [`kind=${kind}`]),
     ...(form === "sentence" ? [] : [`form=${form}`]),
   ];
   return query.length === 0 ? path : `${path}?${query.join("&")}`;
 }
 
-/** 一覧・詳細ページへのリンク。テーマは `/themes/[name]`、最適化する音は `/practice/[char]` */
+/**
+ * 一覧・詳細ページへのリンク。テーマは `/themes/[name]`、最適化する音は `/practice/[char]`。
+ * ごちゃまぜは1つしか無いので名前を持たない `/mix`
+ */
 export function detailHref(kind: ThemeKind, name: string): string {
+  if (kind === "mix") return "/mix";
   const segment = encodeURIComponent(name);
   return kind === "constraint" ? `/practice/${segment}` : `/themes/${segment}`;
 }
@@ -79,7 +85,10 @@ export function rankingHref(kind: ThemeKind, name: string, form: PromptForm = "s
   return `${base}${form === "sentence" ? "" : `?ranking=${form}`}#ranking`;
 }
 
-/** そのモードの一覧ページ。プレイ画面の「一覧に戻る」が使う */
+/**
+ * そのモードの一覧ページ。プレイ画面の「一覧に戻る」が使う。ごちゃまぜは
+ * お題一覧（`/themes`）の先頭に入口があるので、そこへ返す
+ */
 export function listHref(kind: ThemeKind): string {
   return kind === "constraint" ? "/practice" : "/themes";
 }
@@ -89,5 +98,6 @@ export function listHref(kind: ThemeKind): string {
  * （利用者が指定したのはテーマ名ではなく、最適化したい音のため）。
  */
 export function kindLabel(kind: ThemeKind): string {
+  if (kind === "mix") return "ごちゃまぜ";
   return kind === "constraint" ? "この音" : "このテーマ";
 }

@@ -2,6 +2,7 @@ import type { ThemeKind } from "@henge/shared";
 import { Hono } from "hono";
 import { createDb } from "../db/client";
 import {
+  findOrCreateMixTheme,
   findThemeByName,
   getThemeCreator,
   getThemeDetail,
@@ -23,6 +24,12 @@ export const themeRoutes = new Hono<{ Bindings: Env }>()
     const sort = c.req.query("sort") === "recent" ? "recent" : "popular";
     const name = c.req.query("name");
     const db = createDb(c.env.DB);
+
+    // ごちゃまぜは1行だけで、名前で選ぶものではない。**引かれたら無ければ作る**
+    // （`findOrCreateMixTheme`）。一覧も同じ1行を返す
+    if (kind === "mix") {
+      return c.json({ themes: [await findOrCreateMixTheme(db)], nextCursor: null });
+    }
 
     // 表示名での絞り込み。テーマ詳細ページ（/themes/[name]）の解決に使う
     if (name !== undefined) {

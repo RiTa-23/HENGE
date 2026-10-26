@@ -44,7 +44,8 @@ export function RankingRegister({
 
   if (isPending) return null;
 
-  const wrap = "mt-10 rounded-md border border-kinari/15 bg-kinari/5 px-6 py-5 text-center";
+  const wrap =
+    "mt-10 rounded-md border border-kinari/15 bg-kinari/5 px-6 py-5 text-center short:mt-6 short:py-4";
   const note = "text-sm text-kinari/60";
   const link = "ml-2 tracking-widest text-kin hover:underline underline-offset-4";
 

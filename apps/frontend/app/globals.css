@@ -55,6 +55,12 @@
   --color-kikyo: #8a7bd6;
 }
 
+/**
+ * 高さの低い画面（ノートPCなど）。プレイ画面と結果画面の余白を詰めて、
+ * 1画面に収める（それでも入らなければ FitScreen が縮める）。文字の大きさは変えない
+ */
+@custom-variant short (@media (max-height: 820px));
+
 html {
   color-scheme: dark;
 }

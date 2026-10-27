@@ -1,6 +1,7 @@
 import { PracticeMark } from "@/components/ModeMark";
 import { HandFigure } from "@/components/play/FingerGuide";
-import { FINGER_TINT, MiniKeyboard } from "./MiniKeyboard";
+import { type Finger, type FingerName, type Hand } from "@/lib/play/fingers";
+import { fingerTint, MiniKeyboard } from "./MiniKeyboard";
 
 /**
  * 「最適化とは？」の動かない図。文字だけでは伝わりにくいところを、
@@ -19,24 +20,24 @@ function Figure({ caption, children }: { caption: React.ReactNode; children: Rea
   );
 }
 
-/** 凡例の指の並び（左手は小指から）。高さは手の図（`HandFigure`）と同じ見当 */
-const LEGEND_FINGERS: { finger: keyof typeof FINGER_TINT; label: string; height: string }[] = [
-  { finger: "pinky", label: "小指", height: "h-7" },
-  { finger: "ring", label: "薬指", height: "h-10" },
-  { finger: "middle", label: "中指", height: "h-11" },
-  { finger: "index", label: "人差し指", height: "h-10" },
+/** 手の図の指の並び（左手は小指から）。高さは手の図（`HandFigure`）と同じ見当 */
+const HAND_FINGERS: { finger: Exclude<FingerName, "thumb">; height: string }[] = [
+  { finger: "pinky", height: "h-7" },
+  { finger: "ring", height: "h-10" },
+  { finger: "middle", height: "h-11" },
+  { finger: "index", height: "h-10" },
 ];
 
 /** 指の塗りを手の形で見せる。キーと同じ色なので、キーの色から指が辿れる */
-function TintedHand({ hand }: { hand: "left" | "right" }) {
-  const fingers = hand === "left" ? LEGEND_FINGERS : LEGEND_FINGERS.toReversed();
+function TintedHand({ hand }: { hand: Hand }) {
+  const fingers = hand === "left" ? HAND_FINGERS : HAND_FINGERS.toReversed();
   return (
     <div className="flex flex-col items-center">
       <div className="flex items-end gap-1">
         {fingers.map(({ finger, height }) => (
           <span
             key={finger}
-            className={`w-5 rounded-t-full border ${height} ${FINGER_TINT[finger]}`}
+            className={`w-5 rounded-t-full border ${height} ${fingerTint({ hand, finger })}`}
           />
         ))}
       </div>
@@ -48,13 +49,21 @@ function TintedHand({ hand }: { hand: "left" | "right" }) {
   );
 }
 
-/** 塗りと指の名前の対応 */
+/** 塗りと指の名前の対応。人差し指だけ左右で色が違うので、左右を書き分ける */
+const LEGEND: { finger: Finger; label: string }[] = [
+  { finger: { hand: "left", finger: "index" }, label: "左の人差し指" },
+  { finger: { hand: "right", finger: "index" }, label: "右の人差し指" },
+  { finger: { hand: "left", finger: "middle" }, label: "中指" },
+  { finger: { hand: "left", finger: "ring" }, label: "薬指" },
+  { finger: { hand: "left", finger: "pinky" }, label: "小指" },
+];
+
 function FingerLegend() {
   return (
     <ul className="flex flex-wrap justify-center gap-x-5 gap-y-2 text-xs text-kinari/70">
-      {LEGEND_FINGERS.toReversed().map(({ finger, label }) => (
-        <li key={finger} className="flex items-center gap-1.5">
-          <span className={`h-3.5 w-3.5 rounded-sm border ${FINGER_TINT[finger]}`} />
+      {LEGEND.map(({ finger, label }) => (
+        <li key={label} className="flex items-center gap-1.5">
+          <span className={`h-3.5 w-3.5 rounded-sm border ${fingerTint(finger)}`} />
           {label}
         </li>
       ))}
@@ -209,11 +218,18 @@ function KeyCaps({ keys }: { keys: string }) {
 /** 打ち方の分岐。1つの音に打ち方がいくつもあることを、枝分かれで見せる */
 export function RomanBranchFigure() {
   const branches = [
-    { kana: "し", ways: ["SI", "SHI", "CI"] },
+    { kana: "ふ", ways: ["FU", "HU"] },
     { kana: "ち", ways: ["TI", "CHI"] },
   ];
   return (
-    <Figure caption="1つの音に、打ち方はいくつもある。打鍵の少ない方、前後と指がぶつからない方を選ぶ">
+    <Figure
+      caption={
+        <>
+          1つの音に、打ち方はいくつもある。「ふ」を HU で打つと H・U とも右の人差し指が続くが、 FU
+          なら F は左手で打てる
+        </>
+      }
+    >
       <div className="flex flex-wrap justify-center gap-x-12 gap-y-6">
         {branches.map(({ kana, ways }) => (
           <div key={kana} className="flex items-center gap-4">

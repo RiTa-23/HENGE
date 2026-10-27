@@ -1,4 +1,4 @@
-import { type FingerName, fingerOf } from "@/lib/play/fingers";
+import { type Finger, fingerOf } from "@/lib/play/fingers";
 
 /**
  * 説明ページ用の小さなキーボード（文字の3段だけ）。プレイ画面の `Keyboard` は
@@ -21,13 +21,24 @@ const ROWS: { keys: string; indent: string; indentLarge: string }[] = [
 /**
  * 指ごとの塗り。**指の識別色**（`globals.css`。docs/07-ui.md「指の識別色」）で分ける。
  * 生成りの濃淡では見分けがつかなかった。手の図と凡例（`figures.tsx`）も同じ塗りを使う。
+ *
+ * **人差し指だけ左右で色を分ける。** 左右の人差し指は中央で2列ずつ隣り合い（`R T` `F G` と
+ * `Y U` `H J`）、同じ色だとどこで受け持ちが替わるのか読めない。他の指は左右が離れているので同じ色でよい。
  */
-export const FINGER_TINT: Record<Exclude<FingerName, "thumb">, string> = {
-  index: "bg-nadeshiko border-nadeshiko text-sumi",
+const TINT = {
+  leftIndex: "bg-nadeshiko border-nadeshiko text-sumi",
+  rightIndex: "bg-nanohana border-nanohana text-sumi",
   middle: "bg-moegi border-moegi text-sumi",
   ring: "bg-asagi border-asagi text-sumi",
   pinky: "bg-fuji border-fuji text-sumi",
-};
+} as const;
+
+/** その指の塗り。親指（キーボードの文字段では使わない）は null */
+export function fingerTint({ hand, finger }: Finger): string | null {
+  if (finger === "thumb") return null;
+  if (finger === "index") return hand === "left" ? TINT.leftIndex : TINT.rightIndex;
+  return TINT[finger];
+}
 
 /** ホームポジションの印（指を置くと突起が触れるキー） */
 const HOME = new Set(["F", "J"]);
@@ -63,10 +74,7 @@ export function MiniKeyboard({
         <div key={keys} className={`flex gap-1 ${tinted ? indentLarge : indent}`}>
           {[...keys].map((key) => {
             const finger = fingerOf(key);
-            const tint =
-              tinted && finger !== null && finger.finger !== "thumb"
-                ? FINGER_TINT[finger.finger]
-                : null;
+            const tint = tinted && finger !== null ? fingerTint(finger) : null;
             return (
               <span
                 key={key}

@@ -1,13 +1,19 @@
 "use client";
 
-import { isApiError } from "@henge/shared";
+import { isApiError, type ThemeKind } from "@henge/shared";
 import Link from "next/link";
 import { DifficultBadge, difficultForms } from "@/components/DifficultBadge";
 import { useCallback, useEffect, useState } from "react";
 
+const KIND_LABELS: Record<ThemeKind, string> = {
+  theme: "テーマ",
+  constraint: "最適化",
+  mix: "ごちゃまぜ",
+};
+
 interface AdminTheme {
   id: string;
-  kind: "theme" | "constraint";
+  kind: ThemeKind;
   name: string;
   /**
    * 形式ごとの在庫数。**合計にしない。**
@@ -98,7 +104,7 @@ export function AdminThemeList() {
                 <DifficultBadge forms={difficultForms(theme)} />
               </span>
             </td>
-            <td className="py-3 text-kinari/60">{theme.kind === "theme" ? "テーマ" : "最適化"}</td>
+            <td className="py-3 text-kinari/60">{KIND_LABELS[theme.kind]}</td>
             <td className="py-3 text-right font-mono text-kinari/70">
               {theme.promptCounts.sentence}
             </td>

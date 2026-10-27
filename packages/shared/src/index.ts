@@ -1,7 +1,14 @@
 export { PING, ping } from "./ping";
 export { nextResetAt, quotaResetAt, usageDateKey } from "./usage-window";
 export {
+  constraintCharRejection,
   isHiraganaOnly,
+  MIX_CHAOS_NAME,
+  MIX_MODES,
+  MIX_STANDARD_NAME,
+  MIX_SUPER_CHAOS_NAME,
+  type MixName,
+  mixWordsPerSentence,
   normalizeConstraintChar,
   normalizeName,
   normalizeThemeName,
@@ -27,8 +34,10 @@ export {
   UnsupportedKanaError,
 } from "./typing/index";
 export {
+  type ConstraintSpan,
   containsKanji,
   countConstraint,
+  findConstraintSpans,
   countSentenceEnds,
   includesConstraint,
   isHiraganaOnlyWord,

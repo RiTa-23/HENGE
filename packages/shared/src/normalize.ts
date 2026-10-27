@@ -5,7 +5,46 @@
  * **アプリ側で計算して保存する**（クエリ時に正規化することはできない）。
  */
 
-export type ThemeKind = "theme" | "constraint";
+/**
+ * - `theme`: テーマモード（利用者が名前を付けたテーマ）
+ * - `constraint`: 最適化練習（指定の連接を含む文）
+ * - `mix`: 共通語彙リストからランダムに選んだ語で作る文。**行は `MIX_MODES` の名前の分だけ**
+ *   （おまかせ＝1語、ごちゃまぜ＝2語）
+ */
+export type ThemeKind = "theme" | "constraint" | "mix";
+
+/**
+ * 語を選んで作るモード（`kind: 'mix'`）の名前と、1文に渡す語の数。**行はこの名前の分だけ**で、
+ * 利用者が作ることはない（初めて引かれたときに Hono 側で作る。docs/05-generation.md の
+ * 「おまかせ・ごちゃまぜ」）。
+ *
+ * - おまかせ（1語）: 標準。1語から自然な文を作る。とりあえず遊びたい人の入口
+ * - ごちゃまぜ（2語）: カオスモード。つながらない2語を無理につなげた文になる
+ * - 超ごちゃまぜ（3語）: 超カオスモード。3語すべてを詰め込ませる。ごちゃまぜの詳細ページで選ぶ
+ *
+ * **4語以上は入れていない。** 3語でも短文の打鍵数の上限（35打）にぎりぎりで、却下・2ラウンド目・
+ * 失敗が増えるおそれがある（docs/05-generation.md）。
+ */
+export const MIX_MODES = [
+  { name: "おまかせ", wordsPerSentence: 1 },
+  { name: "ごちゃまぜ", wordsPerSentence: 2 },
+  { name: "超ごちゃまぜ", wordsPerSentence: 3 },
+] as const;
+
+export type MixName = (typeof MIX_MODES)[number]["name"];
+
+/** 標準（とりあえず遊びたい人の入口） */
+export const MIX_STANDARD_NAME = "おまかせ" satisfies MixName;
+/** カオスモード */
+export const MIX_CHAOS_NAME = "ごちゃまぜ" satisfies MixName;
+/** 超カオスモード */
+export const MIX_SUPER_CHAOS_NAME = "超ごちゃまぜ" satisfies MixName;
+
+/** その名前のモードで1文に渡す語の数。語を選んで作るモードの名前でなければ null */
+export function mixWordsPerSentence(name: string): 1 | 2 | 3 | null {
+  const normalized = normalizeConstraintChar(name);
+  return MIX_MODES.find((mode) => mode.name === normalized)?.wordsPerSentence ?? null;
+}
 
 /**
  * テーマ名の正規化。
@@ -25,7 +64,10 @@ export function normalizeConstraintChar(char: string): string {
   return char.normalize("NFC");
 }
 
-/** kind に応じた正規化。`themes.normalized_name` と KVキーの両方でこれを使う。 */
+/**
+ * kind に応じた正規化。`themes.normalized_name` と KVキーの両方でこれを使う。
+ * ごちゃまぜは固定名なので、含む文字と同じ NFC だけでよい。
+ */
 export function normalizeName(kind: ThemeKind, name: string): string {
   return kind === "theme" ? normalizeThemeName(name) : normalizeConstraintChar(name);
 }
@@ -41,4 +83,26 @@ export function normalizeName(kind: ThemeKind, name: string): string {
  */
 export function isHiraganaOnly(value: string): boolean {
   return /^[ぁ-ゖ]+$/u.test(value.normalize("NFC"));
+}
+
+/**
+ * 前のかなと1つの打鍵の単位になる小書きのかな（「きゃ」の「ゃ」、「でぃ」の「ぃ」）。
+ * 「っ」は入れない（前ではなく次のかなに付いて子音を重ねる）。
+ */
+const COMBINING_SMALL_KANA = /^[ぁぃぅぇぉゃゅょゎゕゖ]/u;
+
+/**
+ * 最適化する音として指定できないなら、その理由。指定できるなら null。
+ * 公開APIの入口（Zod）と作成フォームの事前検査が同じこれを使う。
+ *
+ * **小書きのかなで始まる音は断る。**「ゃ」は「きゃ」（`kya`）の一部として打ち、単独の
+ * 「ゃ」（`xya`）はほぼ現れない。判定は打鍵の単位で行う（`findConstraintSpans`）ので、
+ * 通すと語彙が見つからず「語彙が足りない」で断ることになり、理由が伝わらない。
+ */
+export function constraintCharRejection(value: string): string | null {
+  if (!isHiraganaOnly(value)) return "最適化する音はひらがなだけを指定できます";
+  if (COMBINING_SMALL_KANA.test(value.normalize("NFC"))) {
+    return "小さいかな（ゃ・ぃ など）は前のかなと続けて指定してください（例: きゃ・でぃ）";
+  }
+  return null;
 }

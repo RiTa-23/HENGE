@@ -1,7 +1,7 @@
 {
   "version": "6",
   "dialect": "sqlite",
-  "id": "e6a35c01-533a-45eb-b1d8-d663732d415e",
+  "id": "727bdebe-fdb0-4194-90bc-fea1630c448f",
   "prevId": "d03064d0-e843-42c1-b3df-ba1346d976f4",
   "tables": {
     "constraint_vocabularies": {
@@ -119,27 +119,6 @@
           "notNull": true,
           "autoincrement": false,
           "default": "(unixepoch())"
-        },
-        "reported_at": {
-          "name": "reported_at",
-          "type": "integer",
-          "primaryKey": false,
-          "notNull": false,
-          "autoincrement": false
-        },
-        "reported_by": {
-          "name": "reported_by",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false,
-          "autoincrement": false
-        },
-        "report_reason": {
-          "name": "report_reason",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false,
-          "autoincrement": false
         }
       },
       "indexes": {
@@ -147,12 +126,6 @@
           "name": "prompts_theme_form_seq",
           "columns": ["theme_id", "form", "sequence_number"],
           "isUnique": true
-        },
-        "prompts_reported": {
-          "name": "prompts_reported",
-          "columns": ["\"reported_at\" desc"],
-          "isUnique": false,
-          "where": "\"reported_at\" IS NOT NULL"
         }
       },
       "foreignKeys": {
@@ -163,15 +136,6 @@
           "columnsFrom": ["theme_id"],
           "columnsTo": ["id"],
           "onDelete": "cascade",
-          "onUpdate": "no action"
-        },
-        "prompts_reported_by_user_id_fk": {
-          "name": "prompts_reported_by_user_id_fk",
-          "tableFrom": "prompts",
-          "tableTo": "user",
-          "columnsFrom": ["reported_by"],
-          "columnsTo": ["id"],
-          "onDelete": "set null",
           "onUpdate": "no action"
         }
       },
@@ -458,6 +422,13 @@
           "notNull": true,
           "autoincrement": false,
           "default": "'ok'"
+        },
+        "default_fingering_json": {
+          "name": "default_fingering_json",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
         },
         "total_play_count": {
           "name": "total_play_count",
@@ -991,13 +962,6 @@
   },
   "internal": {
     "indexes": {
-      "prompts_reported": {
-        "columns": {
-          "\"reported_at\" desc": {
-            "isExpression": true
-          }
-        }
-      },
       "rankings_theme_form_score": {
         "columns": {
           "\"score\" desc": {

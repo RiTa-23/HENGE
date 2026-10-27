@@ -1,10 +1,46 @@
 import {
-  isHiraganaOnly,
+  constraintCharRejection,
   PLAY_SIZE_WORD,
   playStatsRejection,
   PROMPT_REPORT_REASONS,
 } from "@henge/shared";
 import { z } from "zod";
+import { decodeFingering, FINGERING_NOTE_MAX } from "@/lib/practice/fingering";
+
+/**
+ * 最適化の運指（保存の形。`StoredFingering`）の大枠。**音と合うかはここでは見ない**ので、
+ * 使う側で `decodeFingering` に音と一緒に通す（音はテーマ名か、themeId から引いた名前）
+ */
+const storedFingeringSchema = z.object({
+  units: z
+    .array(z.object({ roman: z.string().max(8), fingers: z.array(z.string()).max(8) }).nullable())
+    .max(4),
+});
+
+/**
+ * 最適化の既定の運指を後から変える（`PUT /api/themes/fingering`）。
+ * `fingering: null` は既定を外す（標準運指に戻す）
+ */
+export const defaultFingeringSchema = z.object({
+  themeId: z.string().min(1),
+  fingering: storedFingeringSchema.nullable(),
+});
+
+/**
+ * 運指の投稿（`POST /api/fingerings`）。運指が音と合うかは、themeId から引いた音と照らして
+ * Route Handler で見る。説明文は前後の空白を落とし、空なら無し扱い
+ */
+export const fingeringPostSchema = z.object({
+  themeId: z.string().min(1),
+  fingering: storedFingeringSchema,
+  note: z.string().trim().max(FINGERING_NOTE_MAX).optional(),
+});
+
+/** 投稿一覧の取得（`GET /api/fingerings?themeId=`） */
+export const fingeringListQuerySchema = z.object({ themeId: z.string().min(1) });
+
+/** 投稿ID（パスパラメータ） */
+export const fingeringIdParamSchema = z.object({ id: z.string().min(1) });
 
 /**
  * 入力検証は**公開APIの入口でだけ**行う。Hono側では行わない。
@@ -15,13 +51,30 @@ import { z } from "zod";
 export const themeNameSchema = z
   .discriminatedUnion("kind", [
     z.object({ kind: z.literal("theme"), name: z.string().trim().min(1).max(30) }),
-    z.object({ kind: z.literal("constraint"), name: z.string().trim().min(1).max(4) }),
+    z.object({
+      kind: z.literal("constraint"),
+      name: z.string().trim().min(1).max(4),
+      /**
+       * 作成時に決めた運指。その最適化の既定の運指になる（docs/07-ui.md「最適化の運指」）。
+       * 形はここでは大枠だけ見て、音と合うかは下の superRefine で `decodeFingering` に通す
+       */
+      fingering: storedFingeringSchema.optional(),
+    }),
   ])
-  // NFC正規化はバリデーションより先に行う必要があるため、isHiraganaOnly の中で行っている
-  .refine(
-    (value) => value.kind !== "constraint" || isHiraganaOnly(value.name),
-    "最適化する音はひらがなだけを指定できます",
-  );
+  // NFC正規化はバリデーションより先に行う必要があるため、constraintCharRejection の中で行っている
+  .superRefine((value, ctx) => {
+    if (value.kind !== "constraint") return;
+    const rejection = constraintCharRejection(value.name);
+    if (rejection !== null) {
+      ctx.addIssue({ code: "custom", message: rejection });
+      return;
+    }
+    // 音の切り方と合わない・その音で打てない打ち方・文字数と指の数が違う運指は弾く。
+    // 黙って捨てると、作った人の意図した運指が残らないことに気づけない
+    if (value.fingering !== undefined && decodeFingering(value.fingering, value.name) === null) {
+      ctx.addIssue({ code: "custom", message: "運指が最適化する音と合いません" });
+    }
+  });
 
 /** 匿名時のオフセット。改ざんは許容するが、範囲外の値は弾く */
 const offsetSchema = z.number().int().min(0).max(100_000);

@@ -15,6 +15,7 @@ import { DEFAULT_MODEL, neuronsUsed } from "../src/generation/model";
 import {
   CONSTRAINT_VOCABULARY_MAX,
   CONSTRAINT_VOCABULARY_MIN,
+  mixVocabulary,
   vocabularyFor,
 } from "../src/generation/vocabulary";
 
@@ -375,6 +376,54 @@ describe("POST /themes（最適化の語彙）", () => {
     expect(await getUsage(db, "u1")).toEqual({ count: 0, neurons: 0 });
   });
 
+  it("作成時に決めた運指を既定の運指として保存し、詳細で返す", async () => {
+    await seedUser("u1");
+    const heads = ["一", "二", "三", "四", "五", "六", "七", "八", "九", "十"];
+    stubGeneration([heads.map((n) => `${n}番の座席に座る。`)], "ざせきにすわる");
+    const fingering = { units: [{ roman: "za", fingers: ["left-ring", "left-pinky"] }] };
+
+    const { body } = await post("/themes", {
+      kind: "constraint",
+      name: "ざ",
+      userId: "u1",
+      defaultFingering: fingering,
+    });
+
+    expect(body.created).toBe(true);
+    expect((body.theme as { defaultFingering: unknown }).defaultFingering).toEqual(fingering);
+  });
+
+  it("既存と一致したときは、既定の運指を書き換えない", async () => {
+    const original = { units: [{ roman: "za", fingers: ["left-ring", "left-pinky"] }] };
+    await db.insert(themes).values({
+      id: "t1",
+      kind: "constraint",
+      name: "ざ",
+      normalizedName: "ざ",
+      defaultFingeringJson: JSON.stringify(original),
+    });
+
+    const { body } = await post("/themes", {
+      kind: "constraint",
+      name: "ざ",
+      userId: "u1",
+      defaultFingering: { units: [{ roman: "za", fingers: ["left-middle", "left-pinky"] }] },
+    });
+
+    expect(body.created).toBe(false);
+    expect((body.theme as { defaultFingering: unknown }).defaultFingering).toEqual(original);
+  });
+
+  it("運指を決めずに作れば、既定の運指は null", async () => {
+    await seedUser("u1");
+    const heads = ["一", "二", "三", "四", "五", "六", "七", "八", "九", "十"];
+    stubGeneration([heads.map((n) => `${n}番の座席に座る。`)], "ざせきにすわる");
+
+    const { body } = await post("/themes", { kind: "constraint", name: "ざ", userId: "u1" });
+
+    expect((body.theme as { defaultFingering: unknown }).defaultFingering).toBeNull();
+  });
+
   it("テーマでは語彙を保存しない", async () => {
     await seedUser("u1");
     stubValidGeneration();
@@ -512,6 +561,48 @@ describe("POST /prompts/regenerate", () => {
     expect(await db.select().from(prompts)).toHaveLength(0);
   });
 
+  it("ごちゃまぜに単語・長文は作れない", async () => {
+    await seedUser("u1");
+    await db
+      .insert(themes)
+      .values({ id: "m1", kind: "mix", name: "ごちゃまぜ", normalizedName: "ごちゃまぜ" });
+    stubValidGeneration();
+
+    const results = await Promise.all(
+      (["word", "long"] as const).map((form) =>
+        post("/prompts/regenerate", { themeId: "m1", userId: "u1", form }),
+      ),
+    );
+    for (const { status, body } of results) {
+      expect(status).toBe(400);
+      expect((body.error as { code: string }).code).toBe("VALIDATION_ERROR");
+    }
+    expect(env.AI.run).not.toHaveBeenCalled();
+  });
+
+  it("ごちゃまぜの短文は、共通リストの語を2語ずつ渡して作り、語彙を保存しない", async () => {
+    await seedUser("u1");
+    await db
+      .insert(themes)
+      .values({ id: "m1", kind: "mix", name: "ごちゃまぜ", normalizedName: "ごちゃまぜ" });
+    stubValidGeneration();
+
+    const { status, body } = await post("/prompts/regenerate", { themeId: "m1", userId: "u1" });
+    expect(status).toBe(200);
+    expect(body.added).toBeGreaterThanOrEqual(10);
+
+    const request = vi.mocked(env.AI.run).mock.calls[0]?.[1] as unknown as {
+      messages: { role: string; content: string }[];
+    };
+    const content = request.messages.find((m) => m.role === "user")?.content ?? "";
+    const passed = content.slice(content.indexOf("語の組:")).split("\n")[1]?.split("／") ?? [];
+    expect(passed).toHaveLength(2);
+    const known = new Set(mixVocabulary().map((w) => w.text));
+    for (const word of passed) expect(known.has(word)).toBe(true);
+    // 5000語の JSON を D1 に持たない（毎回共通リストから取る）
+    expect(await db.select().from(constraintVocabularies)).toHaveLength(0);
+  });
+
   it("語彙の無い既存の最適化は、再生成のときに語彙を作って保存し、その語をモデルに渡す", async () => {
     // 語彙を保存するようになる前に作られた最適化（本番の「ざ」）と同じ状態
     await seedUser("u1");
@@ -556,6 +647,55 @@ describe("POST /prompts/regenerate", () => {
     expect(status).toBe(422);
     expect(run).not.toHaveBeenCalled();
     expect(await db.select().from(constraintVocabularies)).toHaveLength(0);
+  });
+
+  /**
+   * 照合を打鍵の単位で見るようにする前に保存した語彙には、字面だけ当たる語（「で」に
+   * 「ディスク」= dhi）が入っている。渡しても検証で落ちるだけなので、読み出すときに外す
+   */
+  it("保存済みの語彙から、打鍵の単位では当たらない語を外してから渡す", async () => {
+    await seedUser("u1");
+    await db
+      .insert(themes)
+      .values({ id: "c1", kind: "constraint", name: "で", normalizedName: "で" });
+    const good = vocabularyFor("で").map((w): [string, string] => [w.text, w.reading]);
+    const stale = Array.from({ length: 300 }, (): [string, string] => ["ディスク", "でぃすく"]);
+    await db
+      .insert(constraintVocabularies)
+      .values({ themeId: "c1", wordsJson: JSON.stringify([...stale, ...good]) });
+    const heads = ["一", "二", "三", "四", "五", "六", "七", "八", "九", "十"];
+    stubGeneration([heads.map((n) => `${n}番の電車で出かける。`)], "でんしゃででかける");
+
+    const { status } = await post("/prompts/regenerate", { themeId: "c1", userId: "u1" });
+    expect(status).toBe(200);
+
+    const request = vi.mocked(env.AI.run).mock.calls[0]?.[1] as unknown as {
+      messages: { role: string; content: string }[];
+    };
+    const content = request.messages.find((m) => m.role === "user")?.content ?? "";
+    expect(content).toContain("語の組:");
+    expect(content).not.toContain("ディスク");
+  });
+
+  it("保存済みの語彙が、外した結果下限に届かなければ AI を呼ばずに失敗する", async () => {
+    await seedUser("u1");
+    await db
+      .insert(themes)
+      .values({ id: "c1", kind: "constraint", name: "で", normalizedName: "で" });
+    const stale = Array.from({ length: CONSTRAINT_VOCABULARY_MIN }, (_, i): [string, string] => [
+      `ディスク${i}`,
+      "でぃすく",
+    ]);
+    await db
+      .insert(constraintVocabularies)
+      .values({ themeId: "c1", wordsJson: JSON.stringify(stale) });
+    const run = vi.spyOn(env.AI, "run");
+
+    const { status, body } = await post("/prompts/regenerate", { themeId: "c1", userId: "u1" });
+
+    expect((body.error as { code: string }).code).toBe("GENERATION_FAILED");
+    expect(status).toBe(422);
+    expect(run).not.toHaveBeenCalled();
   });
 
   it("単語も1件も作れなければ失敗として返す", async () => {

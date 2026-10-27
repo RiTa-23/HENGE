@@ -73,6 +73,13 @@
       "namespace_id": "1004",
       "simple": { "limit": 5, "period": 60 },
     },
+    {
+      // 運指の投稿（POST /api/fingerings）用。1つの最適化に1人5件までなので、
+      // 上限そのものは Hono 側で数えている。ここで弾くのは、最適化をまたいだ連投
+      "name": "FINGERING_RATE_LIMIT",
+      "namespace_id": "1005",
+      "simple": { "limit": 5, "period": 60 },
+    },
   ],
   "observability": { "enabled": true },
 }

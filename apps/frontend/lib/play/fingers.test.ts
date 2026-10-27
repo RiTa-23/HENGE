@@ -59,6 +59,14 @@ describe("fingerPlan", () => {
       shift: { hand: "left", finger: "pinky" },
     });
   });
+
+  // 最適化の運指（「き」の k を右人差し指で）
+  it("決めた指を渡せば、列で決まる指の代わりにそれで押す", () => {
+    expect(fingerPlan("K", false, { hand: "right", finger: "index" })).toEqual({
+      press: { hand: "right", finger: "index" },
+      shift: null,
+    });
+  });
 });
 
 describe("fingerLabel", () => {

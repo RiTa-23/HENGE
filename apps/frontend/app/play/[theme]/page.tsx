@@ -6,6 +6,7 @@ import { betaLimitedPage } from "@/lib/api/admin-page";
 import { decodePageParam, findTheme } from "@/lib/api/themes";
 import { betaBadgeVisible } from "@/lib/beta/beta";
 import { siteUrl } from "@/lib/og";
+import { decodeFingering } from "@/lib/practice/fingering";
 import { detailHref, parsePlayForm, parseThemeKind } from "@/lib/ui/kind";
 
 /** プレイ画面は検索結果に出さない（着地ページはテーマ詳細） */
@@ -62,6 +63,10 @@ export default async function PlayPage({
       poolEmpty={found.promptCounts[playForm] === 0}
       shareUrl={shareUrl}
       beta={beta}
+      // 作成者が決めた運指。音と照らして形が合わなければ標準運指に倒す
+      defaultFingering={
+        themeKind === "constraint" ? decodeFingering(found.defaultFingering, found.name) : null
+      }
     />
   );
 }

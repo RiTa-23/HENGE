@@ -1,4 +1,10 @@
-import { normalizeName, type PromptForm, type ThemeKind } from "@henge/shared";
+import {
+  MIX_MODES,
+  mixWordsPerSentence,
+  normalizeName,
+  type PromptForm,
+  type ThemeKind,
+} from "@henge/shared";
 import { and, desc, eq, isNull, sql } from "drizzle-orm";
 import type { Db } from "./client";
 import { prompts, themes } from "./schema";
@@ -136,9 +142,58 @@ export async function findThemeByName(
   return row ?? null;
 }
 
+/**
+ * 語を選んで作るモード（おまかせ・ごちゃまぜ）の行を引く。**無ければ作る**（お題0件で）。
+ * `MIX_MODES` に無い名前なら null（利用者が作るものではないので、知らない名前の行は作らない）。
+ *
+ * サイトに決まった数だけある入口なので、作成の操作（`POST /themes`）を通さない。通すと、
+ * ベータ版で新規作成を弾いている利用者（`betaLimitation`）が誰も最初の10問を作れない。
+ * お題はプレイ画面の「作る」（`POST /prompts/regenerate`）と補充で積む。
+ *
+ * **お題0件の行を先に作るが、不変条件5（テーマ行はお題と同じバッチで挿入）の理由には
+ * 当たらない。** あの条件が防いでいるのは「公開一覧にお題ゼロのテーマが残る」ことで、
+ * この行は公開一覧（`kind` で絞る）に出ない。管理画面で消しても、次に引かれたときに
+ * 作り直される。
+ */
+export async function findOrCreateMixTheme(db: Db, name: string): Promise<ThemeSummary | null> {
+  if (mixWordsPerSentence(name) === null) return null;
+  const found = await findThemeByName(db, "mix", name);
+  if (found !== null) return found;
+  const normalizedName = normalizeName("mix", name);
+  // 同時に2つ来ても一意制約 `(kind, normalized_name)` で1行に収まる
+  await db
+    .insert(themes)
+    .values({ id: crypto.randomUUID(), kind: "mix", name: normalizedName, normalizedName })
+    .onConflictDoNothing();
+  const created = await findThemeByName(db, "mix", name);
+  if (created === null) throw new Error(`「${name}」の行を作れなかった`);
+  return created;
+}
+
+/** 語を選んで作るモードの行を、`MIX_MODES` の順にすべて（無ければ作る） */
+export async function findOrCreateMixThemes(db: Db): Promise<ThemeSummary[]> {
+  const rows = await Promise.all(MIX_MODES.map((mode) => findOrCreateMixTheme(db, mode.name)));
+  return rows.filter((row): row is ThemeSummary => row !== null);
+}
+
 export interface ThemeDetail extends ThemeSummary {
   /** 形式ごとの在庫数 */
   promptCounts: PromptCounts;
+  /**
+   * 最適化の既定の運指（作成者が決めたもの）。保存したときの JSON をそのまま返す。
+   * 決めていない・テーマなら null。形の検査は使う側（Next.js）で音と照らして行う
+   */
+  defaultFingering: unknown;
+}
+
+/** 保存した JSON を返す。壊れていれば決めていない扱いにする（プレイは標準運指で続けられる） */
+function parseStoredJson(json: string | null): unknown {
+  if (json === null) return null;
+  try {
+    return JSON.parse(json) as unknown;
+  } catch {
+    return null;
+  }
 }
 
 /**
@@ -175,6 +230,7 @@ export async function getThemeDetail(db: Db, id: string): Promise<ThemeDetail | 
       generationStatus: themes.generationStatus,
       wordGenerationStatus: themes.wordGenerationStatus,
       longGenerationStatus: themes.longGenerationStatus,
+      defaultFingeringJson: themes.defaultFingeringJson,
       sentenceCount: promptCountColumns.sentence,
       wordCount: promptCountColumns.word,
       longCount: promptCountColumns.long,
@@ -185,11 +241,47 @@ export async function getThemeDetail(db: Db, id: string): Promise<ThemeDetail | 
     .groupBy(themes.id)
     .limit(1);
   if (row === undefined) return null;
-  const { sentenceCount, wordCount, longCount, ...theme } = row;
+  const { sentenceCount, wordCount, longCount, defaultFingeringJson, ...theme } = row;
   return {
     ...theme,
     promptCounts: { sentence: sentenceCount, word: wordCount, long: longCount },
+    defaultFingering: parseStoredJson(defaultFingeringJson),
   };
+}
+
+/**
+ * 作成者のユーザーID。運営投入分・作成者が退会したテーマは null。テーマが無ければ undefined。
+ *
+ * **公開の詳細（`ThemeDetail`）には含めない。** 公開APIがそのまま中継するため、
+ * 含めると利用者のIDが誰にでも見える。既定の運指を変えてよいかの判定（Next.js 側）だけが使う
+ */
+export async function getThemeCreator(
+  db: Db,
+  id: string,
+): Promise<{ createdBy: string | null } | undefined> {
+  const [row] = await db
+    .select({ createdBy: themes.createdBy })
+    .from(themes)
+    .where(eq(themes.id, id))
+    .limit(1);
+  return row;
+}
+
+/**
+ * 最適化の既定の運指を書き換える。null で外す（標準運指に戻す）。
+ * **最適化（`'constraint'`）にしか書かない。** 書き換えたら true
+ */
+export async function setDefaultFingering(
+  db: Db,
+  id: string,
+  fingering: unknown,
+): Promise<boolean> {
+  const updated = await db
+    .update(themes)
+    .set({ defaultFingeringJson: fingering == null ? null : JSON.stringify(fingering) })
+    .where(and(eq(themes.id, id), eq(themes.kind, "constraint")))
+    .returning({ id: themes.id });
+  return updated.length > 0;
 }
 
 /** プレイ開始のたびに+1。人気順ソートの材料 */

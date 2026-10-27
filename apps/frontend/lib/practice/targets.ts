@@ -1,4 +1,4 @@
-import { normalizeConstraintChar, type TypingProgress } from "@henge/shared";
+import { type ConstraintSpan, findConstraintSpans, type TypingProgress } from "@henge/shared";
 
 /**
  * 最適化練習の「的」。お題の中で**最適化する音が出る箇所**と、そこを打てたか。
@@ -10,10 +10,7 @@ import { normalizeConstraintChar, type TypingProgress } from "@henge/shared";
  */
 
 /** 的1つ。かな単位（`splitKanaUnits` の添字）の範囲で、両端を含む */
-export interface TargetSpan {
-  first: number;
-  last: number;
-}
+export type TargetSpan = ConstraintSpan;
 
 /**
  * - `pending`: まだ差しかかっていない
@@ -26,38 +23,13 @@ export type TargetState = "pending" | "active" | "hit" | "miss";
 /**
  * 読みの中から最適化する音の箇所を探し、かな単位の範囲で返す。
  *
- * 探し方は生成の検証（`countConstraint`）と同じ: NFC に揃え、**重なりは数えない**
- * （「ささ」に「ささ」は1回）。お題が採用された根拠と同じ箇所に的を立てるため。
- *
- * 音がかなの単位の途中から始まる・途中で終わる場合（「きゃ」の中の「ゃ」など）は、
- * その単位ごと的に含める。打鍵の単位を割って囲むことはできない。隣り合う箇所が
- * 同じ単位を共有したら1つの的にまとめる（同じかなを2つの的に入れない）。
+ * 探し方は生成の検証（`countConstraint`）と同じ関数（`findConstraintSpans`）。お題が
+ * 採用された根拠と同じ箇所に的を立てるため。打鍵の単位の並びで探すので、字面では
+ * 含まれていても打つときには別のかなになる箇所（「でぃ」の「で」、「きゃ」の「き」）には
+ * 的を立てない。
  */
 export function findTargets(kanaUnits: readonly string[], constraintChar: string): TargetSpan[] {
-  const target = normalizeConstraintChar(constraintChar);
-  if (target === "") return [];
-
-  // 読みの文字位置 → かな単位の添字
-  const unitAt: number[] = [];
-  const units = kanaUnits.map((unit, index) => {
-    const normalized = normalizeConstraintChar(unit);
-    for (let i = 0; i < normalized.length; i++) unitAt.push(index);
-    return normalized;
-  });
-  const kana = units.join("");
-
-  const spans: TargetSpan[] = [];
-  let from = 0;
-  for (;;) {
-    const at = kana.indexOf(target, from);
-    if (at === -1) return spans;
-    const first = unitAt[at] ?? 0;
-    const last = unitAt[at + target.length - 1] ?? first;
-    const previous = spans.at(-1);
-    if (previous !== undefined && first <= previous.last) previous.last = last;
-    else spans.push({ first, last });
-    from = at + target.length;
-  }
+  return findConstraintSpans(kanaUnits, constraintChar);
 }
 
 /** かな単位 `unit` が始まるローマ字の表示位置。確定済みの単位にだけ使える */

@@ -38,6 +38,64 @@ beforeEach(async () => {
   await db.delete(user);
 });
 
+describe("GET /themes（ごちゃまぜ）", () => {
+  it("行が無ければ作り、お題0件のまま返す", async () => {
+    const { status, body } = await get(`/themes?kind=mix&name=${encodeURIComponent("ごちゃまぜ")}`);
+    expect(status).toBe(200);
+    const found = body.themes as { kind: string; name: string }[];
+    expect(found).toHaveLength(1);
+    expect(found[0]).toMatchObject({ kind: "mix", name: "ごちゃまぜ" });
+    expect(await db.select().from(themes)).toHaveLength(1);
+    expect(await db.select().from(prompts)).toHaveLength(0);
+  });
+
+  it("何度引いても名前ごとに1行のまま", async () => {
+    const path = `/themes?kind=mix&name=${encodeURIComponent("ごちゃまぜ")}`;
+    const first = await get(path);
+    const second = await get(path);
+
+    const id = (first.body.themes as { id: string }[])[0]?.id;
+    expect((second.body.themes as { id: string }[])[0]?.id).toBe(id);
+    expect(await db.select().from(themes)).toHaveLength(1);
+  });
+
+  it("おまかせとごちゃまぜは別の行（プールもランキングも別）", async () => {
+    const omakase = await get(`/themes?kind=mix&name=${encodeURIComponent("おまかせ")}`);
+    const gochamaze = await get(`/themes?kind=mix&name=${encodeURIComponent("ごちゃまぜ")}`);
+
+    const a = (omakase.body.themes as { id: string; name: string }[])[0];
+    const b = (gochamaze.body.themes as { id: string; name: string }[])[0];
+    expect(a?.name).toBe("おまかせ");
+    expect(b?.name).toBe("ごちゃまぜ");
+    expect(a?.id).not.toBe(b?.id);
+  });
+
+  it("知らない名前では行を作らない", async () => {
+    const { body } = await get(`/themes?kind=mix&name=${encodeURIComponent("ほかの名前")}`);
+
+    expect(body.themes).toEqual([]);
+    expect(await db.select().from(themes)).toHaveLength(0);
+  });
+
+  it("名前を付けなければ、全モードの行を返す", async () => {
+    const { body } = await get("/themes?kind=mix");
+
+    expect((body.themes as { name: string }[]).map((t) => t.name)).toEqual([
+      "おまかせ",
+      "ごちゃまぜ",
+      "超ごちゃまぜ",
+    ]);
+  });
+
+  it("テーマ・最適化の一覧には出ない（公開一覧にお題0件の行を出さない）", async () => {
+    await get("/themes?kind=mix");
+
+    expect(await db.select().from(themes)).toHaveLength(3);
+    expect((await get("/themes?kind=theme")).body.themes).toEqual([]);
+    expect((await get("/themes?kind=constraint")).body.themes).toEqual([]);
+  });
+});
+
 describe("GET /themes", () => {
   it("kind で絞り込む（テーマと含む文字は同じテーブル）", async () => {
     await seedTheme({ id: "t1", kind: "theme", name: "ざ", normalizedName: "ざ" });
@@ -188,5 +246,57 @@ describe("GET /users/themes", () => {
   it("作ったものが無ければ空で返す", async () => {
     const { body } = await get("/users/themes?userId=nobody");
     expect(body.themes).toEqual([]);
+  });
+});
+
+async function put(id: string, defaultFingering: unknown) {
+  const res = await SELF.fetch("http://backend/themes/default-fingering", {
+    method: "PUT",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({ themeId: id, defaultFingering }),
+  });
+  return { status: res.status, body: (await res.json()) as Record<string, unknown> };
+}
+
+describe("最適化の既定の運指を後から変える", () => {
+  const KI = { units: [{ roman: "ki", fingers: ["right-index", "right-middle"] }] };
+
+  it("作成者を返す。運営投入分は null", async () => {
+    await seedUser("u1");
+    await seedTheme({ id: "c1", kind: "constraint", createdBy: "u1" });
+    await seedTheme({ id: "c2", kind: "constraint" });
+
+    expect((await get("/themes/c1/creator")).body).toEqual({ createdBy: "u1" });
+    expect((await get("/themes/c2/creator")).body).toEqual({ createdBy: null });
+    expect((await get("/themes/none/creator")).status).toBe(404);
+  });
+
+  // 公開APIが詳細をそのまま中継するため、利用者のIDを載せない
+  it("公開の詳細には作成者を載せない", async () => {
+    await seedUser("u1");
+    await seedTheme({ id: "c1", kind: "constraint", createdBy: "u1" });
+
+    const theme = (await get("/themes/c1")).body.theme as Record<string, unknown>;
+    expect(theme).not.toHaveProperty("createdBy");
+  });
+
+  it("書き換えて詳細を返し、null で外せる", async () => {
+    await seedTheme({ id: "c1", kind: "constraint" });
+
+    const set = await put("c1", KI);
+    expect(set.status).toBe(200);
+    expect((set.body.theme as { defaultFingering: unknown }).defaultFingering).toEqual(KI);
+
+    const cleared = await put("c1", null);
+    expect((cleared.body.theme as { defaultFingering: unknown }).defaultFingering).toBeNull();
+  });
+
+  it("テーマ（kind: theme）や存在しないIDは書き換えずに NOT_FOUND", async () => {
+    await seedTheme({ id: "t1", kind: "theme" });
+
+    expect((await put("t1", KI)).status).toBe(404);
+    expect((await put("none", KI)).status).toBe(404);
+    const [row] = await db.select().from(themes);
+    expect(row?.defaultFingeringJson).toBeNull();
   });
 });

@@ -7,6 +7,7 @@ import {
   type ThemeKind,
   totalKeystrokes,
 } from "@henge/shared";
+import { FitScreen } from "@/components/FitScreen";
 import { FormMark } from "@/components/FormMark";
 import { RankingRegister } from "@/components/play/RankingRegister";
 import { PromptReportPanel } from "@/components/play/PromptReportPanel";
@@ -95,129 +96,136 @@ export function Result({
   ];
 
   return (
-    <div className="flex min-h-dvh items-center justify-center p-6">
-      <div className="w-full max-w-2xl rounded-lg border border-kin/60 bg-kinari/5 px-10 py-12">
-        {/*
+    // **1画面に収める。** 低い画面では「もう一度」や投稿のボタンが下に見切れていた（FitScreen）
+    <div className="h-dvh">
+      <FitScreen>
+        <div className="flex min-h-dvh items-center justify-center p-6 short:p-4">
+          <div className="w-full max-w-2xl rounded-lg border border-kin/60 bg-kinari/5 px-10 py-12 short:py-7">
+            {/*
           見出しはテーマ名（または最適化の文字）だけ。**問題数は出さない。**
           形式ごとに固定（短文10／単語20）なので、書いても情報が増えない。
           **形式は出す。** テーマ名だけだと、あとから見て短文の記録か単語の記録か
           分からない
         */}
-        <h1 className="flex items-center justify-center gap-4 font-mincho text-2xl tracking-widest text-kinari">
-          {themeName}
-          <span className="flex items-center gap-1.5 rounded-full border border-kinari/20 px-3 py-0.5 font-gothic text-xs tracking-widest text-kinari/70">
-            <FormMark form={form} className={`size-3.5 ${formColor(form).text}`} />
-            {formLabel(form)}
-          </span>
-        </h1>
-
-        <div className="mt-10 text-center">
-          <p className="text-xs tracking-[0.3em] text-kinari/50">スコア</p>
-          <p className="mt-1 font-mono text-6xl leading-none text-kin">{etypingScore(stats)}</p>
-        </div>
-
-        <dl className="mt-12 grid grid-cols-2 gap-6 sm:grid-cols-4">
-          {items.map((item) => (
-            <div key={item.label} className="text-center">
-              <dt className="text-xs tracking-wider text-kinari/50">{item.label}</dt>
-              <dd className="mt-1 font-mono text-2xl text-kinari">
-                {item.value}
-                <span className="ml-1 text-xs text-kinari/50">{item.unit}</span>
-              </dd>
-            </div>
-          ))}
-        </dl>
-
-        {targetTally !== undefined && targetTally.total > 0 && (
-          <div className="mt-12 text-center">
-            <p className="text-xs tracking-[0.3em] text-kinari/50">「{themeName}」の的中</p>
-            <p className="mt-2 font-mono text-3xl text-kinari">
-              {targetTally.hits}
-              <span className="text-base text-kinari/50"> / {targetTally.total}</span>
-              <span className="ml-3 text-base text-kinari/70">
-                {Math.floor((targetTally.hits / targetTally.total) * 100)}%
+            <h1 className="flex items-center justify-center gap-4 font-mincho text-2xl tracking-widest text-kinari">
+              {themeName}
+              <span className="flex items-center gap-1.5 rounded-full border border-kinari/20 px-3 py-0.5 font-gothic text-xs tracking-widest text-kinari/70">
+                <FormMark form={form} className={`size-3.5 ${formColor(form).text}`} />
+                {formLabel(form)}
               </span>
-            </p>
-            <p className="mt-2 text-xs text-kinari/40">
-              最適化する音をミスなく打てた数です。スコアには含めません。
-            </p>
-          </div>
-        )}
+            </h1>
 
-        {missed.length > 0 && (
-          <div className="mt-12">
-            <p className="text-center text-xs tracking-[0.3em] text-kinari/50">打ち損ねたキー</p>
-            {/*
+            <div className="mt-10 text-center short:mt-5">
+              <p className="text-xs tracking-[0.3em] text-kinari/50">スコア</p>
+              <p className="mt-1 font-mono text-6xl leading-none text-kin">{etypingScore(stats)}</p>
+            </div>
+
+            <dl className="mt-12 grid grid-cols-2 gap-6 sm:grid-cols-4 short:mt-6">
+              {items.map((item) => (
+                <div key={item.label} className="text-center">
+                  <dt className="text-xs tracking-wider text-kinari/50">{item.label}</dt>
+                  <dd className="mt-1 font-mono text-2xl text-kinari">
+                    {item.value}
+                    <span className="ml-1 text-xs text-kinari/50">{item.unit}</span>
+                  </dd>
+                </div>
+              ))}
+            </dl>
+
+            {targetTally !== undefined && targetTally.total > 0 && (
+              <div className="mt-12 text-center short:mt-6">
+                <p className="text-xs tracking-[0.3em] text-kinari/50">「{themeName}」の的中</p>
+                <p className="mt-2 font-mono text-3xl text-kinari">
+                  {targetTally.hits}
+                  <span className="text-base text-kinari/50"> / {targetTally.total}</span>
+                  <span className="ml-3 text-base text-kinari/70">
+                    {Math.floor((targetTally.hits / targetTally.total) * 100)}%
+                  </span>
+                </p>
+                <p className="mt-2 text-xs text-kinari/40">
+                  最適化する音をミスなく打てた数です。スコアには含めません。
+                </p>
+              </div>
+            )}
+
+            {missed.length > 0 && (
+              <div className="mt-12 short:mt-6">
+                <p className="text-center text-xs tracking-[0.3em] text-kinari/50">
+                  打ち損ねたキー
+                </p>
+                {/*
               押した誤りのキーではなく**打つべきだった文字**を出す。
               「何を打ち損ねるか」が運指の弱点そのもので、次に何を直せばよいかに繋がる
             */}
-            <ul className="mt-4 flex flex-wrap items-center justify-center gap-3">
-              {missed.map((item) => (
-                <li
-                  key={item.key}
-                  className="flex items-baseline gap-2 rounded-md border border-kinari/15 bg-kinari/5 px-4 py-2"
-                >
-                  <span className="font-mono text-xl uppercase text-kinari">{item.key}</span>
-                  <span className="font-mono text-xs text-kinari/50">{item.count}</span>
-                </li>
-              ))}
-            </ul>
+                <ul className="mt-4 flex flex-wrap items-center justify-center gap-3">
+                  {missed.map((item) => (
+                    <li
+                      key={item.key}
+                      className="flex items-baseline gap-2 rounded-md border border-kinari/15 bg-kinari/5 px-4 py-2"
+                    >
+                      <span className="font-mono text-xl uppercase text-kinari">{item.key}</span>
+                      <span className="font-mono text-xs text-kinari/50">{item.count}</span>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            )}
+
+            <ReportPanel
+              themeId={themeId}
+              prompts={prompts}
+              open={reportOpen === "reading"}
+              onOpenChange={(open) => onReportOpenChange(open ? "reading" : null)}
+            />
+            <PromptReportPanel
+              prompts={prompts}
+              open={reportOpen === "prompt"}
+              onOpenChange={(open) => onReportOpenChange(open ? "prompt" : null)}
+            />
+
+            <RankingRegister
+              themeId={themeId}
+              form={form}
+              stats={stats}
+              rankingHref={rankingHref(kind, themeName, form)}
+            />
+
+            <div className="mt-12 flex flex-wrap items-center justify-center gap-4 short:mt-6">
+              <button
+                type="button"
+                onClick={onRetry}
+                className="rounded-md border border-shu bg-shu/15 px-8 py-3 font-gothic tracking-widest text-kinari transition-colors hover:bg-shu/25"
+              >
+                もう一度
+                <span className="ml-2 font-mono text-sm text-kinari/50">R</span>
+              </button>
+              <a
+                href={buildTweetIntentUrl({
+                  url: shareUrl,
+                  text: buildShareText({ kind, form, themeName, stats }),
+                })}
+                target="_blank"
+                rel="noreferrer"
+                className="rounded-md border border-kin/60 px-8 py-3 font-gothic tracking-widest text-kin transition-colors hover:bg-kin/10"
+              >
+                Xでつぶやく
+              </a>
+              <a
+                href={listHref}
+                className="rounded-md border border-kinari/20 px-8 py-3 font-gothic tracking-widest text-kinari/80 transition-colors hover:border-kin hover:text-kinari"
+              >
+                ほかのお題を見る
+              </a>
+            </div>
+
+            <p className="mt-8 text-center text-sm short:mt-5">
+              <a href={detailHref} className="tracking-widest text-kinari/50 hover:text-kinari">
+                「{themeName}」へ戻る
+              </a>
+            </p>
           </div>
-        )}
-
-        <ReportPanel
-          themeId={themeId}
-          prompts={prompts}
-          open={reportOpen === "reading"}
-          onOpenChange={(open) => onReportOpenChange(open ? "reading" : null)}
-        />
-        <PromptReportPanel
-          prompts={prompts}
-          open={reportOpen === "prompt"}
-          onOpenChange={(open) => onReportOpenChange(open ? "prompt" : null)}
-        />
-
-        <RankingRegister
-          themeId={themeId}
-          form={form}
-          stats={stats}
-          rankingHref={rankingHref(kind, themeName, form)}
-        />
-
-        <div className="mt-12 flex flex-wrap items-center justify-center gap-4">
-          <button
-            type="button"
-            onClick={onRetry}
-            className="rounded-md border border-shu bg-shu/15 px-8 py-3 font-gothic tracking-widest text-kinari transition-colors hover:bg-shu/25"
-          >
-            もう一度
-            <span className="ml-2 font-mono text-sm text-kinari/50">R</span>
-          </button>
-          <a
-            href={buildTweetIntentUrl({
-              url: shareUrl,
-              text: buildShareText({ kind, form, themeName, stats }),
-            })}
-            target="_blank"
-            rel="noreferrer"
-            className="rounded-md border border-kin/60 px-8 py-3 font-gothic tracking-widest text-kin transition-colors hover:bg-kin/10"
-          >
-            Xでつぶやく
-          </a>
-          <a
-            href={listHref}
-            className="rounded-md border border-kinari/20 px-8 py-3 font-gothic tracking-widest text-kinari/80 transition-colors hover:border-kin hover:text-kinari"
-          >
-            ほかのお題を見る
-          </a>
         </div>
-
-        <p className="mt-8 text-center text-sm">
-          <a href={detailHref} className="tracking-widest text-kinari/50 hover:text-kinari">
-            「{themeName}」へ戻る
-          </a>
-        </p>
-      </div>
+      </FitScreen>
     </div>
   );
 }

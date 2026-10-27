@@ -95,6 +95,11 @@ describe("vocabularyFor", () => {
     expect(vocabularyFor("き")).toHaveLength(CONSTRAINT_VOCABULARY_MAX);
   });
 
+  it("打鍵の単位で照合する（「で」に「でぃ」、「き」に「きゃ」の語を渡さない）", () => {
+    for (const word of vocabularyFor("で")) expect(word.reading).toMatch(/で(?![ぃゅ])/u);
+    for (const word of vocabularyFor("き")) expect(word.reading).toMatch(/き(?![ゃゅょ])/u);
+  });
+
   it("濁点の有無は別の連接（発表＝はっぴょう は「ひょう」に当たらない）", () => {
     expect(vocabularyFor("ひょう").some((w) => w.reading.includes("ぴょう"))).toBe(false);
   });
@@ -114,5 +119,7 @@ describe("vocabularyFor", () => {
   it("語彙の少ない連接は下限に届かない（作成を断る側）", () => {
     expect(vocabularyFor("を").length).toBeLessThan(CONSTRAINT_VOCABULARY_MIN);
     expect(vocabularyFor("にゃ").length).toBeLessThan(CONSTRAINT_VOCABULARY_MIN);
+    // 小書きで始まる音は、前のかなと組んだ箇所に当たらない（作成フォームでも断る）
+    expect(vocabularyFor("ゃ")).toHaveLength(0);
   });
 });

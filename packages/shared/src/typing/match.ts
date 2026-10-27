@@ -43,6 +43,14 @@ export interface TypingProgress {
   /** 正しく受理された打鍵の回数 */
   readonly hitCount: number;
   readonly finished: boolean;
+  /**
+   * かな単位（添字）ごとに、画面に出す打ち方を指定したもの。最適化練習で
+   * 利用者が選んだ打ち方（`し` を `shi` で打つ等）を、的の箇所に出すために使う。
+   *
+   * **表示だけを変える。** 受理する候補は `units` のままで、指定と違う打ち方で
+   * 打ち始めればその経路の表示に切り替わる（`pick`）。
+   */
+  readonly chosen: ReadonlyMap<number, string>;
 }
 
 /**
@@ -76,6 +84,17 @@ function preferred(candidates: readonly string[]): string {
   return best;
 }
 
+/**
+ * かな `index` の表示に使う候補。指定（`chosen`）が残っている候補にあればそれ、
+ * 無ければ table.ts で先に書いたもの。**指定は候補を増やさない**（その箇所で打てない
+ * 打ち方を指定されていたら、黙って既定の表示に戻す）。
+ */
+function pick(p: TypingProgress, index: number, candidates: readonly string[]): string {
+  const chosen = p.chosen.get(index);
+  if (chosen !== undefined && candidates.includes(chosen)) return chosen;
+  return preferred(candidates);
+}
+
 /** 「っ」の単位か。build は「っ」に必ず SOKUON_FALLBACK を足すので、それで見分ける */
 function isSokuon(unit: readonly string[] | undefined): boolean {
   return unit?.includes(SOKUON_FALLBACK[0] ?? "") ?? false;
@@ -85,7 +104,8 @@ function isSokuon(unit: readonly string[] | undefined): boolean {
  * 未確定のかな `index` を画面に出す打ち方。`candidates` はその候補
  * （現在のかななら絞り込み済みの `matches`）。
  *
- * 基本は table.ts で先に書いた候補（`preferred`）。ただし**「っ」と次のかなは
+ * 基本は table.ts で先に書いた候補（`preferred`）。打ち方の指定（`chosen`）があれば
+ * それを先に見る（`pick`）。ただし**「っ」と次のかなは
  * 揃える。** かなごとに選ぶと、`っ` は `chi` 由来の `c`、`ち` は `ti` になり
  * `まっち` が `macti` と出る。
  *
@@ -100,7 +120,7 @@ function displayOf(p: TypingProgress, index: number, candidates: readonly string
   const prevTyped = index - 1 < p.unitIndex ? p.typedUnits[index - 1] : undefined;
   if (prevTyped !== undefined && prevTyped.length === 1 && isSokuon(p.units[index - 1])) {
     const following = candidates.filter((c) => c.startsWith(prevTyped));
-    if (following.length > 0) return preferred(following);
+    if (following.length > 0) return pick(p, index, following);
   }
 
   const next = p.units[index + 1];
@@ -109,7 +129,7 @@ function displayOf(p: TypingProgress, index: number, candidates: readonly string
     if (head !== undefined && candidates.includes(head)) return head;
   }
 
-  return preferred(candidates);
+  return pick(p, index, candidates);
 }
 
 /** 未確定のかなを、`unitIndex` から順に画面に出す打ち方で並べる */
@@ -120,7 +140,14 @@ function pendingDisplays(p: TypingProgress): string[] {
   ];
 }
 
-export function startTyping(units: RomanCandidates): TypingProgress {
+/**
+ * 打ち始めの状態。`chosen` はかな単位ごとの表示の指定（`TypingProgress.chosen`）。
+ * 省略すれば table.ts の並びで表示する
+ */
+export function startTyping(
+  units: RomanCandidates,
+  chosen: ReadonlyMap<number, string> = new Map(),
+): TypingProgress {
   const first = units[0];
   return {
     units,
@@ -134,6 +161,7 @@ export function startTyping(units: RomanCandidates): TypingProgress {
     missedKeys: new Map(),
     hitCount: 0,
     finished: units.length === 0,
+    chosen,
   };
 }
 

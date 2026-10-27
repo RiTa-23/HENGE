@@ -16,6 +16,8 @@ import {
   type TypingProgress,
 } from "@henge/shared";
 import { useCallback, useEffect, useRef, useState } from "react";
+import { FingeringPanel } from "@/components/FingeringPanel";
+import { FitScreen } from "@/components/FitScreen";
 import { FormMark } from "@/components/FormMark";
 import { Logo } from "@/components/Logo";
 import { authClient } from "@/lib/api/auth-client";
@@ -35,6 +37,13 @@ import { readOffset, writeOffset } from "@/lib/play/offset";
 import { mergeMissedKeys } from "@/lib/play/misses";
 import { addTally, EMPTY_TALLY, findTargets, type TargetTally } from "@/lib/practice/targets";
 import {
+  chosenFingerAt,
+  chosenRomans,
+  type Fingering,
+  isDefaultFingering,
+  readFingering,
+} from "@/lib/practice/fingering";
+import {
   readFingerGuide,
   readMuted,
   readRomanUpper,
@@ -53,6 +62,7 @@ import {
   primeAudio,
 } from "@/lib/play/sound";
 import { detailHref, formColor, formLabel, kindLabel, listHref } from "@/lib/ui/kind";
+import { isPlayStartSpace, TEXT_ENTRY_SELECTOR } from "@/lib/ui/shortcut";
 
 interface Prompt {
   id: string;
@@ -174,6 +184,7 @@ export function PlayScreen({
   poolEmpty,
   shareUrl,
   beta = false,
+  defaultFingering = null,
 }: {
   themeId: string;
   themeName: string;
@@ -193,6 +204,11 @@ export function PlayScreen({
   shareUrl: string;
   /** ベータ運用の間だけロゴの横に「ベータ版」を出す。判定はサーバー側（lib/beta/beta.ts） */
   beta?: boolean;
+  /**
+   * 最適化の既定の運指（作成者が作成時に決めたもの）。この端末で決めた運指が無ければ
+   * これを使う。無ければ null で、標準運指
+   */
+  defaultFingering?: Fingering | null;
 }) {
   const { data: authSession } = authClient.useSession();
   const backToList = listHref(kind);
@@ -241,6 +257,13 @@ export function PlayScreen({
   /** ローマ字列を大文字で出すか。同上 */
   const [romanUpper, setRomanUpper] = useState(false);
   /**
+   * 最適化の運指（最適化練習で、的の箇所に出す打ち方と指）。同上。
+   * お題を出すたびに打ち方を当てるので ref にも持つ（`mutedRef` と同じく、
+   * 開始の合図の effect を設定の変更で出し直させない）
+   */
+  const [fingering, setFingering] = useState<Fingering | null>(null);
+  const fingeringRef = useRef<Fingering | null>(null);
+  /**
    * 消音の最新値。開始の合図の音は合図のタイマーと同じ effect で鳴らすので、
    * deps に `muted` を入れると、合図の最中に音を切り替えただけで合図が出し直しになる
    * （計時の始まりもずれる）。ref 経由で値だけを見る（`loggedIn` と同じ）
@@ -269,19 +292,36 @@ export function PlayScreen({
   const loggedIn = useRef(false);
 
   /**
+   * お題1問の打ち始め。最適化練習では、的の箇所に決めた打ち方を出す
+   * （`chosenRomans`。表示だけで、受理する打ち方は変わらない）
+   */
+  const typingFor = useCallback(
+    (prompt: Prompt | undefined): TypingProgress => {
+      if (prompt === undefined) return startTyping([]);
+      if (kind !== "constraint") return startTyping(prompt.readingRoman);
+      const spans = findTargets(splitKanaUnits(prompt.readingKana), themeName);
+      return startTyping(prompt.readingRoman, chosenRomans(fingeringRef.current, spans));
+    },
+    [kind, themeName],
+  );
+
+  /**
    * 1問目を出して打ち始める。**開始の合図が消えた瞬間に呼ぶ。**
    * ここで `startedAt` を置くので、合図のぶんは計時に入らない。
    */
-  const beginPlay = useCallback((session: SessionResponse) => {
-    setPromptIndex(0);
-    setStats({ hits: 0, misses: 0, elapsedMs: 0 });
-    setMissedKeys(new Map());
-    setTargetTally(EMPTY_TALLY);
-    setFinished(null);
-    startedAt.current = performance.now();
-    setProgress(startTyping(session.prompts[0]?.readingRoman ?? []));
-    setPhase({ name: "playing", session });
-  }, []);
+  const beginPlay = useCallback(
+    (session: SessionResponse) => {
+      setPromptIndex(0);
+      setStats({ hits: 0, misses: 0, elapsedMs: 0 });
+      setMissedKeys(new Map());
+      setTargetTally(EMPTY_TALLY);
+      setFinished(null);
+      startedAt.current = performance.now();
+      setProgress(typingFor(session.prompts[0]));
+      setPhase({ name: "playing", session });
+    },
+    [typingFor],
+  );
 
   /**
    * 途中でやめて開始前へ戻る。**取得済みのお題は捨てる。**
@@ -401,6 +441,13 @@ export function PlayScreen({
   }, []);
 
   useEffect(() => {
+    if (kind !== "constraint") return;
+    // この端末で決めた運指 → 作成者の運指 → 標準運指 の順
+    const showing = readFingering(themeName) ?? defaultFingering;
+    changeFingering(showing === null || isDefaultFingering(themeName, showing) ? null : showing);
+  }, [kind, themeName, defaultFingering]);
+
+  useEffect(() => {
     mutedRef.current = muted;
   }, [muted]);
 
@@ -421,6 +468,12 @@ export function PlayScreen({
     setFingerGuide(next);
     writeFingerGuide(next);
   };
+
+  /** 保存は `FingeringEditor` が済ませている。ここでは画面に持つだけ */
+  function changeFingering(next: Fingering | null) {
+    fingeringRef.current = next;
+    setFingering(next);
+  }
 
   const toggleRomanUpper = () => {
     const next = !romanUpper;
@@ -505,8 +558,11 @@ export function PlayScreen({
   useEffect(() => {
     if (phase.name !== "ready") return;
     const onKey = (event: KeyboardEvent) => {
-      // key と code の両方を見る。配列やIMEの状態によって key が空になることがある
-      if (event.key !== " " && event.code !== "Space") return;
+      // 運指の投稿の説明文など、文字の入力中の Space（日本語入力の変換を含む）は奪わない
+      const target = event.target as HTMLElement | null;
+      const targetIsTextEntry = target?.closest?.(TEXT_ENTRY_SELECTOR) != null;
+      const { key, code, isComposing } = event;
+      if (!isPlayStartSpace({ key, code, isComposing, targetIsTextEntry })) return;
       // スペースでの画面スクロールを止める
       event.preventDefault();
       // **音はユーザー操作の中で起こす。** 操作を伴わずに作った AudioContext は
@@ -535,7 +591,7 @@ export function PlayScreen({
       if (reportOpen !== null) return;
       // input 等にフォーカスがあるときのキーはショートカットにしない（フォーム入力を奪わない）
       const target = event.target as HTMLElement | null;
-      if (target?.closest("input, textarea, select, [contenteditable=true]")) return;
+      if (target?.closest(TEXT_ENTRY_SELECTOR)) return;
       // **修飾キーとの同時押しは拾わない。** `Cmd+R` / `Ctrl+R` のリロードを奪う
       if (event.ctrlKey || event.metaKey || event.altKey) return;
       // key と code の両方を見る。配列やIMEの状態によって key が空になることがある
@@ -630,54 +686,87 @@ export function PlayScreen({
     if (finishedPrompt !== undefined) setFinished({ prompt: finishedPrompt, progress: next });
     setPromptIndex(upcoming);
     // 撒菱は次の問題で消える（新しい TypingProgress を作り直すため）
-    setProgress(startTyping(phase.session.prompts[upcoming]?.readingRoman ?? []));
+    setProgress(typingFor(phase.session.prompts[upcoming]));
   };
 
   if (phase.name === "ready") {
     return (
-      <div className="flex min-h-dvh flex-col items-center justify-center gap-10 p-6">
-        <div className="w-full max-w-lg rounded-lg border border-kin/60 bg-kinari/5 px-10 py-16 text-center">
-          {/* 開始前に出すのはテーマ名だけ。総数を出しても遊べる残り数とは違ううえ、
+      // 運指の設定を開くと縦に伸びるので、開始前も画面に収める（FitScreen）
+      <div className="h-dvh">
+        <FitScreen>
+          <div className="flex min-h-dvh flex-col items-center justify-center gap-10 p-6 short:gap-6">
+            <div className="w-full max-w-lg rounded-lg border border-kin/60 bg-kinari/5 px-10 py-16 text-center short:py-10">
+              {/* 開始前に出すのはテーマ名だけ。総数を出しても遊べる残り数とは違ううえ、
               10問ひと組は例外なく成り立つので添えても情報が増えない */}
-          <h1 className="font-mincho text-4xl leading-snug tracking-wider text-kinari">
-            {themeName}
-          </h1>
-          {/* **どちらの形式を開いているかを出す。** 同じテーマ名で中身が変わるので、
+              <h1 className="font-mincho text-4xl leading-snug tracking-wider text-kinari">
+                {themeName}
+              </h1>
+              {/* **どちらの形式を開いているかを出す。** 同じテーマ名で中身が変わるので、
               名前だけだと単語のつもりで短文を始めてしまう */}
-          <p className="mt-4 flex items-center justify-center gap-2 text-sm tracking-widest text-kinari/50">
-            {/* 紋は一覧・詳細の「打つ」札と同じ（FormMark）。どの画面でも同じ印で形式を示す */}
-            <FormMark form={form} className={`size-4 ${formColor(form).text}`} />
-            {formLabel(form)}・{form === "long" ? "1本" : `${playSize(form)}問`}
-          </p>
+              <p className="mt-4 flex items-center justify-center gap-2 text-sm tracking-widest text-kinari/50">
+                {/* 紋は一覧・詳細の「打つ」札と同じ（FormMark）。どの画面でも同じ印で形式を示す */}
+                <FormMark form={form} className={`size-4 ${formColor(form).text}`} />
+                {formLabel(form)}・{form === "long" ? "1本" : `${playSize(form)}問`}
+              </p>
 
-          <p className="mt-14 flex items-center justify-center gap-3 text-kinari">
-            <span className="rounded-md border border-shu bg-shu/20 px-10 py-2 font-mono text-sm tracking-widest shadow-[0_0_10px_var(--color-shu)]">
-              Space
-            </span>
-            <span className="tracking-widest">で開始</span>
-          </p>
-          <p className="mt-4 text-xs leading-relaxed text-kinari/40">
-            押すまでお題は消費されません。
-          </p>
+              <p className="mt-14 flex items-center justify-center gap-3 text-kinari">
+                <span className="rounded-md border border-shu bg-shu/20 px-10 py-2 font-mono text-sm tracking-widest shadow-[0_0_10px_var(--color-shu)]">
+                  Space
+                </span>
+                <span className="tracking-widest">で開始</span>
+              </p>
+              <p className="mt-4 text-xs leading-relaxed text-kinari/40">
+                押すまでお題は消費されません。
+              </p>
 
-          {/* 開始前は縦に並べて幅を揃える。横に並べると枠の幅に収まらず2つと1つに割れ、
+              {/* 開始前は縦に並べて幅を揃える。横に並べると枠の幅に収まらず2つと1つに割れ、
               長さの違うスイッチが段違いに並ぶ */}
-          <div className="mx-auto mt-8 grid w-fit gap-2">{settingToggles}</div>
-        </div>
+              <div className="mx-auto mt-8 grid w-fit gap-2">{settingToggles}</div>
 
-        {/* 離脱の導線は枠の外に置く。枠の中は「開始」に関することだけ。
+              {/*
+            最適化の運指。**打つ直前に決め直せるよう、開始前にも置く**（詳細ページと同じ設定）。
+            畳んでおく。開けたままだと「Space で開始」が枠の下に押し出される。
+            長文は最適化練習に無い（形式は短文だけ）が、キーボードを出さない形式では
+            運指ガイドも出ないので、念のため形式でも絞る
+          */}
+              {kind === "constraint" && form !== "long" && (
+                <details className="group mx-auto mt-6 w-fit">
+                  <summary className="mx-auto w-fit cursor-pointer list-none rounded-full border border-kinari/15 px-4 py-1.5 text-xs tracking-widest text-kinari/60 transition-colors hover:border-kin hover:text-kinari">
+                    運指を決める
+                    <span className="ml-2 text-kinari/40">
+                      {fingering === null ? "標準" : "最適化"}
+                    </span>
+                    <span className="ml-2 inline-block transition-transform group-open:rotate-180">
+                      ▾
+                    </span>
+                  </summary>
+                  <div className="mt-5">
+                    <FingeringPanel
+                      themeId={themeId}
+                      sound={themeName}
+                      base={defaultFingering}
+                      onChange={changeFingering}
+                    />
+                  </div>
+                </details>
+              )}
+            </div>
+
+            {/* 離脱の導線は枠の外に置く。枠の中は「開始」に関することだけ。
             詳細へ戻るは結果画面と同じ形（枠の下・一覧の下）に揃える */}
-        <div className="flex flex-col items-center gap-4">
-          <a
-            href={backToList}
-            className="rounded-md border border-kinari/20 px-8 py-2.5 tracking-widest text-kinari/80 transition-colors hover:border-kin hover:text-kinari"
-          >
-            一覧に戻る
-          </a>
-          <a href={backToDetail} className="tracking-widest text-kinari/50 hover:text-kinari">
-            「{themeName}」へ戻る
-          </a>
-        </div>
+            <div className="flex flex-col items-center gap-4">
+              <a
+                href={backToList}
+                className="rounded-md border border-kinari/20 px-8 py-2.5 tracking-widest text-kinari/80 transition-colors hover:border-kin hover:text-kinari"
+              >
+                一覧に戻る
+              </a>
+              <a href={backToDetail} className="tracking-widest text-kinari/50 hover:text-kinari">
+                「{themeName}」へ戻る
+              </a>
+            </div>
+          </div>
+        </FitScreen>
       </div>
     );
   }
@@ -731,7 +820,7 @@ export function PlayScreen({
 
     return (
       <div className="flex min-h-dvh items-center justify-center p-6">
-        <div className="w-full max-w-lg rounded-lg border border-kin/60 bg-kinari/5 px-10 py-12 text-center">
+        <div className="w-full max-w-lg rounded-lg border border-kin/60 bg-kinari/5 px-10 py-12 text-center short:py-8">
           <h1 className="font-mincho text-2xl tracking-widest text-kinari">{message}</h1>
 
           {canRegenerate && (
@@ -856,110 +945,131 @@ export function PlayScreen({
       tabIndex={0}
       onKeyDown={onKeyDown}
       onBlur={() => surface.current?.focus()}
-      className="mx-auto flex min-h-dvh w-full max-w-4xl flex-col px-8 py-6"
+      className="h-dvh"
     >
-      <header className="flex items-start justify-between border-b border-kin/40 pb-4">
-        <Logo beta={beta} />
-        <div className="flex items-center gap-5">
-          {/*
+      {/*
+        **1画面に収める。** 低い画面で巻物かキーボードが見切れると、打ちながら
+        スクロールすることになる（FitScreen）
+      */}
+      <FitScreen>
+        <div className="mx-auto flex min-h-dvh w-full max-w-4xl flex-col px-8 py-6 short:py-3">
+          <header className="flex items-start justify-between border-b border-kin/40 pb-4 short:pb-2">
+            <Logo beta={beta} />
+            <div className="flex items-center gap-5">
+              {/*
             テーマ名と形式は**表示であって操作ではない**のでチップにしない。
             打っている最中に見返る情報なので、操作ボタンより文字を大きく。
             形式は識別色（`formColor`＝札と紋と同じ色）で出す
           */}
-          <div className="flex items-baseline gap-2.5">
-            <span className="text-lg tracking-widest text-kinari">{themeName}</span>
-            <span className="flex items-center gap-1 text-sm tracking-widest">
-              <FormMark form={form} className={`size-3.5 ${formColor(form).text}`} />
-              <span className={formColor(form).text}>{formLabel(form)}</span>
-            </span>
-          </div>
-          {/*
+              <div className="flex items-baseline gap-2.5">
+                <span className="text-lg tracking-widest text-kinari">{themeName}</span>
+                <span className="flex items-center gap-1 text-sm tracking-widest">
+                  <FormMark form={form} className={`size-3.5 ${formColor(form).text}`} />
+                  <span className={formColor(form).text}>{formLabel(form)}</span>
+                </span>
+              </div>
+              {/*
             打鍵を拾う要素の中に置く。外に出すと、押した時点でフォーカスが
             surface から外れ、onBlur の当て直しと競合する。
             **朱は使わない。** 朱は「今すぐ打つべきもの」だけの色で、
             やめるボタンに使うとキーボードのハイライトと役割がぶつかる
           */}
-          <button
-            type="button"
-            onClick={quit}
-            className="rounded-full border border-kinari/15 px-4 py-1 text-xs tracking-widest text-kinari/50 transition-colors hover:border-kin hover:text-kinari"
-          >
-            やめる
-            <span className="ml-2 font-mono text-kinari/40">Esc</span>
-          </button>
-        </div>
-      </header>
+              <button
+                type="button"
+                onClick={quit}
+                className="rounded-full border border-kinari/15 px-4 py-1 text-xs tracking-widest text-kinari/50 transition-colors hover:border-kin hover:text-kinari"
+              >
+                やめる
+                <span className="ml-2 font-mono text-kinari/40">Esc</span>
+              </button>
+            </div>
+          </header>
 
-      {/*
+          {/*
         設定の入/切も、やめるボタンと同じ理由で surface の中に置く。
         **ヘッダーとは別の行にする。** 3つをヘッダーに並べると幅が足りず、
         テーマ名・形式・やめるボタンが1文字ずつ縦に折り返す
       */}
-      <div className="mt-3 flex flex-wrap justify-end gap-2">{settingToggles}</div>
+          <div className="mt-3 flex flex-wrap justify-end gap-2 short:mt-2">{settingToggles}</div>
 
-      {form === "long" ? (
-        /*
+          {form === "long" ? (
+            /*
           **長文はキーボードを出さない。** そのぶん巻物を縦に大きくし、紙の大半を本文で
           埋める（docs/07-ui.md）。進捗は問題数ではなく1本の中の打鍵の進みで示す
           （1プレイ1本なので進捗ドットは意味を持たない）
         */
-        <div className="flex flex-1 flex-col justify-center gap-6 py-6">
-          <LongScroll
-            text={prompt.text}
-            kanaUnits={splitKanaUnits(prompt.readingKana)}
-            progress={progress}
-            upper={romanUpper}
-          />
-          <LongProgress progress={progress} />
-        </div>
-      ) : (
-        <>
-          <div className="flex flex-1 flex-col justify-center gap-8 py-8">
-            {/*
+            <div className="flex flex-1 flex-col justify-center gap-6 py-6 short:gap-4 short:py-3">
+              <LongScroll
+                text={prompt.text}
+                kanaUnits={splitKanaUnits(prompt.readingKana)}
+                progress={progress}
+                upper={romanUpper}
+              />
+              <LongProgress progress={progress} />
+            </div>
+          ) : (
+            <>
+              <div className="flex flex-1 flex-col justify-center gap-8 py-8 short:gap-4 short:py-4">
+                {/*
               **問題ごとに作り直す**（key）。切り替わりの演出（煙／手裏剣）はCSSの
               アニメーションで、作り直したときに1度だけ走る。1問目には出さない
               （切り替わりではない。開始の合図がすでにある）
             */}
-            <div
-              key={promptIndex}
-              className={`relative mx-auto w-full max-w-3xl ${
-                promptIndex > 0 && kind === "constraint" ? "strike-shake" : ""
-              }`}
-            >
-              {board(prompt, progress)}
-              {promptIndex > 0 &&
-                finished !== null &&
-                (kind === "constraint" ? (
-                  <ShurikenStrike previous={board(finished.prompt, finished.progress)} />
-                ) : (
-                  <SmokePuff previous={board(finished.prompt, finished.progress)} />
-                ))}
-            </div>
+                <div
+                  key={promptIndex}
+                  className={`relative mx-auto w-full max-w-3xl ${
+                    promptIndex > 0 && kind === "constraint" ? "strike-shake" : ""
+                  }`}
+                >
+                  {board(prompt, progress)}
+                  {promptIndex > 0 &&
+                    finished !== null &&
+                    (kind === "constraint" ? (
+                      <ShurikenStrike previous={board(finished.prompt, finished.progress)} />
+                    ) : (
+                      <SmokePuff previous={board(finished.prompt, finished.progress)} />
+                    ))}
+                </div>
 
-            <div className="flex items-center justify-between">
-              <ProgressDots current={promptIndex} total={phase.session.prompts.length} />
-              <span className="font-mono text-sm text-kinari/50">
-                {promptIndex + 1}/{Math.min(phase.session.prompts.length, playSize(form))}
-              </span>
-            </div>
-          </div>
+                <div className="flex items-center justify-between">
+                  <ProgressDots current={promptIndex} total={phase.session.prompts.length} />
+                  <span className="font-mono text-sm text-kinari/50">
+                    {promptIndex + 1}/{Math.min(phase.session.prompts.length, playSize(form))}
+                  </span>
+                </div>
+              </div>
 
-          <div className="flex flex-col gap-5 border-t border-kin/40 pt-6">
-            <Keyboard nextKey={nextKey} missKey={missKey} />
-            {fingerGuide && <FingerGuide nextKey={nextKey} />}
-          </div>
-        </>
-      )}
+              <div className="flex flex-col gap-5 border-t border-kin/40 pt-6 short:gap-3 short:pt-3">
+                <Keyboard nextKey={nextKey} missKey={missKey} />
+                {fingerGuide && (
+                  <FingerGuide
+                    nextKey={nextKey}
+                    chosen={
+                      kind === "constraint"
+                        ? chosenFingerAt(
+                            progress,
+                            findTargets(splitKanaUnits(prompt.readingKana), themeName),
+                            fingering,
+                          )
+                        : null
+                    }
+                  />
+                )}
+              </div>
+            </>
+          )}
 
-      {imeDetected && (
-        <p className="mt-4 rounded-md border border-shu/50 bg-shu/10 px-4 py-3 text-center text-sm text-kinari">
-          日本語入力のままです。<strong>英数入力に切り替えてください。</strong>
-        </p>
-      )}
+          {imeDetected && (
+            <p className="mt-4 rounded-md border border-shu/50 bg-shu/10 px-4 py-3 text-center text-sm text-kinari short:mt-2 short:py-2">
+              日本語入力のままです。<strong>英数入力に切り替えてください。</strong>
+            </p>
+          )}
 
-      <p className="mt-4 text-center font-mono text-xs text-kinari/40">
-        {romanDisplay(progress).cursor} 打目 ／ ミス {progress.missCount}
-      </p>
+          <p className="mt-4 text-center font-mono text-xs text-kinari/40 short:mt-2">
+            {romanDisplay(progress).cursor} 打目 ／ ミス {progress.missCount}
+          </p>
+        </div>
+      </FitScreen>
     </div>
   );
 }

@@ -27,6 +27,11 @@
 | GET | `/api/me` | 必須 | ユーザー情報・本日の残ニューロン |
 | POST | `/api/rankings` | 必須 | ランキングへの登録（ベストのときだけ書き換え） |
 | POST | `/api/prompt-reports` | 必須 | おかしなお題の報告。**その場で配信から外す** |
+| PUT | `/api/themes/fingering` | 作成者・運営 | 最適化の既定の運指を変える |
+| GET | `/api/fingerings?themeId=` | 不要 | 最適化の運指の投稿一覧（選んだ人数の多い順） |
+| POST | `/api/fingerings` | 必須（ユーザー名あり） | 運指の投稿 |
+| DELETE | `/api/fingerings/[id]` | 投稿者・運営 | 投稿の削除 |
+| PUT | `/api/fingerings/[id]/pick` | 必須 | この投稿を選んだ、の記録（1人1つの最適化につき1票） |
 | GET | `/api/admin/themes` | 管理者 | 管理用一覧 |
 | DELETE | `/api/admin/themes/[id]` | 管理者 | 削除（prompts・KVも連鎖） |
 | GET | `/api/admin/themes/[id]/prompts` | 管理者 | テーマ1つ分のお題一覧（管理用） |
@@ -87,6 +92,65 @@
 
 **最適化練習で、読みに指定の連接を含む語が100語に届かなければ `GENERATION_FAILED`（422）。** 文言は「「を」を含む語彙が足りず、お題を作れません。別の音を指定してください」。**AI を呼ぶ前に断る**のでニューロンを消費しない。語彙は共通語彙リストから選ぶ（`docs/05-generation.md`）。届かないのは拗音の大半（にゃ・ひゃ・みゃ・りゃ など）、を・ぢ・づ・ゔ、2文字以上の連接の一部（でき・ぬの・ぺん）。
 
+**最適化練習では、作成時に運指を決めて送れる（任意）。** その最適化の既定の運指になる（`docs/07-ui.md`「最適化の運指」）。
+
+```jsonc
+{ "kind": "constraint", "name": "き",
+  "fingering": { "units": [{ "roman": "ki", "fingers": ["right-index", "right-middle"] }] } }
+```
+
+- `units` は最適化する音を打鍵の単位に切った並び（`splitKanaUnits`）と同じ長さ。決められない単位（「ん」「っ」）は `null`。指は `"<left|right>-<pinky|ring|middle|index|thumb>"`
+- **音と合わない運指は `VALIDATION_ERROR`**（単位の数が違う・その単位で打てない打ち方・文字数と指の数が違う）。黙って捨てると、作った人が意図した運指が残っていないことに気づけない
+- **標準運指と同じなら保存しない**（`themes.default_fingering_json` は NULL）
+- **既存と一致した（`created: false`）ときは何も変えない。** 最初に作った人の運指のまま
+- テーマ（`kind: "theme"`）に付けても読み捨てる
+- 詳細（`GET /themes/:id` の `theme.defaultFingering`）は保存した JSON をそのまま返す。決めていなければ `null`
+- 作成後に変えるのは `PUT /api/themes/fingering`（下）
+
+### PUT /api/themes/fingering
+
+最適化の既定の運指を後から変える。**変えられるのはその最適化の作成者と運営（`ADMIN_EMAILS`）だけ。**
+
+```jsonc
+// リクエスト。fingering: null で既定を外す（標準運指に戻す）
+{ "themeId": "...",
+  "fingering": { "units": [{ "roman": "ki", "fingers": ["right-index", "right-middle"] }] } }
+
+// レスポンス（POST /api/themes と同じ詳細）
+{ "theme": { "id": "...", "kind": "constraint", "name": "き", "defaultFingering": { ... }, ... } }
+```
+
+- 未ログインは `UNAUTHORIZED`。作成者でも運営でもなければ `FORBIDDEN`。**運営投入分（`created_by` が NULL）は運営だけ**（`null === null` で誰でも通さない）。判定は `lib/api/fingering-guard.ts`
+- ベータ版の非運営は `FORBIDDEN`（最適化練習ごと閉じているのに合わせる）
+- テーマ（`kind: "theme"`）は `VALIDATION_ERROR`。音と合わない運指も `VALIDATION_ERROR`。標準運指と同じなら外す（NULL）
+- **作成者のユーザーIDは公開の詳細に載せない。** 判定のために Hono の内部ルート（`GET /themes/:id/creator`）から引く。このルートは公開APIで中継しない
+
+### 運指の投稿（/api/fingerings）
+
+最適化の運指を、ログインユーザーなら誰でも投稿でき、プレイヤーは一覧から選んで自分の運指に写せる（`docs/07-ui.md`「運指の投稿」）。既定の運指（`PUT /api/themes/fingering`）とは別物。
+
+```jsonc
+// GET /api/fingerings?themeId=... のレスポンス。選んだ人数の多い順、同数なら新しい順。最大50件
+{ "posts": [
+  { "id": "...", "displayName": "しのび", "note": "k を人差し指で取る",
+    "fingering": { "units": [{ "roman": "ki", "fingers": ["right-index", "right-ring"] }] },
+    "pickCount": 3, "createdAt": 1793000000,
+    "mine": false,       // ログイン中の自分の投稿か
+    "deletable": false } // 消せるか（投稿者本人か運営）
+] }
+
+// POST /api/fingerings のリクエスト。note は任意（前後の空白を落として60文字まで）
+{ "themeId": "...", "fingering": { "units": [...] }, "note": "..." }
+```
+
+- **投稿者のユーザーIDは返さない。** `mine` / `deletable` に畳む（判定は Next.js 側。`lib/api/fingering-guard.ts`）。名前は `user.display_name` のいまの値
+- 投稿は**ユーザー名が決まっていることが条件**（`FORBIDDEN`。一覧に名前を出すため。ランキングと同じ）。ベータ版の非運営は `FORBIDDEN`
+- 運指は最適化する音と照らし、合わなければ `VALIDATION_ERROR`。**標準運指そのものは `VALIDATION_ERROR`**（最適化ではない）。テーマ（`kind: "theme"`）にも投稿できない
+- **同じ運指は誰の投稿でも1件だけ**（`VALIDATION_ERROR`「同じ運指が既に投稿されています」）。保存する JSON は検証した運指から、**決めていない単位（null）を標準運指で埋めて**作り直す（`canonicalFingering`）ので、キーの順・余計な項目・null と標準の書き分けで同じ運指がすり抜けない。既定の運指の保存も同じ形にする
+- **1人1つの最適化につき5件まで**（`VALIDATION_ERROR`）。最適化をまたいだ連投は `FINGERING_RATE_LIMIT` で弾く
+- 削除は投稿者本人か運営。消すと、その投稿を選んだ記録も消える
+- **選んだ記録（`/pick`）はログインユーザーだけ。** 匿名は数えない（不変条件10）。運指の適用そのものはクライアントの localStorage で済ませてあり、ここは数えるだけ。選び直せば票が移る
+
 ### POST /api/prompts/regenerate
 
 ```jsonc
@@ -104,7 +168,7 @@
 
 既存と一致した場合は**エラーにせず既存テーマを返す**。クォータも消費しない。
 
-**最適化練習（`kind: 'constraint'`）に `sentence` 以外の形式を指定すると `VALIDATION_ERROR`。** 単語・長文はテーマだけ（`docs/05-generation.md`）。
+**最適化練習（`kind: 'constraint'`）・おまかせ／ごちゃまぜ（`kind: 'mix'`）に `sentence` 以外の形式を指定すると `VALIDATION_ERROR`。** 単語・長文はテーマだけ（`docs/05-generation.md`）。
 
 表示名の正規化は Hono 側で行う。呼び出し側で正規化すると、規則が2か所に分かれて必ずずれる。
 
@@ -274,13 +338,13 @@
 | kind | 許可 |
 |---|---|
 | `'theme'` | 任意の文字列（1〜30文字） |
-| `'constraint'` | **ひらがなのみ**（1〜4文字） |
+| `'constraint'` | **ひらがなのみ**（1〜4文字）。**小書きのかな（ぁぃぅぇぉゃゅょゎゕゖ）で始まる音は弾く**（`constraintCharRejection`。「ゃ」は「きゃ」の一部として打ち、単独では現れない。`docs/05-generation.md`「打鍵の単位で照合する」）。「っ」は弾かない |
 
 ## ②内部API（Hono）
 
 | Method | Path | 説明 |
 |---|---|---|
-| GET | `/themes` | 一覧（kind / sort / limit / cursor）。`name` を渡すと表示名で1件引く |
+| GET | `/themes` | 一覧（kind / sort / limit / cursor）。`name` を渡すと表示名で1件引く。**`kind=mix` は `name` のモード（おまかせ・ごちゃまぜ・超ごちゃまぜ）の行を返し、無ければお題0件で作る。** 知らない名前なら空で、行は作らない。`name` を省くと全モードの行を返す（`docs/05-generation.md`） |
 | GET | `/themes/:id` | 単体取得 |
 | POST | `/sessions/start` | 1プレイ分の取得＋オフセット更新＋補充要否判定 |
 | POST | `/themes` | 作成＋初回10問の同期生成 |
@@ -288,6 +352,13 @@
 | GET | `/usage/:userId` | 当日の `{ count, neurons }`（Next.js側の判定の材料）。**上限値はHono側に持たない** |
 | GET | `/rankings` | テーマ×形式の上位100件（`themeId` / `form` をクエリで受ける）。`displayName` を結合して返す |
 | POST | `/rankings` | 記録の登録。生の値からスコアを計算し、ベストのときだけ書き換え、101位以下を消す。**そのプールを遊んだ記録が無ければ `FORBIDDEN`** |
+| GET | `/themes/:id/creator` | 作成者のユーザーID。既定の運指を変えてよいかの判定用。**公開APIで中継しない** |
+| PUT | `/themes/default-fingering` | 最適化の既定の運指を書き換える（`themeId` は本文） |
+| GET | `/fingerings` | 運指の投稿一覧（`themeId` をクエリで受ける）。投稿者の `userId` を含む（Next.js 側で畳む） |
+| GET | `/fingerings/:id` | 投稿1件の持ち主と最適化。削除の判定用 |
+| POST | `/fingerings` | 投稿。同じ運指・1人5件超えは `VALIDATION_ERROR` |
+| DELETE | `/fingerings/:id` | 投稿の削除 |
+| PUT | `/fingerings/picks` | 選んだ投稿の記録（`userId` × 最適化で1行。上書き） |
 | GET | `/users/themes` | ある利用者が作ったテーマ／含む文字の一覧（`userId` / `limit` / `cursor` をクエリで受ける）。`kind` で絞らず作成順。マイページ用 |
 | GET | `/admin/themes` | 管理用一覧 |
 | DELETE | `/admin/themes/:id` | 削除 |
@@ -372,6 +443,7 @@ Cloudflare の Rate Limiting binding（`GENERATION_RATE_LIMIT`、Next.js Worker 
 | `RANKING_RATE_LIMIT` | `POST /api/rankings` | ユーザーID | 10回 / 60秒 | `RATE_LIMITED`(429) |
 | `REPORT_RATE_LIMIT` | `POST /api/reading-reports` | ユーザーID、匿名は接続元IP | 5回 / 60秒 | `RATE_LIMITED`(429) |
 | `REPORT_RATE_LIMIT` | `POST /api/prompt-reports` | `prompt:<ユーザーID>`（読み違い報告と枠を分ける） | 5回 / 60秒 | `RATE_LIMITED`(429) |
+| `FINGERING_RATE_LIMIT` | `POST /api/fingerings` | ユーザーID | 5回 / 60秒 | `RATE_LIMITED`(429) |
 
 - キーをIPにしないのは、共有回線の背後にいる別のユーザーを巻き添えにする理由が無いため。匿名の `sessions/start` は補充をキックしないので判定自体を行わない
 - **例外は読み違い報告。** 匿名でも送れる書き込み口で、ユーザーIDが無いのでIPで数える。1回で最大15件まとめて送れるため、共有回線でも人の操作で上限に届くことはまず無い

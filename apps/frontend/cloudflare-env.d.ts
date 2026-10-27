@@ -7,6 +7,7 @@ interface __BaseEnv_CloudflareEnv {
 	REFILL_RATE_LIMIT: RateLimit;
 	RANKING_RATE_LIMIT: RateLimit;
 	REPORT_RATE_LIMIT: RateLimit;
+	FINGERING_RATE_LIMIT: RateLimit;
 	ASSETS: Fetcher;
 	BETA_MODE: "true";
 	GOOGLE_CLIENT_ID: string;

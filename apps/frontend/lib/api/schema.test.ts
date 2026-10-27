@@ -1,6 +1,8 @@
 import { describe, expect, test } from "bun:test";
 import {
   adminPromptListQuerySchema,
+  defaultFingeringSchema,
+  fingeringPostSchema,
   displayNameSchema,
   promptReportSchema,
   promptTextSchema,
@@ -14,6 +16,28 @@ import {
 } from "./schema";
 
 describe("themeNameSchema", () => {
+  test("最適化の運指は、音と合うものだけ通す", () => {
+    const ki = { units: [{ roman: "ki", fingers: ["right-index", "right-middle"] }] };
+    expect(
+      themeNameSchema.safeParse({ kind: "constraint", name: "き", fingering: ki }).success,
+    ).toBe(true);
+    // 音の切り方と合わない
+    expect(
+      themeNameSchema.safeParse({ kind: "constraint", name: "きき", fingering: ki }).success,
+    ).toBe(false);
+    // 文字数と指の数が違う
+    const short = { units: [{ roman: "ki", fingers: ["right-index"] }] };
+    expect(
+      themeNameSchema.safeParse({ kind: "constraint", name: "き", fingering: short }).success,
+    ).toBe(false);
+  });
+
+  test("テーマに運指を付けても読み捨てる", () => {
+    const parsed = themeNameSchema.safeParse({ kind: "theme", name: "忍び", fingering: {} });
+    expect(parsed.success).toBe(true);
+    expect(parsed.data).toEqual({ kind: "theme", name: "忍び" });
+  });
+
   test("テーマ名は1〜30文字", () => {
     expect(themeNameSchema.safeParse({ kind: "theme", name: "忍びの心得" }).success).toBe(true);
     expect(themeNameSchema.safeParse({ kind: "theme", name: "あ".repeat(30) }).success).toBe(true);
@@ -33,6 +57,18 @@ describe("themeNameSchema", () => {
   test("最適化する音にひらがな以外は使えない（読み仮名と永久に一致しないため）", () => {
     for (const name of ["ザ", "座", "za", "1", "ー", "あ い"]) {
       expect(themeNameSchema.safeParse({ kind: "constraint", name }).success).toBe(false);
+    }
+  });
+
+  test("小書きのかなで始まる音は弾く（「ゃ」は「きゃ」の一部として打ち、単独では現れない）", () => {
+    for (const name of ["ゃ", "ぃ", "ょう", "ぁい"]) {
+      const parsed = themeNameSchema.safeParse({ kind: "constraint", name });
+      expect(parsed.success).toBe(false);
+      expect(parsed.error?.issues[0]?.message).toContain("小さいかな");
+    }
+    // 前のかなと続けて書けば通る。「っ」は次のかなに付くので弾かない
+    for (const name of ["きゃ", "でぃ", "っ", "かっ"]) {
+      expect(themeNameSchema.safeParse({ kind: "constraint", name }).success).toBe(true);
     }
   });
 
@@ -364,5 +400,47 @@ describe("promptReportSchema", () => {
     ).toBe(true);
     expect(promptReportSchema.safeParse({ promptIds: ids(1), reason: "spam" }).success).toBe(false);
     expect(promptReportSchema.safeParse({ promptIds: ids(1) }).success).toBe(false);
+  });
+});
+
+describe("defaultFingeringSchema", () => {
+  const ki = { units: [{ roman: "ki", fingers: ["right-index", "right-middle"] }] };
+
+  test("運指か null（既定を外す）を受け付ける", () => {
+    expect(defaultFingeringSchema.safeParse({ themeId: "t1", fingering: ki }).success).toBe(true);
+    expect(defaultFingeringSchema.safeParse({ themeId: "t1", fingering: null }).success).toBe(true);
+  });
+
+  test("themeId が無い・運指の形が違うものは弾く", () => {
+    expect(defaultFingeringSchema.safeParse({ fingering: ki }).success).toBe(false);
+    expect(
+      defaultFingeringSchema.safeParse({ themeId: "t1", fingering: { units: "x" } }).success,
+    ).toBe(false);
+  });
+});
+
+describe("fingeringPostSchema", () => {
+  const ki = { units: [{ roman: "ki", fingers: ["right-index", "right-ring"] }] };
+
+  test("説明文は任意で、前後の空白を落として60文字まで", () => {
+    expect(fingeringPostSchema.safeParse({ themeId: "t1", fingering: ki }).success).toBe(true);
+    const parsed = fingeringPostSchema.safeParse({
+      themeId: "t1",
+      fingering: ki,
+      note: "  短く  ",
+    });
+    expect(parsed.data?.note).toBe("短く");
+    expect(
+      fingeringPostSchema.safeParse({ themeId: "t1", fingering: ki, note: "あ".repeat(60) })
+        .success,
+    ).toBe(true);
+    expect(
+      fingeringPostSchema.safeParse({ themeId: "t1", fingering: ki, note: "あ".repeat(61) })
+        .success,
+    ).toBe(false);
+  });
+
+  test("運指が無いものは弾く", () => {
+    expect(fingeringPostSchema.safeParse({ themeId: "t1" }).success).toBe(false);
   });
 });

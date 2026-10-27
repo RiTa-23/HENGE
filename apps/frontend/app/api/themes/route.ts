@@ -5,6 +5,7 @@ import { limitGeneration } from "@/lib/api/rate-limit";
 import { themeListQuerySchema, themeNameSchema } from "@/lib/api/schema";
 import { currentUserId } from "@/lib/api/session";
 import { betaLimitation } from "@/lib/beta/beta";
+import { canonicalFingering, decodeFingering, isDefaultFingering } from "@/lib/practice/fingering";
 
 export const dynamic = "force-dynamic";
 
@@ -62,7 +63,19 @@ export async function POST(request: Request) {
     );
   }
 
-  const res = await client.themes.$post({ json: { ...parsed.data, userId } });
+  // 作成時に決めた運指は、その最適化の既定の運指として保存する。**標準運指と同じなら
+  // 送らない**（保存しておく意味が無く、localStorage の「既定と同じなら消す」と揃える）
+  const { kind, name } = parsed.data;
+  const fingering =
+    parsed.data.kind === "constraint" && parsed.data.fingering !== undefined
+      ? decodeFingering(parsed.data.fingering, name)
+      : null;
+  const defaultFingering =
+    fingering === null || isDefaultFingering(name, fingering)
+      ? undefined
+      : canonicalFingering(name, fingering);
+
+  const res = await client.themes.$post({ json: { kind, name, userId, defaultFingering } });
   const body = await res.json();
   if (!res.ok) return Response.json(body, { status: res.status });
 

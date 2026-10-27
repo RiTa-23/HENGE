@@ -9,7 +9,7 @@ import {
   setGenerationStatus,
 } from "../db/themes";
 import { recordUsage } from "../db/usage";
-import { loadConstraintVocabulary } from "../db/vocabularies";
+import { loadGenerationVocabulary } from "../db/vocabularies";
 import { acceptsPartialBatch, generateBatch } from "../generation/batch";
 import { AiQuotaExceededError, AiUnavailableError } from "../generation/ai";
 import { resolveModel } from "../generation/model";
@@ -24,6 +24,11 @@ interface CreateBody {
   kind: ThemeKind;
   name: string;
   userId: string;
+  /**
+   * 最適化の既定の運指。Next.js 側で音と照らして検証し、標準運指と同じなら外してある。
+   * **既存と一致したときは使わない**（最初に作った人の運指のまま）
+   */
+  defaultFingering?: unknown;
 }
 
 interface RegenerateBody {
@@ -116,7 +121,18 @@ export const generateRoutes = new Hono<{ Bindings: Env }>()
 
     await insertThemeWithPrompts(
       db,
-      { id: themeId, kind: body.kind, name: body.name, normalizedName, createdBy: body.userId },
+      {
+        id: themeId,
+        kind: body.kind,
+        name: body.name,
+        normalizedName,
+        createdBy: body.userId,
+        // テーマ行の列なので、お題と同じバッチに入る（不変条件5）
+        defaultFingeringJson:
+          body.kind === "constraint" && body.defaultFingering != null
+            ? JSON.stringify(body.defaultFingering)
+            : null,
+      },
       result.valid,
       model,
       vocabulary,
@@ -138,12 +154,16 @@ export const generateRoutes = new Hono<{ Bindings: Env }>()
 
     const form: PromptForm = body.form ?? "sentence";
 
-    // **単語・長文はテーマだけ。** 最適化練習（含む文字）には付けない
+    // **単語・長文はテーマだけ。** 最適化練習（含む文字）・おまかせ・ごちゃまぜには付けない
     // （docs/05-generation.md）。URLを手で書けば `kind=constraint&form=long` の
     // プレイ画面まで辿り着けるので、作る口はここで塞ぐ。長文の指示は指定文字を
     // 入れさせないため、通すと偶然含んだ本だけのプールができる
-    if (theme.kind === "constraint" && form !== "sentence") {
-      return fail(c, "VALIDATION_ERROR", "最適化練習で作れるのは短文だけです");
+    if (theme.kind !== "theme" && form !== "sentence") {
+      return fail(
+        c,
+        "VALIDATION_ERROR",
+        `${theme.kind === "mix" ? theme.name : "最適化練習"}で作れるのは短文だけです`,
+      );
     }
 
     // 背景補充が走っている最中なら、二重に生成しない。**ロックは形式ごと**
@@ -164,8 +184,7 @@ export const generateRoutes = new Hono<{ Bindings: Env }>()
         path: "regenerate",
         target: playSize(form),
         existing: await recentPromptTexts(db, theme.id, form, existingContextSize(form)),
-        vocabulary:
-          theme.kind === "constraint" ? await loadConstraintVocabulary(db, theme) : undefined,
+        vocabulary: await loadGenerationVocabulary(db, theme),
         model,
         getReadings: createGetReadings(c.env),
         waitUntil: (promise) => c.executionCtx.waitUntil(promise),

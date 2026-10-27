@@ -353,3 +353,47 @@ describe("missedKeys", () => {
     expect([...progress.missedKeys]).toEqual([["h", 1]]);
   });
 });
+
+/** 表示の打ち方を指定して打ち込む */
+function typeChosen(kana: string, chosen: [number, string][], keys = ""): TypingProgress {
+  let progress = startTyping(buildRomanCandidates(kana), new Map(chosen));
+  for (const key of keys) progress = pressKey(progress, key);
+  return progress;
+}
+
+describe("表示する打ち方の指定（chosen）", () => {
+  test("指定したかなだけ、指定した打ち方で出す", () => {
+    expect(romanDisplay(typeChosen("しし", [[1, "shi"]])).text).toBe("sishi");
+  });
+
+  test("候補に無い打ち方の指定は無視して既定の表示に戻す", () => {
+    expect(romanDisplay(typeChosen("し", [[0, "xi"]])).text).toBe("si");
+  });
+
+  test("指定と違う経路で打ち始めたら、その経路の表示に切り替わる", () => {
+    expect(romanDisplay(typeChosen("し", [[0, "shi"]], "si")).text).toBe("si");
+    expect(romanDisplay(typeChosen("し", [[0, "ci"]], "s")).text).toBe("si");
+  });
+
+  test("指定の経路を打ち進めても表示は保たれる", () => {
+    expect(romanDisplay(typeChosen("し", [[0, "shi"]], "sh"))).toEqual({ text: "shi", cursor: 2 });
+  });
+
+  test("前の「っ」は指定した打ち方の頭文字に揃う", () => {
+    expect(romanDisplay(typeChosen("っち", [[1, "chi"]])).text).toBe("cchi");
+  });
+
+  test("「っ」を別の子音で打っていたら、その子音で始まる候補に戻す", () => {
+    expect(romanDisplay(typeChosen("っち", [[1, "chi"]], "t")).text).toBe("tti");
+  });
+
+  test("苦手キーは画面に出していた打ち方の文字で数える", () => {
+    // `shi` を出しているので、`s` の次に苦無が指すのは `h`
+    const progress = typeChosen("し", [[0, "shi"]], "sx");
+    expect([...progress.missedKeys]).toEqual([["h", 1]]);
+  });
+
+  test("指定しなければ従来どおり", () => {
+    expect(romanDisplay(startTyping(buildRomanCandidates("し"))).text).toBe("si");
+  });
+});

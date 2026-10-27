@@ -51,6 +51,33 @@ export function vocabularyFor(
   return words;
 }
 
+/**
+ * おまかせ・ごちゃまぜで使う語の数。**共通リストの上から（よく使われる順に）この語数だけ使う。**
+ *
+ * どちらも「とりあえず遊びたい人」向けなので、知らない語で文が不自然になるのを
+ * 避ける。共通リストの下のほうは zipf 2.0 前後の珍しい語で、ランダムな2語の組に入ると
+ * 意味のつながらない文になりやすい（最適化の実測で、不自然な文の多くは語彙の側に原因が
+ * あった。docs/05-generation.md）。
+ */
+export const MIX_VOCABULARY_SIZE = 5000;
+
+let mixVocabularyCache: VocabularyWord[] | undefined;
+
+/**
+ * おまかせ・ごちゃまぜの語彙（両方で共通）。共通リストの上から `MIX_VOCABULARY_SIZE` 語。**D1 には保存しない**
+ * （どの連接も含ませないので最適化ごとの語彙と違って選び直す必要が無く、5000語の JSON を
+ * 1行に持つ意味も無い）。分解は Worker の生存中1回だけ。
+ */
+export function mixVocabulary(): VocabularyWord[] {
+  mixVocabularyCache ??= VOCABULARY_TSV.split("\n")
+    .slice(0, MIX_VOCABULARY_SIZE)
+    .map((line) => {
+      const tab = line.indexOf("\t");
+      return { text: line.slice(0, tab), reading: line.slice(tab + 1) };
+    });
+  return mixVocabularyCache;
+}
+
 /** 共通リストの語数。テストで上限を検査する（膨らんでメモリの心配を始めないため） */
 export function vocabularySize(): number {
   return VOCABULARY_TSV.split("\n").length;

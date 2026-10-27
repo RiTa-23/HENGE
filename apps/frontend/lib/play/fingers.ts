@@ -48,8 +48,12 @@ export interface FingerPlan {
   shift: Finger | null;
 }
 
-export function fingerPlan(key: string, shift: boolean): FingerPlan | null {
-  const press = fingerOf(key);
+/**
+ * `chosen` を渡すと、キーの列で決まる指の代わりにそれで押す（最適化の運指。
+ * `lib/practice/fingering.ts`）。Shift はそのときも押す指と反対の手の小指
+ */
+export function fingerPlan(key: string, shift: boolean, chosen?: Finger): FingerPlan | null {
+  const press = chosen ?? fingerOf(key);
   if (press === null) return null;
   return {
     press,

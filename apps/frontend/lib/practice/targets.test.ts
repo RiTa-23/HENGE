@@ -36,18 +36,20 @@ describe("findTargets: 最適化する音の箇所をかな単位で返す", () 
     expect(findTargets(splitKanaUnits("さささ"), "ささ")).toEqual([{ first: 0, last: 1 }]);
   });
 
-  it("音がかなの単位の途中で終わるときは、その単位ごと含める", () => {
-    // しきゃ → し / きゃ。「しき」は「きゃ」の途中で終わる
-    expect(findTargets(splitKanaUnits("しきゃ"), "しき")).toEqual([{ first: 0, last: 1 }]);
+  // 字面では含まれていても、打つときには別のかなになる箇所に的を立てない
+  it("後ろの小書きと1単位になるかなには的を立てない（でぃ は dhi、きゃ は kya）", () => {
+    expect(findTargets(splitKanaUnits("でぃすくで"), "で")).toEqual([{ first: 3, last: 3 }]);
+    expect(findTargets(splitKanaUnits("きゃくのきもち"), "き")).toEqual([{ first: 3, last: 3 }]);
+    // し / きゃ。「しき」の「き」は「きゃ」の一部
+    expect(findTargets(splitKanaUnits("しきゃ"), "しき")).toEqual([]);
   });
 
-  it("音がかなの単位の途中から始まるときも、その単位ごと含める", () => {
-    expect(findTargets(splitKanaUnits("きゃく"), "ゃ")).toEqual([{ first: 0, last: 0 }]);
+  it("前のかなと1単位になる小書きには的を立てない", () => {
+    expect(findTargets(splitKanaUnits("きゃく"), "ゃ")).toEqual([]);
   });
 
-  it("隣り合う箇所が同じ単位を共有したら1つにまとめる", () => {
-    // しゃ / しゃ / しゃ。「ゃし」は1つ目が単位0〜1、2つ目が単位1〜2で、単位1を共有する
-    expect(findTargets(["しゃ", "しゃ", "しゃ"], "ゃし")).toEqual([{ first: 0, last: 2 }]);
+  it("拗音そのものを指定すれば、その単位に的を立てる", () => {
+    expect(findTargets(splitKanaUnits("しきゃく"), "きゃ")).toEqual([{ first: 1, last: 1 }]);
   });
 
   it("分解された濁点でも一致する（NFC に揃える）", () => {

@@ -1,4 +1,4 @@
-import type { PromptForm } from "@henge/shared";
+import type { PromptForm, ThemeKind } from "@henge/shared";
 import { FormMark } from "@/components/FormMark";
 import { formLabel } from "@/lib/ui/kind";
 
@@ -36,14 +36,14 @@ export function DifficultBadge({
 
 /** テーマの形式ごとの印を、困難な形式の配列に畳む */
 export function difficultForms(theme: {
-  kind: "theme" | "constraint";
+  kind: ThemeKind;
   generationStatus: "ok" | "difficult";
   wordGenerationStatus: "ok" | "difficult";
   longGenerationStatus: "ok" | "difficult";
 }): PromptForm[] {
   const forms: PromptForm[] = [];
   if (theme.generationStatus === "difficult") forms.push("sentence");
-  // 最適化練習に単語・長文は無いので、その印は見ない
+  // 最適化練習・ごちゃまぜに単語・長文は無いので、その印は見ない
   if (theme.kind === "theme" && theme.wordGenerationStatus === "difficult") forms.push("word");
   if (theme.kind === "theme" && theme.longGenerationStatus === "difficult") forms.push("long");
   return forms;

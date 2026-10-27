@@ -9,13 +9,14 @@ D1（SQLite）+ Drizzle ORM。Better Auth管理下のテーブル（`user` / `se
 | カラム | 型 | 制約 | 説明 |
 |---|---|---|---|
 | `id` | TEXT | PK | UUID |
-| `kind` | TEXT | NOT NULL | `'theme'` / `'constraint'` |
+| `kind` | TEXT | NOT NULL | `'theme'` / `'constraint'` / `'mix'`（おまかせ・ごちゃまぜ・超ごちゃまぜ。**モードごとに1行だけ**。`docs/05-generation.md`） |
 | `name` | TEXT | NOT NULL | 表示名（入力されたまま） |
 | `normalized_name` | TEXT | NOT NULL | 重複判定用の正規化キー |
 | `created_by` | TEXT | NULL可, FK→`user.id` ON DELETE SET NULL | `user.id`。運営投入分はNULL。作成者が退会してもテーマは公開コンテンツとして残すためCASCADEにしない |
 | `generation_status` | TEXT | NOT NULL, default `'ok'` | `'ok'` / `'difficult'`。**短文プールの分** |
 | `word_generation_status` | TEXT | NOT NULL, default `'ok'` | 同上。**単語プールの分**。1本にまとめない（単語が作れないテーマで短文の補充まで止まる） |
 | `long_generation_status` | TEXT | NOT NULL, default `'ok'` | 同上。**長文プールの分** |
+| `default_fingering_json` | TEXT | NULL可 | 最適化（`'constraint'`）の既定の運指。作成者が作成時に決め、作成者と運営が後から変えられる（`docs/07-ui.md`「最適化の運指」・`docs/04-api.md` の `PUT /api/themes/fingering`）。形は localStorage の `henge:fingering:<音>` と同じ JSON。標準運指のまま・テーマなら NULL。**テーマ行の列なので、お題10問と同じバッチに入る**（不変条件5） |
 | `total_play_count` | INTEGER | NOT NULL, default 0 | 人気順ソート用。プレイ開始のたび+1 |
 | `created_at` | INTEGER | NOT NULL | unixepoch |
 
@@ -37,6 +38,7 @@ CREATE INDEX themes_created_by ON themes (created_by, created_at DESC);
 |---|---|
 | `'theme'` | NFKC正規化 → 前後の空白除去 → 連続空白を1つに → 英字を小文字化 |
 | `'constraint'` | NFC正規化のみ |
+| `'mix'` | NFC正規化のみ（名前は `MIX_MODES` の「おまかせ」「ごちゃまぜ」「超ごちゃまぜ」だけ） |
 
 **含む文字はひらがなのみ受け付ける。** カタカナ・漢字・英数字・記号・空白は入力段階で拒否する。判定対象が読み仮名（ひらがな）のため、それ以外を指定しても永久に一致しない。
 
@@ -93,7 +95,7 @@ CREATE INDEX prompts_reported ON prompts (reported_at DESC) WHERE reported_at IS
 - **採番（`MAX + 1`）と重複回避の文脈（`recentPromptTexts`）は外したお題も含める。** 採番から外すと既存の番号と衝突し、文脈から外すと同じおかしな文がまた作られうる
 - 報告中のお題をもう一度報告しても書き換えない（最初の報告者と理由を残す）
 - 管理画面の報告キューは `prompts_reported`（報告中の行だけの部分インデックス）で引く。全お題を走査しない
-- **`reported_by` の ON DELETE SET NULL はマイグレーション（0009）に手で足している。** drizzle-kit は `ADD COLUMN` の外部キーから ON DELETE を落とす。無いと報告者を退会させられない
+- **`reported_by` の ON DELETE SET NULL はマイグレーション（0011）に手で足している。** drizzle-kit は `ADD COLUMN` の外部キーから ON DELETE を落とす。無いと報告者を退会させられない
 
 **テーマ行はお題10問と同じバッチで挿入する。** テーマ行を先に作ると、生成失敗時にお題ゼロのテーマが公開一覧に残り、クリックしても何も遊べない状態になる。
 
@@ -180,9 +182,48 @@ MVPでは日次上限のみ（**500ニューロン/日**）。月次上限は設
 | `prompts` | FKのCASCADEで自動削除 |
 | `constraint_vocabularies` | 同上 |
 | `user_theme_progress` / `rankings` | 同上 |
+| `fingering_posts` / `fingering_picks` | 同上 |
 | **KVのキャッシュ・ロック** | **自動では消えない。削除処理で明示的に削除する**（ロックは**形式ぶんすべて**） |
 
 D1のCASCADEはD1の中でしか効かない。KVを消し忘れると「削除したテーマがキャッシュ経由で復活したように見える」不具合になる。
+
+## fingering_posts
+
+最適化の運指の投稿。**ログインしていてユーザー名を決めた人なら誰でも投稿できる**（`docs/04-api.md`「運指の投稿」）。既定の運指（`themes.default_fingering_json`）とは別物で、プレイヤーは一覧から選んで自分の運指（localStorage）に写す。
+
+| カラム | 型 | 制約 | 説明 |
+|---|---|---|---|
+| `id` | TEXT | PK | UUID |
+| `theme_id` | TEXT | NOT NULL, FK→`themes.id` ON DELETE CASCADE | 最適化（`kind: 'constraint'`）だけ |
+| `user_id` | TEXT | NOT NULL, FK→`user.id` ON DELETE CASCADE | 投稿者。退会したら投稿ごと消える |
+| `fingering_json` | TEXT | NOT NULL | 運指。形は `default_fingering_json` と同じ。**検証した運指から、決めていない単位を標準で埋めて作り直した JSON**（`canonicalFingering`）なので、同じ運指なら同じ文字列 |
+| `note` | TEXT | NULL可 | 任意の説明文（60文字まで） |
+| `created_at` | INTEGER | NOT NULL | unixepoch |
+
+```sql
+CREATE UNIQUE INDEX fingering_posts_theme_fingering ON fingering_posts (theme_id, fingering_json);
+CREATE INDEX fingering_posts_user_theme ON fingering_posts (user_id, theme_id);
+```
+
+一意制約で、**同じ運指は誰の投稿でも1件だけ**にする（同時に投稿されても2件にならない）。2本目は1人あたりの投稿数（5件まで）を数えるため。名前は持たず、表示時に `user.display_name` を結合する（ランキングと同じ）。
+
+## fingering_picks
+
+投稿の「選んだ人」。**ログインユーザーが、その最適化について最後に選んだ投稿**を1人1行で持つ。一覧の並び順（選んだ人数の多い順）に使う。いいね・お気に入りではない（MVP のスコープ外）。匿名は数えない（不変条件10）。
+
+| カラム | 型 | 説明 |
+|---|---|---|
+| `user_id` | TEXT | FK→`user.id` ON DELETE CASCADE |
+| `theme_id` | TEXT | FK→`themes.id` ON DELETE CASCADE |
+| `post_id` | TEXT | FK→`fingering_posts.id` ON DELETE CASCADE。投稿を消せば票も消える |
+| `updated_at` | INTEGER | unixepoch |
+
+```sql
+PRIMARY KEY (user_id, theme_id)
+CREATE INDEX fingering_picks_post ON fingering_picks (post_id);
+```
+
+**主キーに `post_id` を含めない。** 含めると1人が同じ最適化の投稿を全部選べて、人数が「選んでいる人」ではなく「押した回数」になる。別の投稿を選び直せば行が上書きされ、票が移る。
 
 ## rankings
 

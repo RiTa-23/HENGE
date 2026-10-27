@@ -15,8 +15,9 @@ import {
  * どちらを開くか決まらない。URLの kind を落とすと、静かに別のプールを開く。
  */
 describe("parseThemeKind", () => {
-  it("constraint だけを含むモードとして受け取る", () => {
+  it("constraint と mix をそのモードとして受け取る", () => {
     expect(parseThemeKind("constraint")).toBe("constraint");
+    expect(parseThemeKind("mix")).toBe("mix");
   });
 
   it.each([undefined, "", "theme", "Constraint", "practice", "../constraint"])(
@@ -46,6 +47,20 @@ describe("detailHref", () => {
   it("テーマは /themes/[name]、最適化する音は /practice/[char]", () => {
     expect(detailHref("theme", "忍びの心得")).toBe(`/themes/${encodeURIComponent("忍びの心得")}`);
     expect(detailHref("constraint", "ざ")).toBe(`/practice/${encodeURIComponent("ざ")}`);
+  });
+});
+
+describe("おまかせ・ごちゃまぜのURL", () => {
+  it("プレイは kind=mix を付ける", () => {
+    expect(playHref("mix", "おまかせ")).toBe(`/play/${encodeURIComponent("おまかせ")}?kind=mix`);
+  });
+
+  it("詳細は /mix/[name]、一覧はお題一覧", () => {
+    const segment = encodeURIComponent("ごちゃまぜ");
+    expect(detailHref("mix", "ごちゃまぜ")).toBe(`/mix/${segment}`);
+    expect(rankingHref("mix", "ごちゃまぜ")).toBe(`/mix/${segment}#ranking`);
+    expect(listHref("mix")).toBe("/themes");
+    expect(kindLabel("mix")).toBe("このモード");
   });
 });
 

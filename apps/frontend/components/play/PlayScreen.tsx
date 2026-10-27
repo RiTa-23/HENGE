@@ -217,7 +217,7 @@ export function PlayScreen({
    */
   defaultFingering?: Fingering | null;
 }) {
-  const { data: authSession } = authClient.useSession();
+  const { data: authSession, isPending: authPending } = authClient.useSession();
   const backToList = listHref(kind);
   /**
    * いま遊んでいたテーマの詳細。**プレイ画面からの離脱先はここにする。**
@@ -738,6 +738,27 @@ export function PlayScreen({
               <p className="mt-4 text-xs leading-relaxed text-kinari/40">
                 押すまでお題は消費されません。
               </p>
+              {/* **遊ぶ前に知らせる。** 結果画面で初めて知ると、遊び直すことになる。
+              結果画面からログインしても記録は引き継げるが（PendingRankingRegister）、
+              ここでログインしておけば手間が無い。確かめている間は出さない（ログイン中の人に
+              一瞬だけ見える） */}
+              {!authPending && authSession === null && (
+                <p className="mt-2 text-xs leading-relaxed text-kinari/40">
+                  ログインしていないと、記録はランキングに登録できません。
+                  <button
+                    type="button"
+                    onClick={() =>
+                      void authClient.signIn.social({
+                        provider: "google",
+                        callbackURL: `${location.pathname}${location.search}`,
+                      })
+                    }
+                    className="ml-2 tracking-widest text-kin hover:underline underline-offset-4"
+                  >
+                    Googleでログイン
+                  </button>
+                </p>
+              )}
 
               {/* 開始前は縦に並べて幅を揃える。横に並べると枠の幅に収まらず2つと1つに割れ、
               長さの違うスイッチが段違いに並ぶ */}

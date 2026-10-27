@@ -4,7 +4,6 @@ import { errorResponse } from "@/lib/api/error";
 import { denyIfCannotEditFingering } from "@/lib/api/fingering-guard";
 import { defaultFingeringSchema } from "@/lib/api/schema";
 import { currentSession } from "@/lib/api/session";
-import { betaLimitation } from "@/lib/beta/beta";
 import { canonicalFingering, decodeFingering, isDefaultFingering } from "@/lib/practice/fingering";
 
 export const dynamic = "force-dynamic";
@@ -18,11 +17,6 @@ export const dynamic = "force-dynamic";
 export async function PUT(request: Request) {
   const session = await currentSession(request);
   if (session === null) return errorResponse("UNAUTHORIZED");
-
-  // **ベータ版では最適化練習ごと閉じている**ので、非運営は変えられない（作成と同じ扱い）
-  if (await betaLimitation(request)) {
-    return errorResponse("FORBIDDEN", "最適化練習は調整中です");
-  }
 
   const parsed = defaultFingeringSchema.safeParse(await request.json());
   if (!parsed.success) return errorResponse("VALIDATION_ERROR");

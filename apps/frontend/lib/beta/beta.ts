@@ -1,6 +1,5 @@
 import { isAdminEmail } from "@henge/shared";
 import { getCloudflareContext } from "@opennextjs/cloudflare";
-import type { Metadata } from "next";
 import { currentSession } from "@/lib/api/session";
 
 /**
@@ -10,7 +9,8 @@ import { currentSession } from "@/lib/api/session";
  * `"true"` の間だけベータ版になる。外す・別の値にして再デプロイすれば、
  * コードの変更なしで公開版（現在の状態）に戻る。
  *
- * ベータ版で制限するのは「新しいお題の生成」と「最適化練習の公開」。
+ * ベータ版で制限するのは「テーマの新規生成」だけ。最適化練習は公開済み
+ * （作成・運指の投稿・既定の運指の変更を含め、誰でも使える）。
  * **既存プールのプレイと補充生成は制限しない**（在庫が尽きたテーマが
  * ベータ版利用者にも遊べる状態を保つため）。
  *
@@ -22,20 +22,6 @@ import { currentSession } from "@/lib/api/session";
 /** env の値の解釈はここだけ。**`"true"` のときだけ有効**（他の値・未設定は公開版） */
 export function isBetaMode(betaMode: string | undefined): boolean {
   return betaMode === "true";
-}
-
-/**
- * ベータ版で調整中のページの metadata。**調整中の間だけ検索エンジンに見せない。**
- *
- * 着地ページ（`/practice` 系）をベータの間にインデックスさせると、調整中の画面が
- * 検索結果に出てしまう。公開版に戻せば各ページの通常の metadata に戻る。
- *
- * リテラルをここに置くのは `lib/ui/routing.test.ts` のため。インデックス対象の
- * ページに生の noindex が現れないことを機械的に検査しており、ページ側は
- * この関数を返すだけで済む。
- */
-export function adjustingMetadata(): Metadata {
-  return { robots: { index: false, follow: false } };
 }
 
 /**

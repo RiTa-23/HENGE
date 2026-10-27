@@ -1,8 +1,6 @@
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
-import { AdjustingView } from "@/components/Adjusting";
 import { PlayScreen } from "@/components/play/PlayScreen";
-import { betaLimitedPage } from "@/lib/api/admin-page";
 import { decodePageParam, findTheme } from "@/lib/api/themes";
 import { betaBadgeVisible } from "@/lib/beta/beta";
 import { siteUrl } from "@/lib/og";
@@ -38,11 +36,6 @@ export default async function PlayPage({
   const themeKind = parseThemeKind(kind);
   // 未知の値は短文に倒す。**形式ごとにプールもオフセットも別**（docs/03-data-model.md）
   const playForm = parsePlayForm(form);
-  // **ベータ版では最適化練習ごと公開しない。** テーマモードのプレイは制限しない
-  // （運営が生成したお題をそのまま遊べる）
-  if (themeKind === "constraint" && (await betaLimitedPage())) {
-    return <AdjustingView what="最適化練習" />;
-  }
 
   const found = await findTheme(themeKind, name);
   if (found === null) notFound();

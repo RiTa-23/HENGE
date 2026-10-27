@@ -1,6 +1,5 @@
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
-import { AdjustingView } from "@/components/Adjusting";
 import { DefaultFingeringEditor } from "@/components/DefaultFingeringEditor";
 import { DetailMato } from "@/components/DetailScroll";
 import { FingeringPanel } from "@/components/FingeringPanel";
@@ -9,13 +8,11 @@ import { PracticeMark } from "@/components/ModeMark";
 import { SealButton } from "@/components/SealButton";
 import { SiteFooter } from "@/components/SiteFooter";
 import { SiteHeader } from "@/components/SiteHeader";
-import { betaLimitedPage } from "@/lib/api/admin-page";
 import { defaultFingeringEditable } from "@/lib/api/fingering";
 import { ogFields, pageTitle } from "@/lib/og";
 import { listRankings } from "@/lib/api/rankings";
 import { decodePageParam, findTheme } from "@/lib/api/themes";
 import { decodeFingering } from "@/lib/practice/fingering";
-import { adjustingMetadata } from "@/lib/beta/beta";
 import { playHref } from "@/lib/ui/kind";
 
 /** 検索エンジンからの着地ページ。「ざ タイピング 練習」のような需要を拾う */
@@ -24,10 +21,6 @@ export async function generateMetadata({
 }: {
   params: Promise<{ char: string }>;
 }): Promise<Metadata> {
-  // **ベータ版では調整中**。着地ページの体裁を保てないため、
-  // 調整中の間だけ検索エンジンに見せない
-  if (await betaLimitedPage()) return adjustingMetadata();
-
   const char = decodePageParam((await params).char);
   if (char === null) return {};
   const title = pageTitle(`「${char}」のタイピング最適化練習`);
@@ -49,9 +42,6 @@ export default async function PracticeDetailPage({
 }: {
   params: Promise<{ char: string }>;
 }) {
-  // **ベータ版では運営アカウント以外に調整中の画面を出す**
-  if (await betaLimitedPage()) return <AdjustingView what="最適化練習" />;
-
   // ページのルートパラメータはエンコードされたまま渡ってくる（Route Handler とは違う）
   const char = decodePageParam((await params).char);
   if (char === null) notFound();

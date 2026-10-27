@@ -49,7 +49,7 @@ const SINGLE: Record<string, string[]> = {
   け: ["ke"],
   こ: ["ko"],
   さ: ["sa"],
-  し: ["si", "shi", "ci"],
+  し: ["si", "shi"],
   す: ["su"],
   せ: ["se"],
   そ: ["so"],

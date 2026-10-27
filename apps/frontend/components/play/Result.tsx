@@ -179,6 +179,9 @@ export function Result({
             />
 
             <RankingRegister
+              themeId={themeId}
+              form={form}
+              score={etypingScore(stats)}
               ticket={ticket}
               playLog={playLog}
               rankingHref={rankingHref(kind, themeName, form)}

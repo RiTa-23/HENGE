@@ -26,6 +26,7 @@ import { Keyboard, type NextKey, toNextKey } from "./Keyboard";
 import { Loading } from "./Loading";
 import { LongScroll } from "./LongScroll";
 import { MatoBoard } from "./MatoBoard";
+import { PendingRankingRegister } from "./PendingRankingRegister";
 import { ProgressDots } from "./ProgressDots";
 import { ShurikenStrike, SmokePuff } from "./PromptChange";
 import { Result, type PlayStats } from "./Result";
@@ -62,7 +63,7 @@ import {
   playStrike,
   primeAudio,
 } from "@/lib/play/sound";
-import { detailHref, formColor, formLabel, kindLabel, listHref } from "@/lib/ui/kind";
+import { detailHref, formColor, formLabel, kindLabel, listHref, rankingHref } from "@/lib/ui/kind";
 import { isPlayStartSpace, TEXT_ENTRY_SELECTOR } from "@/lib/ui/shortcut";
 
 interface Prompt {
@@ -770,6 +771,14 @@ export function PlayScreen({
                 </details>
               )}
             </div>
+
+            {/* ログイン前に遊んだ記録。結果画面からログインして戻ってきたときだけ出る。
+            枠の中は「開始」に関することだけなので、枠の外に置く */}
+            <PendingRankingRegister
+              themeId={themeId}
+              form={form}
+              rankingHref={rankingHref(kind, themeName, form)}
+            />
 
             {/* 離脱の導線は枠の外に置く。枠の中は「開始」に関することだけ。
             詳細へ戻るは結果画面と同じ形（枠の下・一覧の下）に揃える */}

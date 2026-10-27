@@ -52,6 +52,11 @@ export default async function PracticePage({
           <strong className="text-kinari">読み仮名</strong>
           に対して行うので、表記に出ていなくても構いません（「座禅」は読み「ざぜん」に「ざ」を含みます）。
         </p>
+        <p className="mt-3 text-sm">
+          <a href="/practice/about" className="text-kin hover:text-kinari">
+            最適化とは？ — はじめての人へ
+          </a>
+        </p>
 
         <div className="mt-8">
           <ModeTabs current="constraint" />

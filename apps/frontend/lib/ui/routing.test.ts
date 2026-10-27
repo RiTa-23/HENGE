@@ -18,6 +18,7 @@ const PAGES: { route: string; file: string; noindex: boolean }[] = [
   { route: "/themes", file: "themes/page.tsx", noindex: false },
   { route: "/themes/[name]", file: "themes/[name]/page.tsx", noindex: false },
   { route: "/practice", file: "practice/page.tsx", noindex: false },
+  { route: "/practice/about", file: "practice/about/page.tsx", noindex: false },
   { route: "/practice/[char]", file: "practice/[char]/page.tsx", noindex: false },
   { route: "/play/[theme]", file: "play/[theme]/page.tsx", noindex: true },
   { route: "/themes/new", file: "themes/new/page.tsx", noindex: true },

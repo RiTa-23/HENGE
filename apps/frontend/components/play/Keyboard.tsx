@@ -105,16 +105,32 @@ interface KeyboardProps {
   missKey?: string | null;
 }
 
+/**
+ * 段ごとの字下げ。**実物と同じく、下の段ほど半キーずつ右へずらす**（`1` → `Q` → `A` → `Z` が
+ * 斜めに並ぶ）。キーの間隔は 44px ＋ 隙間 6px ＝ 50px なので、半キーは 25px。
+ *
+ * **段を中央揃えにしない。** 最下段は左右に幅の広い Shift を持つので、中央に揃えると
+ * 段全体が左へ寄り、`Z` の位置に `X` が来る。最下段は字下げせず、左の Shift で
+ * `Z` を 75px の位置まで押し出す（`SHIFT_WIDTH`）。
+ */
+const ROW_INDENT = ["", "pl-[25px]", "pl-[50px]", ""];
+
+/** 左右の Shift の幅。最下段の左端から `Z` の手前（75px − 隙間 6px）まで */
+const SHIFT_WIDTH = "w-[69px]";
+
 export function Keyboard({ nextKey, missKey = null }: KeyboardProps) {
   return (
-    <div className="flex flex-col items-center gap-1.5">
+    <div className="mx-auto flex w-fit flex-col gap-1.5">
       {ROWS.map((row, rowIndex) => (
-        <div key={rowIndex} className="flex gap-1.5">
+        <div key={rowIndex} className={`flex gap-1.5 ${ROW_INDENT[rowIndex] ?? ""}`}>
           {row.map((key) => {
             const isShift = SHIFT_SIDE[key] !== undefined;
             const state = keyState(key, nextKey, missKey);
             return (
-              <span key={key} className={isShift ? `${keyClass(state)} w-20` : keyClass(state)}>
+              <span
+                key={key}
+                className={isShift ? `${keyClass(state)} ${SHIFT_WIDTH}` : keyClass(state)}
+              >
                 {isShift ? "Shift" : key}
               </span>
             );

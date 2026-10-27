@@ -23,7 +23,7 @@ export interface FingeringPost {
 }
 
 /**
- * 最適化の運指の投稿一覧。**選んだ人数の多い順**、同数なら新しい順。
+ * 最適化の運指の投稿一覧。**選んだ人数の多い順**、同数なら新しい順（同じ秒なら後に作った方）。
  *
  * 人数は `fingering_picks` を投稿ごとに数える（1人1つの最適化につき1票）。
  */
@@ -44,7 +44,9 @@ export async function listFingeringPosts(db: Db, themeId: string): Promise<Finge
     .leftJoin(fingeringPicks, eq(fingeringPicks.postId, fingeringPosts.id))
     .where(eq(fingeringPosts.themeId, themeId))
     .groupBy(fingeringPosts.id)
-    .orderBy(desc(pickCount), desc(fingeringPosts.createdAt))
+    // **作成時刻は秒単位なので、同じ秒の投稿は同点になる。** 同点の並びを SQLite 任せにすると
+    // 毎回変わりうる（ID の UUID 順に流れる）。挿入順の rowid で「後に作った方が先」に揃える
+    .orderBy(desc(pickCount), desc(fingeringPosts.createdAt), desc(sql`${fingeringPosts}.rowid`))
     .limit(FINGERING_LIST_LIMIT);
   return rows.map((row) => ({
     id: row.id,

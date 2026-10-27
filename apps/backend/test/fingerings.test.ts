@@ -122,6 +122,26 @@ describe("投稿を選ぶ（選んだ人数の多い順）", () => {
     expect(posts.map((p) => p.pickCount)).toEqual([1, 1]);
   });
 
+  it("同じ秒に作った投稿も、後に作った方を先に出す（並びを毎回同じにする）", async () => {
+    // created_at は秒単位なので、続けて投稿すると同じ値になる。ID（UUID）の並びと
+    // 作った順が逆になる組で、作成時刻の同点が ID 順に流れないことを確かめる
+    const createdAt = 1_700_000_000;
+    for (const [id, finger] of [
+      ["p-a", "right-ring"],
+      ["p-z", "right-pinky"],
+    ] as const) {
+      await db.insert(fingeringPosts).values({
+        id,
+        themeId: "c1",
+        userId: "u1",
+        fingeringJson: JSON.stringify(ki(finger)),
+        createdAt,
+      });
+    }
+
+    expect((await list()).map((p) => p.id)).toEqual(["p-z", "p-a"]);
+  });
+
   it("無い投稿は NOT_FOUND", async () => {
     expect((await call("PUT", "/fingerings/picks", { userId: "u1", postId: "none" })).status).toBe(
       404,

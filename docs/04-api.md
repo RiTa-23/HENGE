@@ -126,7 +126,7 @@
 最適化の運指を、ログインユーザーなら誰でも投稿でき、プレイヤーは一覧から選んで自分の運指に写せる（`docs/07-ui.md`「運指の投稿」）。既定の運指（`PUT /api/themes/fingering`）とは別物。
 
 ```jsonc
-// GET /api/fingerings?themeId=... のレスポンス。選んだ人数の多い順、同数なら新しい順。最大50件
+// GET /api/fingerings?themeId=... のレスポンス。選んだ人数の多い順、同数なら新しい順（同じ秒なら後に作った方）。最大50件
 { "posts": [
   { "id": "...", "displayName": "しのび", "note": "k を人差し指で取る",
     "fingering": { "units": [{ "roman": "ki", "fingers": ["right-index", "right-ring"] }] },

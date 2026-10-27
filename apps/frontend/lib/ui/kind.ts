@@ -103,3 +103,13 @@ export function kindLabel(kind: ThemeKind): string {
   if (kind === "mix") return "このモード";
   return kind === "constraint" ? "この音" : "このテーマ";
 }
+
+/**
+ * 管理画面での種別の呼び名。**`kindLabel` は利用者向け**（「このテーマ」のように
+ * 画面の中のものを指す言い方）なので、一覧に並べると読みにくい。こちらは種別名そのもの
+ */
+export const ADMIN_KIND_LABELS: Record<ThemeKind, string> = {
+  theme: "テーマ",
+  constraint: "最適化",
+  mix: "ごちゃまぜ",
+};

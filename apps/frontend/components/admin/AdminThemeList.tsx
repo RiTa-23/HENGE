@@ -4,12 +4,7 @@ import { isApiError, type ThemeKind } from "@henge/shared";
 import Link from "next/link";
 import { DifficultBadge, difficultForms } from "@/components/DifficultBadge";
 import { useCallback, useEffect, useState } from "react";
-
-const KIND_LABELS: Record<ThemeKind, string> = {
-  theme: "テーマ",
-  constraint: "最適化",
-  mix: "ごちゃまぜ",
-};
+import { ADMIN_KIND_LABELS } from "@/lib/ui/kind";
 
 interface AdminTheme {
   id: string;
@@ -104,7 +99,7 @@ export function AdminThemeList() {
                 <DifficultBadge forms={difficultForms(theme)} />
               </span>
             </td>
-            <td className="py-3 text-kinari/60">{KIND_LABELS[theme.kind]}</td>
+            <td className="py-3 text-kinari/60">{ADMIN_KIND_LABELS[theme.kind]}</td>
             <td className="py-3 text-right font-mono text-kinari/70">
               {theme.promptCounts.sentence}
             </td>

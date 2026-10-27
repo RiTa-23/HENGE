@@ -9,7 +9,7 @@ import {
 } from "@henge/shared";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { readJsonBody } from "@/lib/api/json";
-import { formLabel, kindLabel } from "@/lib/ui/kind";
+import { ADMIN_KIND_LABELS, formLabel } from "@/lib/ui/kind";
 
 interface ReportedPrompt {
   id: string;
@@ -122,7 +122,7 @@ export function AdminPromptReportList() {
                   href={`/admin/themes/${encodeURIComponent(p.themeId)}`}
                   className="ml-auto font-gothic text-kinari/60 hover:text-kinari"
                 >
-                  {kindLabel(p.themeKind)}「{p.themeName}」・{formLabel(p.form)}
+                  {ADMIN_KIND_LABELS[p.themeKind]}「{p.themeName}」・{formLabel(p.form)}
                 </a>
               </div>
               <p className="mt-2 font-mincho text-base text-kinari">{p.text}</p>

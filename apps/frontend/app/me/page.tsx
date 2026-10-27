@@ -6,6 +6,7 @@ import { MyDisplayName } from "@/components/MyDisplayName";
 import { SiteFooter } from "@/components/SiteFooter";
 import { SiteHeader } from "@/components/SiteHeader";
 import { ThemeCard } from "@/components/ThemeCard";
+import { listMyFavorites } from "@/lib/api/favorites";
 import { dailyNeurons, listMyThemes } from "@/lib/api/me";
 import { currentSession } from "@/lib/api/session";
 import { pageTitle } from "@/lib/og";
@@ -23,6 +24,7 @@ export const dynamic = "force-dynamic";
  *
  * - ユーザー名（表示名）の編集
  * - 本日の残りニューロン。生成の直後にしか出ない値を、いつでも確かめられるようにする
+ * - お気に入り。詳細ページで登録したテーマ・最適化する音へ、一覧から探し直さずに飛べるようにする
  * - 作ったお題。一覧から探し直さずに自分のものへ戻れるようにする
  *
  * SSRで Service Bindings を直接使う（`/themes` と同じ）。セッションは Route Handler と
@@ -44,8 +46,9 @@ export default async function MyPage() {
     );
   }
 
-  const [neurons, themes] = await Promise.all([
+  const [neurons, favorites, themes] = await Promise.all([
     dailyNeurons(session.user.id),
+    listMyFavorites(session.user.id),
     listMyThemes(session.user.id),
   ]);
 
@@ -96,6 +99,31 @@ export default async function MyPage() {
           </section>
         </div>
 
+        {/* 作ったお題より上に置く。よく打つものへ飛ぶための場所なので、すぐ目に入る位置にする */}
+        <section className="mt-16">
+          <h2 className="font-mincho text-xl tracking-wide text-kinari">お気に入り</h2>
+          <p className="mt-2 text-sm leading-loose text-kinari/60">
+            お題の詳細ページで登録したテーマと最適化する音。登録の新しい順に並びます。
+          </p>
+          {favorites.length === 0 ? (
+            <p className="mt-8 text-kinari/50">
+              まだありません。お題の詳細ページの「お気に入り」から登録できます。
+              <a
+                href="/themes"
+                className="ml-2 text-kinari/70 underline-offset-4 hover:text-kinari hover:underline"
+              >
+                お題を探す →
+              </a>
+            </p>
+          ) : (
+            <div className="card-grid--mixed mt-8 grid gap-x-5 gap-y-8 sm:grid-cols-2 lg:grid-cols-3">
+              {favorites.map((theme) => (
+                <ThemeCard key={theme.id} theme={theme} />
+              ))}
+            </div>
+          )}
+        </section>
+
         <section className="mt-16">
           <h2 className="font-mincho text-xl tracking-wide text-kinari">作ったお題</h2>
           <p className="mt-2 text-sm leading-loose text-kinari/60">
@@ -112,7 +140,7 @@ export default async function MyPage() {
               </a>
             </p>
           ) : (
-            <div className="mt-8 grid gap-x-5 gap-y-8 sm:grid-cols-2 lg:grid-cols-3">
+            <div className="card-grid--mixed mt-8 grid gap-x-5 gap-y-8 sm:grid-cols-2 lg:grid-cols-3">
               {themes.map((theme) => (
                 <ThemeCard key={theme.id} theme={theme} />
               ))}

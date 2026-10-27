@@ -12,6 +12,8 @@ interface DetailProps {
   stats: { label: string; value: number; unit?: string }[];
   /** 「打つ」ボタン。テーマは形式ごとの木札（`FormButton`）、形式が1つのモードは朱印（`SealButton`） */
   actions: ReactNode;
+  /** お気に入りの切り替え（`FavoriteButton`）。ログインしていなければ渡さない */
+  favorite?: ReactNode;
 }
 
 /**
@@ -58,13 +60,17 @@ export function DetailMato(props: DetailProps) {
   );
 }
 
-function DetailBody({ mark, eyebrow, title, description, stats, actions }: DetailProps) {
+function DetailBody({ mark, eyebrow, title, description, stats, actions, favorite }: DetailProps) {
   return (
     <>
-      <p className="flex items-center gap-2 text-sm tracking-[0.25em] text-kinari/50">
-        <span className="text-kin">{mark}</span>
-        {eyebrow}
-      </p>
+      {/* お気に入りは肩の行の右端に小さく。主役の「打つ」より目立たせない */}
+      <div className="flex items-start justify-between gap-4">
+        <p className="flex items-center gap-2 text-sm tracking-[0.25em] text-kinari/50">
+          <span className="text-kin">{mark}</span>
+          {eyebrow}
+        </p>
+        {favorite}
+      </div>
       <h1 className="mt-3 font-mincho text-3xl leading-snug tracking-wide text-kinari sm:text-4xl">
         {title}
       </h1>

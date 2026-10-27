@@ -168,6 +168,7 @@ MVPでは日次上限のみ（**500ニューロン/日**）。月次上限は設
 | `constraint_vocabularies` | 同上 |
 | `user_theme_progress` / `rankings` | 同上 |
 | `fingering_posts` / `fingering_picks` | 同上 |
+| `favorites` | 同上 |
 | **KVのキャッシュ・ロック** | **自動では消えない。削除処理で明示的に削除する**（ロックは**形式ぶんすべて**） |
 
 D1のCASCADEはD1の中でしか効かない。KVを消し忘れると「削除したテーマがキャッシュ経由で復活したように見える」不具合になる。
@@ -194,7 +195,7 @@ CREATE INDEX fingering_posts_user_theme ON fingering_posts (user_id, theme_id);
 
 ## fingering_picks
 
-投稿の「選んだ人」。**ログインユーザーが、その最適化について最後に選んだ投稿**を1人1行で持つ。一覧の並び順（選んだ人数の多い順）に使う。いいね・お気に入りではない（MVP のスコープ外）。匿名は数えない（不変条件10）。
+投稿の「選んだ人」。**ログインユーザーが、その最適化について最後に選んだ投稿**を1人1行で持つ。一覧の並び順（選んだ人数の多い順）に使う。いいね・お気に入りではない（お気に入りは下の `favorites`）。匿名は数えない（不変条件10）。
 
 | カラム | 型 | 説明 |
 |---|---|---|
@@ -209,6 +210,23 @@ CREATE INDEX fingering_picks_post ON fingering_picks (post_id);
 ```
 
 **主キーに `post_id` を含めない。** 含めると1人が同じ最適化の投稿を全部選べて、人数が「選んでいる人」ではなく「押した回数」になる。別の投稿を選び直せば行が上書きされ、票が移る。
+
+## favorites
+
+お気に入り。**ログインユーザーが登録したテーマ／最適化する音**を1件1行で持つ。マイページの「お気に入り」に登録の新しい順で並べ、一覧から探し直さずに戻れるようにする（`docs/07-ui.md`）。匿名は持たない（不変条件10）。
+
+| カラム | 型 | 説明 |
+|---|---|---|
+| `user_id` | TEXT | FK→`user.id` ON DELETE CASCADE |
+| `theme_id` | TEXT | FK→`themes.id` ON DELETE CASCADE。`kind` が `theme` / `constraint` のものだけ（おまかせ・ごちゃまぜは Hono 側で弾く） |
+| `created_at` | INTEGER | unixepoch。一覧の並び順（登録の新しい順）。登録し直しても変えない |
+
+```sql
+PRIMARY KEY (user_id, theme_id)
+CREATE INDEX favorites_user_created ON favorites (user_id, created_at DESC);
+```
+
+主キーで**1人1テーマにつき1行**（2回押しても増えない）。インデックスはマイページの一覧（本人で絞って登録順）用。KV には持たないので、テーマ削除で KV を消す処理（不変条件6）に足すものは無い。
 
 ## rankings
 
@@ -279,7 +297,7 @@ Better Auth の4テーブルは CLI の出力をそのまま使うが、**`user`
 
 | 対象 | 消え方 |
 |---|---|
-| `user_theme_progress` / `user_generation_usage` / `rankings` | FKのCASCADEで自動削除 |
+| `user_theme_progress` / `user_generation_usage` / `rankings` / `favorites` | FKのCASCADEで自動削除 |
 | Better Auth の `session` / `account` | 同上 |
 | `themes` | **消さない。** `created_by` がNULLになるだけ（公開コンテンツのため） |
 

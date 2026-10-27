@@ -116,7 +116,7 @@ export default async function MyPage() {
               </a>
             </p>
           ) : (
-            <div className="mt-8 grid gap-x-5 gap-y-8 sm:grid-cols-2 lg:grid-cols-3">
+            <div className="card-grid--mixed mt-8 grid gap-x-5 gap-y-8 sm:grid-cols-2 lg:grid-cols-3">
               {favorites.map((theme) => (
                 <ThemeCard key={theme.id} theme={theme} />
               ))}
@@ -140,7 +140,7 @@ export default async function MyPage() {
               </a>
             </p>
           ) : (
-            <div className="mt-8 grid gap-x-5 gap-y-8 sm:grid-cols-2 lg:grid-cols-3">
+            <div className="card-grid--mixed mt-8 grid gap-x-5 gap-y-8 sm:grid-cols-2 lg:grid-cols-3">
               {themes.map((theme) => (
                 <ThemeCard key={theme.id} theme={theme} />
               ))}

@@ -5,7 +5,6 @@ import { canDeleteFingeringPost } from "@/lib/api/fingering-guard";
 import { limitFingeringPost } from "@/lib/api/rate-limit";
 import { fingeringListQuerySchema, fingeringPostSchema } from "@/lib/api/schema";
 import { currentSession } from "@/lib/api/session";
-import { betaLimitation } from "@/lib/beta/beta";
 import { canonicalFingering, decodeFingering, isDefaultFingering } from "@/lib/practice/fingering";
 
 export const dynamic = "force-dynamic";
@@ -66,8 +65,6 @@ export async function POST(request: Request) {
   if (!session.user.displayName) {
     return errorResponse("FORBIDDEN", "ユーザー名を決めると運指を投稿できます");
   }
-  // **ベータ版では最適化練習ごと閉じている**ので、非運営は投稿できない
-  if (await betaLimitation(request)) return errorResponse("FORBIDDEN", "最適化練習は調整中です");
 
   // 連投はここで弾く。入力検証や Hono の照会より先に判定する
   const limited = await limitFingeringPost(session.user.id);

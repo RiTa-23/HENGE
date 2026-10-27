@@ -33,11 +33,15 @@ export async function POST(request: Request) {
   const userId = await currentUserId(request);
   if (userId === null) return errorResponse("UNAUTHORIZED");
 
-  // **ベータ版では新しいお題の生成を弾く。** ベータ版利用者は既存プールのプレイと
-  // 補充生成だけができるため、/api/prompts/regenerate と /api/sessions/start は通す。
-  // 運営アカウントは制限しない（lib/beta/beta.ts）。判定はレート制限やクォータの
-  // 照会より前に置く（認可の決まり。docs/04-api.md）
-  if (await betaLimitation(request)) {
+  const parsed = themeNameSchema.safeParse(await request.json());
+
+  // **ベータ版ではテーマの新規生成を弾く。** 最適化練習（kind: "constraint"）は公開済みなので
+  // 通す。ベータ版利用者は既存プールのプレイと補充生成もできるため、
+  // /api/prompts/regenerate と /api/sessions/start は通す。運営アカウントは制限しない
+  // （lib/beta/beta.ts）。判定はレート制限やクォータの照会より前に置く（認可の決まり。
+  // docs/04-api.md）。形が壊れた入力は kind が分からないのでテーマ側に倒す
+  const isConstraint = parsed.success && parsed.data.kind === "constraint";
+  if (!isConstraint && (await betaLimitation(request))) {
     return errorResponse("FORBIDDEN", "お題の生成は調整中です。既にあるお題は引き続き遊べます");
   }
 
@@ -45,7 +49,6 @@ export async function POST(request: Request) {
   const limited = await limitGeneration(userId);
   if (limited !== null) return limited;
 
-  const parsed = themeNameSchema.safeParse(await request.json());
   if (!parsed.success) {
     return errorResponse("VALIDATION_ERROR", parsed.error.issues[0]?.message);
   }

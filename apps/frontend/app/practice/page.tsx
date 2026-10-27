@@ -1,15 +1,12 @@
 import type { Metadata } from "next";
-import { AdjustingView } from "@/components/Adjusting";
 import { CreateThemeForm } from "@/components/CreateThemeForm";
 import { ModeTabs } from "@/components/ModeTabs";
 import { SiteFooter } from "@/components/SiteFooter";
 import { SiteHeader } from "@/components/SiteHeader";
 import { ThemeCard } from "@/components/ThemeCard";
-import { betaLimitedPage } from "@/lib/api/admin-page";
 import { ogFields, pageTitle } from "@/lib/og";
 import { PRESETS, presetCreateHref } from "@/lib/practice/presets";
 import { listThemes } from "@/lib/api/themes";
-import { adjustingMetadata } from "@/lib/beta/beta";
 import { normalizeName } from "@henge/shared";
 import { playHref } from "@/lib/ui/kind";
 
@@ -19,16 +16,11 @@ const DESCRIPTION =
 
 export const dynamic = "force-dynamic";
 
-/**
- * **ベータ版では調整中**（まだアラが目立つため公開しない）。運営アカウントは
- * 何も変わらず使える。検索エンジンには調整中の画面を見せないため noindex を返す。
- */
-export async function generateMetadata(): Promise<Metadata> {
-  // **調整中のときは OG を付けない。** noindex にしている画面の共有カードを
-  // 用意しても、出したくない状態の画面を広めるだけになる
-  if (await betaLimitedPage()) return adjustingMetadata();
-  return { title: TITLE, description: DESCRIPTION, ...ogFields(TITLE, DESCRIPTION) };
-}
+export const metadata: Metadata = {
+  title: TITLE,
+  description: DESCRIPTION,
+  ...ogFields(TITLE, DESCRIPTION),
+};
 
 /**
  * 最適化練習の一覧。テーマ一覧と**対称の構造**にする。
@@ -41,10 +33,6 @@ export default async function PracticePage({
 }: {
   searchParams: Promise<{ char?: string }>;
 }) {
-  // **ベータ版では運営アカウント以外に調整中の画面を出す。** 一覧の取得や
-  // 作成フォームを出さない（生成の入口ごと閉じる）
-  if (await betaLimitedPage()) return <AdjustingView what="最適化練習" />;
-
   const { char } = await searchParams;
   const generated = await listThemes({ kind: "constraint", sort: "popular", limit: 50 });
 

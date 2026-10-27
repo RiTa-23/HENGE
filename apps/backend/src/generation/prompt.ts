@@ -184,7 +184,7 @@ function longRules(count: number): string[] {
  * 読まれ、10呼び出し中4回、組を無視して1語ごとに1文を書いた。
  *
  * 1 は最適化では使わない（1文に指定の音が1回しか入らない）。おまかせ（`kind: 'mix'`）が使う
- * （`mixWordsPerSentence`）。
+ * （`mixWordsPerSentence`）。3 は超ごちゃまぜも使うが、指示は「3語すべて」に変わる（`constraintRules`）。
  */
 export type WordsPerSentence = 1 | 2 | 3;
 export const CONSTRAINT_WORDS_PER_SENTENCE: WordsPerSentence = 2;
@@ -201,13 +201,17 @@ export const CONSTRAINT_WORDS_PER_SENTENCE: WordsPerSentence = 2;
  * **指定の音そのものはプロンプトに書かない。** 書くと、渡した語を無視してその音で
  * 書き始める癖が戻る。指定の音が入っているかは検証側（`includesConstraint`）で見る。
  */
-function constraintRules(wordsPerSentence: WordsPerSentence): string[] {
+function constraintRules(wordsPerSentence: WordsPerSentence, kind: ThemeKind): string[] {
   return [
     wordsPerSentence === 1
       ? "- 各行の語を、文の中で使う"
       : wordsPerSentence === 2
         ? "- 各行の2語を、両方とも文の中で使う"
-        : "- 各行の3語のうち、自然に使える2語以上を文の中で使う。無理に3語すべてを入れない",
+        : // **超ごちゃまぜ（mix）は3語すべてを使わせる。** 意味がつながらないこと自体が狙い
+          // （超カオスモード）。最適化の3語案は自然な文を優先して「2語以上を選ぶ」にしてある
+          kind === "mix"
+          ? "- 各行の3語を、すべて文の中で使う。3語を1つの短い文に詰め込む"
+          : "- 各行の3語のうち、自然に使える2語以上を文の中で使う。無理に3語すべてを入れない",
     "- 語は文に合わせて活用させたり、助詞を付けたりしてよい。ただし別の語に言い換えない",
     "- 語を並べるだけにせず、意味の通る自然な日本語の文にする",
     "- 語の組と同じ順に、上から1文ずつ出力する",
@@ -263,7 +267,7 @@ export function buildGenerationPrompt(input: {
       "",
       "条件:",
       ...rules(groups.length),
-      ...constraintRules(input.wordsPerSentence ?? CONSTRAINT_WORDS_PER_SENTENCE),
+      ...constraintRules(input.wordsPerSentence ?? CONSTRAINT_WORDS_PER_SENTENCE, input.kind),
       "",
       "語の組:",
       ...groups.map((group) => group.join("／")),

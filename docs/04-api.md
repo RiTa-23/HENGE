@@ -310,7 +310,7 @@
 
 | Method | Path | 説明 |
 |---|---|---|
-| GET | `/themes` | 一覧（kind / sort / limit / cursor）。`name` を渡すと表示名で1件引く。**`kind=mix` は `name` のモード（おまかせ・ごちゃまぜ）の行を返し、無ければお題0件で作る。** 知らない名前なら空で、行は作らない。`name` を省くと全モードの行を返す（`docs/05-generation.md`） |
+| GET | `/themes` | 一覧（kind / sort / limit / cursor）。`name` を渡すと表示名で1件引く。**`kind=mix` は `name` のモード（おまかせ・ごちゃまぜ・超ごちゃまぜ）の行を返し、無ければお題0件で作る。** 知らない名前なら空で、行は作らない。`name` を省くと全モードの行を返す（`docs/05-generation.md`） |
 | GET | `/themes/:id` | 単体取得 |
 | POST | `/sessions/start` | 1プレイ分の取得＋オフセット更新＋補充要否判定 |
 | POST | `/themes` | 作成＋初回10問の同期生成 |

@@ -32,7 +32,7 @@ HENGEで「忍びの心得」の短文を打った。
 
 - **X APIを使わない。** 投稿は intent URL で足りる。認証・レート制限・キーの管理がすべて不要になる
 - `text` / `url` は `encodeURIComponent` する。改行は `%0A`
-- **共有するURLはプレイ画面ではなく詳細ページ**（`detailHref(kind, name)`。テーマなら `/themes/[name]`、最適化なら `/practice/[char]`、おまかせ・ごちゃまぜなら `/mix/[name]`）。詳細ページは検索エンジン・SNSからの着地ページとして設計済み（docs/07-ui.md）で、OGPが付く。プレイ画面はnoindexであり、着地先として整っていない
+- **共有するURLはプレイ画面ではなく詳細ページ**（`detailHref(kind, name)`。テーマなら `/themes/[name]`、最適化なら `/practice/[char]`、おまかせ・ごちゃまぜなら `/mix/[name]`、超ごちゃまぜなら `/mix/ごちゃまぜ?mode=超ごちゃまぜ`）。詳細ページは検索エンジン・SNSからの着地ページとして設計済み（docs/07-ui.md）で、OGPが付く。プレイ画面はnoindexであり、着地先として整っていない
 - URLの組み立ては `lib/ui/kind.ts` の `detailHref` を使う。**手で `/play/...` を組み立てない**（`kind` を落として別のプールを開く事故の防止。同ファイルの責務）
 - `Result` には `kind` が渡っていないため、`PlayScreen`（`kind` を知っている）から共有URLを渡す。**形式（`form`）も同じ経路で渡す**（結果画面の見出しの問題数と、投稿の文面の両方で使う）
 
@@ -60,7 +60,7 @@ HENGEで「忍びの心得」の短文を打った。
 | `/themes` / `/practice` | 既存のタイトル | |
 | `/themes/[name]` | `HENGE \| 「忍びの心得」のタイピング練習` | **シェアの着地ページ。ここが確実にカードになること** |
 | `/practice/[char]` | `HENGE \| 「ざ」のタイピング最適化練習` | 同上 |
-| `/mix/[name]` | `HENGE \| おまかせタイピング` | 同上。おまかせ・ごちゃまぜ。説明は `lib/ui/mix.ts` の `MIX_COPY` |
+| `/mix/[name]` | `HENGE \| おまかせタイピング` | 同上。おまかせ・ごちゃまぜ。超ごちゃまぜは `?mode=超ごちゃまぜ` で、タイトル・説明もそのモードのもの。説明は `lib/ui/mix.ts` の `MIX_COPY` |
 | `/mix` | — | 旧URL（ごちゃまぜが1つだけだった頃に共有された）。`/mix/ごちゃまぜ` へ恒久転送 |
 | `/play/[theme]` | 基本OGのみ | noindexのまま。シェア対象ではない |
 

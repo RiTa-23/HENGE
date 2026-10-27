@@ -20,13 +20,15 @@ export type ThemeKind = "theme" | "constraint" | "mix";
  *
  * - おまかせ（1語）: 標準。1語から自然な文を作る。とりあえず遊びたい人の入口
  * - ごちゃまぜ（2語）: カオスモード。つながらない2語を無理につなげた文になる
+ * - 超ごちゃまぜ（3語）: 超カオスモード。3語すべてを詰め込ませる。ごちゃまぜの詳細ページで選ぶ
  *
- * **3語以上は入れていない。** 短文の打鍵数の上限（35打）に3語以上はまず収まらず、過去の実測で
- * 3語を渡すと組を無視して1語ずつ別の文を書く形の崩れが出た（docs/05-generation.md）。
+ * **4語以上は入れていない。** 3語でも短文の打鍵数の上限（35打）にぎりぎりで、却下・2ラウンド目・
+ * 失敗が増えるおそれがある（docs/05-generation.md）。
  */
 export const MIX_MODES = [
   { name: "おまかせ", wordsPerSentence: 1 },
   { name: "ごちゃまぜ", wordsPerSentence: 2 },
+  { name: "超ごちゃまぜ", wordsPerSentence: 3 },
 ] as const;
 
 export type MixName = (typeof MIX_MODES)[number]["name"];
@@ -35,9 +37,11 @@ export type MixName = (typeof MIX_MODES)[number]["name"];
 export const MIX_STANDARD_NAME = "おまかせ" satisfies MixName;
 /** カオスモード */
 export const MIX_CHAOS_NAME = "ごちゃまぜ" satisfies MixName;
+/** 超カオスモード */
+export const MIX_SUPER_CHAOS_NAME = "超ごちゃまぜ" satisfies MixName;
 
 /** その名前のモードで1文に渡す語の数。語を選んで作るモードの名前でなければ null */
-export function mixWordsPerSentence(name: string): 1 | 2 | null {
+export function mixWordsPerSentence(name: string): 1 | 2 | 3 | null {
   const normalized = normalizeConstraintChar(name);
   return MIX_MODES.find((mode) => mode.name === normalized)?.wordsPerSentence ?? null;
 }

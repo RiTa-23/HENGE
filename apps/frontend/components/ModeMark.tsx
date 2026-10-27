@@ -79,9 +79,10 @@ export function PracticeMark({ className }: { className?: string }) {
  * おまかせ・ごちゃまぜ。**賽子（さいころ）。** 選ばずに振って出た目で打つモード。
  *
  * 語をランダムに選んで文を作る仕様とそのまま対応する。**目の数でモードを分ける**:
- * おまかせ（1語）は一の目、ごちゃまぜ（カオスモード）は五の目（四隅と中心）。
+ * おまかせ（1語）は一の目、ごちゃまぜ（カオス）は五の目（四隅と中心）、
+ * 超ごちゃまぜ（超カオス）は六の目（2列×3段）。
  */
-export function MixMark({ className, pips }: { className?: string; pips: 1 | 5 }) {
+export function MixMark({ className, pips }: { className?: string; pips: 1 | 5 | 6 }) {
   return (
     <svg
       viewBox="0 0 64 64"
@@ -99,7 +100,7 @@ export function MixMark({ className, pips }: { className?: string; pips: 1 | 5 }
         {pips === 1 ? (
           // 一の目は大きく1つ（本物の賽子と同じく、ほかの目より大きい）
           <circle cx="32" cy="32" r="8" />
-        ) : (
+        ) : pips === 5 ? (
           <>
             <circle cx="21" cy="21" r="4" />
             <circle cx="43" cy="21" r="4" />
@@ -107,8 +108,23 @@ export function MixMark({ className, pips }: { className?: string; pips: 1 | 5 }
             <circle cx="21" cy="43" r="4" />
             <circle cx="43" cy="43" r="4" />
           </>
+        ) : (
+          <>
+            <circle cx="22" cy="19" r="4" />
+            <circle cx="42" cy="19" r="4" />
+            <circle cx="22" cy="32" r="4" />
+            <circle cx="42" cy="32" r="4" />
+            <circle cx="22" cy="45" r="4" />
+            <circle cx="42" cy="45" r="4" />
+          </>
         )}
       </g>
     </svg>
   );
+}
+
+/** そのモードの賽子の目。おまかせ＝1、ごちゃまぜ＝5、超ごちゃまぜ＝6 */
+export function mixPips(wordsPerSentence: 1 | 2 | 3): 1 | 5 | 6 {
+  if (wordsPerSentence === 1) return 1;
+  return wordsPerSentence === 2 ? 5 : 6;
 }

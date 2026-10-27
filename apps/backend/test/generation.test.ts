@@ -189,6 +189,20 @@ describe("おまかせ・ごちゃまぜの生成（最適化と同じく語を�
     expect(prompts[0]).toContain("各行の2語を、両方とも文の中で使う");
   });
 
+  it("超ごちゃまぜは1文に3語を渡し、3語すべてを使わせる（最適化の3語案のように選ばせない）", async () => {
+    const prompts: string[] = [];
+    await generateBatch(
+      envCapturingPrompts([[], []], prompts),
+      input({ kind: "mix", name: "超ごちゃまぜ", target: 1, vocabulary: mixVocabulary() }),
+    );
+
+    const lines = groupLinesInPrompt(prompts[0] ?? "");
+    expect(lines).toHaveLength(N_REQUEST);
+    for (const line of lines) expect(line.split("／")).toHaveLength(3);
+    expect(prompts[0]).toContain("各行の3語を、すべて文の中で使う");
+    expect(prompts[0]).not.toContain("2語以上");
+  });
+
   it("共通リストの上から MIX_VOCABULARY_SIZE 語を使う", () => {
     const words = mixVocabulary();
     expect(words).toHaveLength(MIX_VOCABULARY_SIZE);

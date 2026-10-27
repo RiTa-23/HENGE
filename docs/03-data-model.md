@@ -9,7 +9,7 @@ D1（SQLite）+ Drizzle ORM。Better Auth管理下のテーブル（`user` / `se
 | カラム | 型 | 制約 | 説明 |
 |---|---|---|---|
 | `id` | TEXT | PK | UUID |
-| `kind` | TEXT | NOT NULL | `'theme'` / `'constraint'` / `'mix'`（おまかせ・ごちゃまぜ。**モードごとに1行だけ**。`docs/05-generation.md`） |
+| `kind` | TEXT | NOT NULL | `'theme'` / `'constraint'` / `'mix'`（おまかせ・ごちゃまぜ・超ごちゃまぜ。**モードごとに1行だけ**。`docs/05-generation.md`） |
 | `name` | TEXT | NOT NULL | 表示名（入力されたまま） |
 | `normalized_name` | TEXT | NOT NULL | 重複判定用の正規化キー |
 | `created_by` | TEXT | NULL可, FK→`user.id` ON DELETE SET NULL | `user.id`。運営投入分はNULL。作成者が退会してもテーマは公開コンテンツとして残すためCASCADEにしない |
@@ -38,7 +38,7 @@ CREATE INDEX themes_created_by ON themes (created_by, created_at DESC);
 |---|---|
 | `'theme'` | NFKC正規化 → 前後の空白除去 → 連続空白を1つに → 英字を小文字化 |
 | `'constraint'` | NFC正規化のみ |
-| `'mix'` | NFC正規化のみ（名前は `MIX_MODES` の「おまかせ」「ごちゃまぜ」だけ） |
+| `'mix'` | NFC正規化のみ（名前は `MIX_MODES` の「おまかせ」「ごちゃまぜ」「超ごちゃまぜ」だけ） |
 
 **含む文字はひらがなのみ受け付ける。** カタカナ・漢字・英数字・記号・空白は入力段階で拒否する。判定対象が読み仮名（ひらがな）のため、それ以外を指定しても永久に一致しない。
 

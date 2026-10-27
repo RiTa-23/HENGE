@@ -1,4 +1,5 @@
 import { parsePromptForm, type PromptForm, type ThemeKind } from "@henge/shared";
+import { mixDetailPath } from "./mix";
 
 /**
  * テーマモードと最適化モードの**URL上の区別**をここだけに閉じ込める。
@@ -67,11 +68,11 @@ export function playHref(kind: ThemeKind, name: string, form: PromptForm = "sent
 
 /**
  * 一覧・詳細ページへのリンク。テーマは `/themes/[name]`、最適化する音は `/practice/[char]`。
- * おまかせ・ごちゃまぜは `/mix/[name]`
+ * おまかせ・ごちゃまぜは `/mix/[name]`。超ごちゃまぜはごちゃまぜの詳細で選ぶ（`mixDetailPath`）
  */
 export function detailHref(kind: ThemeKind, name: string): string {
+  if (kind === "mix") return mixDetailPath(name);
   const segment = encodeURIComponent(name);
-  if (kind === "mix") return `/mix/${segment}`;
   return kind === "constraint" ? `/practice/${segment}` : `/themes/${segment}`;
 }
 

@@ -87,9 +87,10 @@ describe("isHiraganaOnly", () => {
 });
 
 describe("mixWordsPerSentence", () => {
-  test("おまかせは1語、ごちゃまぜ（カオスモード）は2語", () => {
+  test("おまかせは1語、ごちゃまぜ（カオス）は2語、超ごちゃまぜ（超カオス）は3語", () => {
     expect(mixWordsPerSentence("おまかせ")).toBe(1);
     expect(mixWordsPerSentence("ごちゃまぜ")).toBe(2);
+    expect(mixWordsPerSentence("超ごちゃまぜ")).toBe(3);
   });
 
   test("結合濁点の表記でも同じモードに当てる（NFC で揃える）", () => {

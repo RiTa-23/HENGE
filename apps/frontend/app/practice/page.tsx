@@ -52,11 +52,34 @@ export default async function PracticePage({
           <strong className="text-kinari">読み仮名</strong>
           に対して行うので、表記に出ていなくても構いません（「座禅」は読み「ざぜん」に「ざ」を含みます）。
         </p>
-        <p className="mt-3 text-sm">
-          <a href="/practice/about" className="text-kin hover:text-kinari">
-            最適化とは？ — はじめての人へ
-          </a>
-        </p>
+        {/* 最適化という言葉を知らない人の入口。文字リンクだと読み飛ばされるので、
+            押せる面を持たせる。主役は下の指定一覧なので、塗りは選択カードと同じ淡さに留める */}
+        <a
+          href="/practice/about"
+          className="group mt-6 flex max-w-2xl items-center gap-5 rounded-md border border-kinari/15 bg-kinari/5 px-6 py-5 transition-colors hover:border-kin/60 hover:bg-kinari/10"
+        >
+          <span
+            aria-hidden="true"
+            className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full border border-kin/40 font-mincho text-2xl text-kin transition-colors group-hover:border-kin"
+          >
+            ？
+          </span>
+          <span className="min-w-0 flex-1">
+            <span className="block text-xs tracking-[0.25em] text-kin">はじめての人へ</span>
+            <span className="mt-1 block font-mincho text-xl tracking-wide text-kinari">
+              最適化とは？
+            </span>
+            <span className="mt-1 block text-sm leading-relaxed text-kinari/60">
+              同じ指が続くと遅くなる理由と、指の組み替え方を図で見る
+            </span>
+          </span>
+          <span
+            aria-hidden="true"
+            className="shrink-0 text-xl text-kinari/40 transition-[color,transform] group-hover:translate-x-1 group-hover:text-kinari"
+          >
+            →
+          </span>
+        </a>
 
         <div className="mt-8">
           <ModeTabs current="constraint" />

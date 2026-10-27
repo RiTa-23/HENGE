@@ -18,3 +18,6 @@ lex_3_1.csv
 # apps/backend/scripts/compare-constraint-prompts.ts の既定の出力と、Node で動かすためのバンドル
 constraint-prompts.md
 .compare-constraint-prompts.mjs
+# apps/backend/scripts/compare-moderation-models.ts の既定の出力と、Node で動かすためのバンドル
+moderation-models.md
+.compare-moderation-models.mjs

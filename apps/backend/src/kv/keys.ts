@@ -28,6 +28,15 @@ export function themeLockKeys(themeId: string): string[] {
 }
 
 /**
+ * 登録に使ったプレイチケットの印（`jti`）。**チケットを使い捨てにする。**
+ * TTL はチケットの有効期限まで（期限が過ぎればチケット自体が通らないので、印も要らない）。
+ * テーマに紐づかないので、テーマ削除時に消す対象ではない。
+ */
+export function rankingTicketKey(jti: string): string {
+  return `ranking-ticket:${jti}`;
+}
+
+/**
  * 生成ロックのTTL。**値は `packages/shared` に置く。**
  *
  * クライアントの待ち上限（`GENERATION_WAIT_LIMIT_MS`）より短いことが前提の値で、

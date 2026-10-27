@@ -5,6 +5,7 @@ import {
   isApiError,
   isImeKey,
   normalizeTypedKey,
+  type PlayLog,
   playSize,
   type PromptForm,
   pressKey,
@@ -77,6 +78,11 @@ interface SessionResponse {
   remainingInPool: number;
   /** 本日の残ニューロン。ログイン時のみ */
   neuronsRemaining?: number;
+  /**
+   * プレイチケット（出したお題の証明）。ランキングの登録に打鍵ログと一緒に送る。
+   * サーバーに署名鍵が無ければ null で、登録はできない
+   */
+  ticket: string | null;
 }
 
 type Phase =
@@ -271,6 +277,12 @@ export function PlayScreen({
   const mutedRef = useRef(false);
   const missTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const startedAt = useRef<number>(0);
+  /**
+   * 打鍵ログ（ランキングの登録で、サーバーが再生して記録を出す）。**判定に流した打鍵だけ**を
+   * 積む。打鍵のたびに描き直す必要は無いので ref に積み、打ち終えたら `playLog` に移す
+   */
+  const typedLog = useRef<{ keys: string[]; t: number[] }>({ keys: [], t: [] });
+  const [playLog, setPlayLog] = useState<PlayLog>({ keys: "", t: [] });
   const surface = useRef<HTMLDivElement>(null);
   // 生成中の待ち。attempt を増やすと load が走り直す
   const [attempt, setAttempt] = useState(0);
@@ -316,6 +328,7 @@ export function PlayScreen({
       setMissedKeys(new Map());
       setTargetTally(EMPTY_TALLY);
       setFinished(null);
+      typedLog.current = { keys: [], t: [] };
       startedAt.current = performance.now();
       setProgress(typingFor(session.prompts[0]));
       setPhase({ name: "playing", session });
@@ -640,6 +653,11 @@ export function PlayScreen({
     }
     event.preventDefault();
 
+    // **判定に流す打鍵と同じものを、同じ順で積む。** 時刻は計時と同じ基準（開始の合図が
+    // 消えた時点から）で、整数に丸める。丸めても順序は崩れない
+    typedLog.current.keys.push(typed);
+    typedLog.current.t.push(Math.round(performance.now() - startedAt.current));
+
     const next = pressKey(progress, typed);
     // **受理されなかった打鍵だけを赤くする。** 押したキーそのものを出すので、
     // 苦手キーの集計（打つべきだった文字を数える）とは別物
@@ -678,6 +696,7 @@ export function PlayScreen({
     if (upcoming >= phase.session.prompts.length) {
       // 計時はここで止める。結果画面は終了の合図を挟んでから出す
       setStats({ hits, misses, elapsedMs: performance.now() - startedAt.current });
+      setPlayLog({ keys: typedLog.current.keys.join(""), t: [...typedLog.current.t] });
       setPhase({ name: "finishing", session: phase.session });
       return;
     }
@@ -899,6 +918,8 @@ export function PlayScreen({
           themeId={themeId}
           detailHref={backToDetail}
           stats={stats}
+          ticket={phase.session.ticket}
+          playLog={playLog}
           missedKeys={missedKeys}
           targetTally={kind === "constraint" ? targetTally : undefined}
           themeName={themeName}

@@ -1,4 +1,5 @@
 import type { PlayStats } from "./score";
+import type { PromptForm } from "./session";
 import type { RomanCandidates } from "./typing/build";
 import { pressKey, startTyping } from "./typing/match";
 
@@ -22,6 +23,17 @@ export interface PlayLog {
  * 打鍵数の範囲は再生した後に `playStatsRejection` で見る。
  */
 export const MAX_PLAY_LOG_KEYS = 10_000;
+
+/**
+ * 再生に使うお題の読み。Hono が ID で引いて返し、Next.js がチケットの出題順に並べ直す。
+ * テーマ・形式も持つのは、チケットのお題と同じプールのものかを確かめるため。
+ */
+export interface ReplayPrompt {
+  id: string;
+  themeId: string;
+  form: PromptForm;
+  readingRoman: RomanCandidates;
+}
 
 export type ReplayResult = { stats: PlayStats } | { rejection: string };
 

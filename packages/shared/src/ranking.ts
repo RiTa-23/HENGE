@@ -33,9 +33,9 @@ export function maxHits(form: PromptForm): number {
 /**
  * ランキングに登録する記録の範囲検査。**通れば正しい記録、ではない。**
  *
- * 記録はクライアントの自己申告で、改ざんは防げない（MVPでは対策しない）。
- * ここで弾くのは「打っていないと分かる値」だけで、弾く理由を返す。
- * 検査の入口は Next.js の Zod（`refine`）で、規則はここに1つだけ置く。
+ * 記録はサーバーが打鍵ログを再生して出したもの（`replayPlay`）で、ここでは
+ * 「打っていないと分かる値」（速すぎる・短すぎる）を弾き、弾く理由を返す。
+ * 呼ぶのは Next.js の登録（`lib/api/play-record.ts`）で、規則はここに1つだけ置く。
  */
 export function playStatsRejection(stats: PlayStats, form: PromptForm): string | null {
   if (stats.elapsedMs <= 0 || stats.elapsedMs > MAX_ELAPSED_MS) return "時間が範囲外です";

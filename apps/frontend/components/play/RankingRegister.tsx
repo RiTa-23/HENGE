@@ -1,6 +1,6 @@
 "use client";
 
-import { isApiError, type PlayStats, type PromptForm, RANKING_SIZE } from "@henge/shared";
+import { isApiError, type PlayLog, RANKING_SIZE } from "@henge/shared";
 import { useState } from "react";
 import { authClient } from "@/lib/api/auth-client";
 import { readJsonBody } from "@/lib/api/json";
@@ -14,8 +14,9 @@ interface Registered {
 /**
  * 結果画面の「ランキングに登録」。
  *
- * 送るのは**生の値**（打鍵数・ミス・時間）で、スコアはサーバーで計算する
- * （画面のスコアと同じ関数。`packages/shared/src/score.ts`）。
+ * 送るのは**プレイチケットと打鍵ログ**で、打鍵数・ミス・時間もスコアも送らない。
+ * サーバーがチケットのお題で打鍵ログを再生して記録を出し、スコアを計算する
+ * （画面と同じ打鍵エンジンと同じ関数。`docs/04-api.md`）。
  *
  * 登録できるのはログイン済みで**ユーザー名を決めた**人だけ。プレイ画面には
  * `SiteHeader` が無く、名前未設定のままここまで来られるので、その場合はマイページへ
@@ -26,14 +27,13 @@ interface Registered {
  * ので、状態はこの部品の寿命（1回の結果）に閉じる。
  */
 export function RankingRegister({
-  themeId,
-  form,
-  stats,
+  ticket,
+  playLog,
   rankingHref,
 }: {
-  themeId: string;
-  form: PromptForm;
-  stats: PlayStats;
+  /** プレイチケット。サーバーに署名鍵が無ければ null で、登録できない */
+  ticket: string | null;
+  playLog: PlayLog;
   /** 詳細ページのランキング（登録後に見に行く先） */
   rankingHref: string;
 }) {
@@ -48,6 +48,14 @@ export function RankingRegister({
     "mt-10 rounded-md border border-kinari/15 bg-kinari/5 px-6 py-5 text-center short:mt-6 short:py-4";
   const note = "text-sm text-kinari/60";
   const link = "ml-2 tracking-widest text-kin hover:underline underline-offset-4";
+
+  if (ticket === null) {
+    return (
+      <div className={wrap}>
+        <p className={note}>この記録はランキングに登録できません。</p>
+      </div>
+    );
+  }
 
   if (session === null) {
     return (
@@ -85,7 +93,7 @@ export function RankingRegister({
     const response = await fetch("/api/rankings", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ themeId, form, ...stats }),
+      body: JSON.stringify({ ticket, log: playLog }),
     });
     // 本文が空（サーバー側の例外など）でも落とさない。エラーを出そうとして別の例外で
     // 結果画面ごと消えるのが最悪の壊れ方

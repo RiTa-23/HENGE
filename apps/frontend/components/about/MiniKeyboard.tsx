@@ -19,16 +19,14 @@ const ROWS: { keys: string; indent: string; indentLarge: string }[] = [
 ];
 
 /**
- * 指ごとの塗り。**色相を足さず、生成りの濃さで分ける**（4色の制約。docs/07-ui.md「配色」）。
- * 人差し指をいちばん濃く、小指は縁だけにして、ホームポジションから外へ向かって薄れる形にする。
- * 段差を大きく取る（濃さが近いと隣の指と見分けられない）。
- * 手の図の凡例（`FingerLegend`）も同じ塗りを使う。
+ * 指ごとの塗り。**指の識別色**（`globals.css`。docs/07-ui.md「指の識別色」）で分ける。
+ * 生成りの濃淡では見分けがつかなかった。手の図と凡例（`figures.tsx`）も同じ塗りを使う。
  */
 export const FINGER_TINT: Record<Exclude<FingerName, "thumb">, string> = {
-  index: "bg-kinari/80 border-kinari/80 text-sumi",
-  middle: "bg-kinari/45 border-kinari/45 text-sumi",
-  ring: "bg-kinari/15 border-kinari/25 text-kinari",
-  pinky: "bg-transparent border-kinari/30 text-kinari/70",
+  index: "bg-nadeshiko border-nadeshiko text-sumi",
+  middle: "bg-moegi border-moegi text-sumi",
+  ring: "bg-asagi border-asagi text-sumi",
+  pinky: "bg-fuji border-fuji text-sumi",
 };
 
 /** ホームポジションの印（指を置くと突起が触れるキー） */

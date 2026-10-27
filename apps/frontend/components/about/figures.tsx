@@ -27,7 +27,7 @@ const LEGEND_FINGERS: { finger: keyof typeof FINGER_TINT; label: string; height:
   { finger: "index", label: "人差し指", height: "h-10" },
 ];
 
-/** 指の塗りを手の形で見せる。キーと同じ塗りなので、キーの濃さから指が辿れる */
+/** 指の塗りを手の形で見せる。キーと同じ色なので、キーの色から指が辿れる */
 function TintedHand({ hand }: { hand: "left" | "right" }) {
   const fingers = hand === "left" ? LEGEND_FINGERS : LEGEND_FINGERS.toReversed();
   return (
@@ -209,7 +209,7 @@ function KeyCaps({ keys }: { keys: string }) {
 /** 打ち方の分岐。1つの音に打ち方がいくつもあることを、枝分かれで見せる */
 export function RomanBranchFigure() {
   const branches = [
-    { kana: "し", ways: ["SI", "SHI"] },
+    { kana: "し", ways: ["SI", "SHI", "CI"] },
     { kana: "ち", ways: ["TI", "CHI"] },
   ];
   return (

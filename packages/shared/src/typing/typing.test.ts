@@ -29,12 +29,8 @@ describe("複数候補の受理", () => {
     expect(accepts("ふ", 0, "hu")).toBe(true);
   });
 
-  test("し は shi / si が使える", () => {
-    for (const roman of ["shi", "si"]) expect(accepts("し", 0, roman)).toBe(true);
-  });
-
-  test("し は ci では打てない", () => {
-    expect(accepts("し", 0, "ci")).toBe(false);
+  test("し は shi / si / ci が使える", () => {
+    for (const roman of ["shi", "si", "ci"]) expect(accepts("し", 0, roman)).toBe(true);
   });
 
   test("じ は ji でも zi でも打てる", () => {
@@ -78,16 +74,10 @@ describe("「っ」の子音借用", () => {
     expect(shortest("いって")).toBe("itte");
   });
 
-  test("次のかなの子音を借りる（っち なら t と c）", () => {
-    const [sokuon] = buildRomanCandidates("っち");
-    expect(sokuon).toContain("t");
-    expect(sokuon).toContain("c");
-  });
-
-  test("次のかなに無い子音は借りない（し は ci で打てないので、っし に c は無い）", () => {
+  test("次のかなの子音を借りる（っし なら s と c）", () => {
     const [sokuon] = buildRomanCandidates("っし");
     expect(sokuon).toContain("s");
-    expect(sokuon).not.toContain("c");
+    expect(sokuon).toContain("c");
   });
 
   test("借用しない打ち方も残す", () => {

@@ -66,7 +66,7 @@ function play(kana: string, sound: string, fingering: Fingering | null, keys = "
 
 describe("打ち方の一覧", () => {
   it("table.ts の候補を並びのまま出す", () => {
-    expect(romanChoices("し")).toEqual(["si", "shi"]);
+    expect(romanChoices("し")).toEqual(["si", "shi", "ci"]);
   });
 
   // 前後のかなで打ち方が変わり、1つに決めておけない
@@ -219,15 +219,15 @@ describe("プレイ中の打ち方と指", () => {
 
   // 打ち方と指は1文字ずつ対応しているので、表示が違う打ち方の指は使えない
   it("別の打ち方で打ち始めたら指も標準に戻す", () => {
-    const chi: Fingering = {
-      units: [{ roman: "chi", fingers: [LEFT_RING, RIGHT_INDEX, RIGHT_MIDDLE] }],
+    const shi: Fingering = {
+      units: [{ roman: "shi", fingers: [LEFT_RING, RIGHT_INDEX, RIGHT_MIDDLE] }],
     };
-    // `chi` と決めて `t` から打った。表示は `ti` に切り替わる
-    const { progress, finger } = play("ち", "ち", chi, "t");
-    expect(romanDisplay(progress).text).toBe("ti");
+    // `shi` と決めて `c` から打った。表示は `ci` に切り替わる
+    const { progress, finger } = play("し", "し", shi, "c");
+    expect(romanDisplay(progress).text).toBe("ci");
     expect(finger).toBeNull();
     // 決めた打ち方の途中までなら、決めた指のまま
-    expect(play("ち", "ち", chi, "c").finger).toEqual(RIGHT_INDEX);
+    expect(play("し", "し", shi, "s").finger).toEqual(RIGHT_INDEX);
   });
 
   it("2かな以上の音は単位ごとに決めた運指を出す", () => {

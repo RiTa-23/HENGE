@@ -15,6 +15,7 @@ describe("複数候補の受理", () => {
     ["ふ", "hu"],
     ["し", "shi"],
     ["し", "si"],
+    ["し", "ci"],
     ["つ", "tsu"],
     ["つ", "tu"],
     ["ち", "chi"],
@@ -339,7 +340,7 @@ describe("missedKeys", () => {
   });
 
   test("候補が複数あるときは画面に出ている最短候補で数える", () => {
-    // 「し」は si / shi。表示は最短の si なので、打ち損ねた文字は s
+    // 「し」は shi / si / ci。表示は最短の si なので、打ち損ねた文字は s
     const progress = play("し", ["x"]);
 
     expect([...progress.missedKeys]).toEqual([["s", 1]]);
@@ -371,6 +372,7 @@ describe("表示する打ち方の指定（chosen）", () => {
 
   test("指定と違う経路で打ち始めたら、その経路の表示に切り替わる", () => {
     expect(romanDisplay(typeChosen("し", [[0, "shi"]], "si")).text).toBe("si");
+    expect(romanDisplay(typeChosen("し", [[0, "ci"]], "s")).text).toBe("si");
   });
 
   test("指定の経路を打ち進めても表示は保たれる", () => {

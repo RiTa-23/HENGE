@@ -133,7 +133,7 @@ export default function OptimizationAboutPage() {
 
         <Section title="HENGEでの練習の仕方">
           <PracticeFlowFigure />
-          <ul className="grid gap-3 sm:grid-cols-3">
+          <ul className="grid gap-3">
             {[
               [
                 "練習したい最適化を、自分で作れる",
@@ -145,7 +145,7 @@ export default function OptimizationAboutPage() {
                 "選んだ人の多い順に並ぶので、みんなが使っている運指を確かめて、そのまま自分の運指に設定できます",
               ],
             ].map(([title, body]) => (
-              <li key={title} className="rounded border border-kin/40 px-4 py-3">
+              <li key={title} className="rounded border border-kinari/15 px-4 py-3">
                 <p className="text-kinari">{title}</p>
                 <p className="mt-1 text-sm leading-relaxed text-kinari/60">{body}</p>
               </li>

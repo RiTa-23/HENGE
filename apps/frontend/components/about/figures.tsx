@@ -1,6 +1,6 @@
 import { PracticeMark } from "@/components/ModeMark";
 import { HandFigure } from "@/components/play/FingerGuide";
-import { MiniKeyboard } from "./MiniKeyboard";
+import { FINGER_TINT, MiniKeyboard } from "./MiniKeyboard";
 
 /**
  * 「最適化とは？」の動かない図。文字だけでは伝わりにくいところを、
@@ -19,23 +19,70 @@ function Figure({ caption, children }: { caption: React.ReactNode; children: Rea
   );
 }
 
-/** 標準運指。キーごとに受け持つ指を添え、例に使う I・K の列を縁取る */
+/** 凡例の指の並び（左手は小指から）。高さは手の図（`HandFigure`）と同じ見当 */
+const LEGEND_FINGERS: { finger: keyof typeof FINGER_TINT; label: string; height: string }[] = [
+  { finger: "pinky", label: "小指", height: "h-7" },
+  { finger: "ring", label: "薬指", height: "h-10" },
+  { finger: "middle", label: "中指", height: "h-11" },
+  { finger: "index", label: "人差し指", height: "h-10" },
+];
+
+/** 指の塗りを手の形で見せる。キーと同じ塗りなので、キーの濃さから指が辿れる */
+function TintedHand({ hand }: { hand: "left" | "right" }) {
+  const fingers = hand === "left" ? LEGEND_FINGERS : LEGEND_FINGERS.toReversed();
+  return (
+    <div className="flex flex-col items-center">
+      <div className="flex items-end gap-1">
+        {fingers.map(({ finger, height }) => (
+          <span
+            key={finger}
+            className={`w-5 rounded-t-full border ${height} ${FINGER_TINT[finger]}`}
+          />
+        ))}
+      </div>
+      <span className="mt-1 h-2 self-stretch rounded-b-lg border border-kinari/15 bg-kinari/5" />
+      <span className="mt-2 text-[11px] tracking-widest text-kinari/50">
+        {hand === "left" ? "左手" : "右手"}
+      </span>
+    </div>
+  );
+}
+
+/** 塗りと指の名前の対応 */
+function FingerLegend() {
+  return (
+    <ul className="flex flex-wrap justify-center gap-x-5 gap-y-2 text-xs text-kinari/70">
+      {LEGEND_FINGERS.toReversed().map(({ finger, label }) => (
+        <li key={finger} className="flex items-center gap-1.5">
+          <span className={`h-3.5 w-3.5 rounded-sm border ${FINGER_TINT[finger]}`} />
+          {label}
+        </li>
+      ))}
+    </ul>
+  );
+}
+
+/** 標準運指。キーを受け持つ指ごとに塗り、例に使う I・K の列を縁取る */
 export function StandardFingeringFigure() {
   return (
     <Figure
       caption={
         <>
-          縦の列ごとに押す指が決まっている。<span className="text-daidai">縁取った列</span>
-          （I・K）は、どちらも右の中指。金の印は人差し指を置く F・J
+          <span className="text-daidai">縁取った列</span>
+          （I・K）は、どちらも右の中指。下線は人差し指を置く F・J
         </>
       }
     >
       <div className="flex justify-center">
-        <MiniKeyboard fingers states={{ I: "mark", K: "mark" }} />
+        <MiniKeyboard tinted states={{ I: "ring", K: "ring" }} />
       </div>
-      <p className="mt-3 text-center text-[10px] tracking-widest text-kinari/40">
-        小＝小指　薬＝薬指　中＝中指　人＝人差し指
-      </p>
+      <div className="mt-6 flex items-end justify-center gap-10 sm:gap-16">
+        <TintedHand hand="left" />
+        <TintedHand hand="right" />
+      </div>
+      <div className="mt-5">
+        <FingerLegend />
+      </div>
     </Figure>
   );
 }
@@ -162,7 +209,7 @@ function KeyCaps({ keys }: { keys: string }) {
 /** 打ち方の分岐。1つの音に打ち方がいくつもあることを、枝分かれで見せる */
 export function RomanBranchFigure() {
   const branches = [
-    { kana: "し", ways: ["SI", "SHI", "CI"] },
+    { kana: "し", ways: ["SI", "SHI"] },
     { kana: "ち", ways: ["TI", "CHI"] },
   ];
   return (

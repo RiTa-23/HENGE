@@ -269,23 +269,25 @@ function Sentence({ text, faded = false }: { text: string; faded?: boolean }) {
 }
 
 /**
- * 反復の仕方。同じ文の繰り返しは文ごと覚えてしまうが、毎回違う文なら
- * 「き」の指の運びだけが残る。HENGE がお題を毎回作る理由そのもの
+ * 反復の仕方。運営が用意した決まった文から出すと、いずれ同じ文が戻ってきて文ごと覚えてしまう。
+ * HENGE は運営が文を書かず、AI が毎回作るので「き」の指の運びだけが残る。HENGE がお題を毎回作る理由そのもの
  */
 export function RepetitionFigure() {
   return (
-    <Figure caption="同じ文を繰り返すと、文の流れごと覚えてしまう。毎回違う文なら、その音の指の運びだけが残る">
+    <Figure caption="決まった文はいずれ一巡し、文の流れごと覚えてしまう。毎回新しい文なら、その音の指の運びだけが残る">
       <div className="grid gap-6 sm:grid-cols-2">
         <div>
-          <p className="text-xs tracking-widest text-kinari/50">同じ文を繰り返す</p>
+          <p className="text-xs tracking-widest text-kinari/50">
+            これまで：運営が用意した文から出る
+          </p>
           <div className="mt-3 space-y-2">
             <Sentence text="きのうはげんきだった" faded />
-            <Sentence text="きのうはげんきだった" faded />
+            <Sentence text="すきなきせつはあき" faded />
             <Sentence text="きのうはげんきだった" faded />
           </div>
         </div>
         <div>
-          <p className="text-xs tracking-widest text-kin">HENGE：毎回違う文</p>
+          <p className="text-xs tracking-widest text-kin">HENGE：AIがその場で作る文</p>
           <div className="mt-3 space-y-2">
             <Sentence text="きのうはげんきだった" />
             <Sentence text="すきなきせつはあき" />

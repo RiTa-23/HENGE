@@ -102,8 +102,12 @@ export default function OptimizationAboutPage() {
 
         <Section title="5. 身につけるには、反復がいる">
           <p>
-            知っただけでは使えません。慣れた指は、気を抜くと元の運びに戻ります。
-            <Em>いろいろな文の中で、何度も打つ</Em>ことで、実戦でも出せるようになります。
+            知っただけでは使えません。慣れた指は、気を抜くと元の運びに戻ります。ただ、決まった文を繰り返すだけでは、指より先に文を覚えてしまいます。
+          </p>
+          <p>
+            HENGEのお題は、<Em>運営が1文も書いていません。</Em>
+            AIがその場で作るので毎回違い、同じ文が続けて出ることもありません。
+            <Em>いろいろな文の中で、何度も打てます。</Em>
           </p>
           <RepetitionFigure />
         </Section>
@@ -129,9 +133,25 @@ export default function OptimizationAboutPage() {
 
         <Section title="HENGEでの練習の仕方">
           <PracticeFlowFigure />
-          <p>
-            運指は、ほかの人が投稿したものから選ぶこともできます。打っている間、その音の箇所では運指ガイドが決めた指を案内します。
-          </p>
+          <ul className="grid gap-3 sm:grid-cols-3">
+            {[
+              [
+                "練習したい最適化を、自分で作れる",
+                "これまでは運営が用意した最適化しか練習できませんでした。HENGEでは、無ければログインして音を入れるだけで新しく作れます。用意を待たずに、いつでも好きな最適化を練習できます",
+              ],
+              ["運指を共有できる", "自分の崩し方を投稿して、ほかの人に使ってもらえます"],
+              [
+                "みんなの運指から選べる",
+                "選んだ人の多い順に並ぶので、みんなが使っている運指を確かめて、そのまま自分の運指に設定できます",
+              ],
+            ].map(([title, body]) => (
+              <li key={title} className="rounded border border-kin/40 px-4 py-3">
+                <p className="text-kinari">{title}</p>
+                <p className="mt-1 text-sm leading-relaxed text-kinari/60">{body}</p>
+              </li>
+            ))}
+          </ul>
+          <p>打っている間、その音の箇所では選んだ運指で指を案内します。</p>
           <p className="pt-2 text-center">
             <a
               href="/practice"

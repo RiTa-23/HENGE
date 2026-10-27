@@ -1,11 +1,11 @@
-import { and, desc, eq, sql } from "drizzle-orm";
+import { and, desc, eq, inArray, sql } from "drizzle-orm";
 import { asBatch, chunk } from "./batch";
 import type { Db } from "./client";
 import { prompts, themes } from "./schema";
 import type { ValidPrompt } from "../generation/batch";
 import type { VocabularyWord } from "../generation/vocabulary";
 import { constraintVocabularyInsert } from "./vocabularies";
-import type { PromptForm, ThemeKind } from "@henge/shared";
+import type { PromptForm, ReplayPrompt, ThemeKind } from "@henge/shared";
 
 /**
  * テーマ内のお題の数。**`COUNT(*)` で数える（`MAX(sequence_number)` ではない）。**
@@ -82,6 +82,32 @@ export async function fetchPromptPage(
     id: row.id,
     text: row.text,
     readingKana: row.readingKana,
+    readingRoman: JSON.parse(row.readingRomanJson) as string[][],
+  }));
+}
+
+/**
+ * ランキングの登録で、打鍵ログを再生するためのお題の読み。**IDで引く。**
+ *
+ * 並びは保証しない（呼び出し側がチケットの出題順に並べ直す）。消されたお題は
+ * 返らないので、件数が足りなければ呼び出し側で登録を断る。
+ * 1プレイは最大20問（単語）なので、D1 のバインド変数の上限（100）に届かない。
+ */
+export async function fetchPromptsByIds(db: Db, ids: string[]): Promise<ReplayPrompt[]> {
+  if (ids.length === 0) return [];
+  const rows = await db
+    .select({
+      id: prompts.id,
+      themeId: prompts.themeId,
+      form: prompts.form,
+      readingRomanJson: prompts.readingRomanJson,
+    })
+    .from(prompts)
+    .where(inArray(prompts.id, ids));
+  return rows.map((row) => ({
+    id: row.id,
+    themeId: row.themeId,
+    form: row.form,
     readingRoman: JSON.parse(row.readingRomanJson) as string[][],
   }));
 }

@@ -1,5 +1,6 @@
-import { constraintCharRejection, playStatsRejection } from "@henge/shared";
+import { constraintCharRejection, MAX_PLAY_LOG_KEYS } from "@henge/shared";
 import { z } from "zod";
+import { PLAY_TICKET_MAX_LENGTH } from "@/lib/api/play-ticket";
 import { decodeFingering, FINGERING_NOTE_MAX } from "@/lib/practice/fingering";
 
 /**
@@ -174,34 +175,26 @@ export const displayNameSchema = z
   );
 
 /**
- * ランキングの登録。クライアントは**生の値**（打鍵数・ミス・時間）を送り、
- * スコアはサーバー（Hono）で計算する。クライアントのスコアを受け取らない。
+ * ランキングの登録。クライアントは**プレイチケットと打鍵ログ**を送る。打鍵数・ミス・
+ * 時間もスコアも受け取らない（送られてきても読み捨てる）。記録はサーバーが打鍵ログを
+ * 再生して出す（`lib/api/play-record.ts`）。
  *
- * 記録は自己申告で改ざんは防げない。ここで弾くのは「打っていないと分かる値」だけで、
- * 規則は `packages/shared` の `playStatsRejection`（1プレイの打鍵数の範囲・時間・
- * 1秒あたりの打鍵数）に1つだけ置く。形式で範囲が変わるので `form` と一緒に検査する。
+ * ここで見るのは形だけ。署名は `verifyPlayTicket`、ログの中身（お題を打ち切ったか・
+ * 時刻が単調か）は再生（`replayPlay`）で見る。キーは正規化後の1文字（`normalizeTypedKey`
+ * と同じ文字の集合）、時刻は開始からの経過ミリ秒（整数）。
  */
-export const rankingRegisterSchema = z
-  .object({
-    themeId: z.string().min(1),
-    form: formSchema,
-    hits: z.number().int().min(0),
-    misses: z.number().int().min(0).max(100_000),
-    /**
-     * **小数で来る。** プレイ画面は `performance.now()` の差で計っていて、
-     * `61234.567` のような値になる。整数を要求すると正しい記録がすべて弾かれるので、
-     * ここで丸める（保存先は INTEGER）。上限・下限の検査は丸めた後に行う。
-     */
-    elapsedMs: z
-      .number()
-      .finite()
-      .transform((ms) => Math.round(ms)),
-  })
-  .superRefine((value, ctx) => {
-    // 弾く理由をそのまま利用者に返す（「範囲外」だけでは何が悪いか分からない）
-    const reason = playStatsRejection(value, value.form);
-    if (reason !== null) ctx.addIssue({ code: "custom", message: reason });
-  });
+export const rankingRegisterSchema = z.object({
+  ticket: z.string().min(1).max(PLAY_TICKET_MAX_LENGTH),
+  log: z
+    .object({
+      keys: z
+        .string()
+        .max(MAX_PLAY_LOG_KEYS)
+        .regex(/^[a-z!,\-.?]*$/),
+      t: z.array(z.number().int().min(0)).max(MAX_PLAY_LOG_KEYS),
+    })
+    .refine((log) => log.keys.length === log.t.length),
+});
 
 /**
  * 読み違い報告の1件分。`expectedKana` はひらがなかカタカナ（承認時にサーバーが

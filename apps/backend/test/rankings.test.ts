@@ -4,7 +4,8 @@ import { env, SELF } from "cloudflare:test";
 import { eq } from "drizzle-orm";
 import { beforeEach, describe, expect, it } from "vitest";
 import { createDb } from "../src/db/client";
-import { rankings, themes, user, userThemeProgress } from "../src/db/schema";
+import { prompts, rankings, themes, user } from "../src/db/schema";
+import { rankingTicketKey } from "../src/kv/keys";
 
 const db = createDb(env.DB);
 
@@ -22,11 +23,6 @@ async function seedUser(id: string, displayName: string | null = id) {
 
 async function seedTheme(id: string) {
   await db.insert(themes).values({ id, kind: "theme", name: id, normalizedName: id });
-}
-
-/** 遊んだ印。ログインユーザーの再生オフセットが1プレイ分進んでいる状態 */
-async function seedPlayed(userId: string, themeId: string, form: "sentence" | "word" = "sentence") {
-  await db.insert(userThemeProgress).values({ userId, themeId, form, playCount: 15 });
 }
 
 /** 60秒・ミス0で hits 打鍵 → スコアは hits と同じ値になる（WPM = hits、正確率 1） */
@@ -54,14 +50,6 @@ async function fillBoard() {
         displayName: id,
       })),
     );
-    await db.insert(userThemeProgress).values(
-      chunk.map((userId) => ({
-        userId,
-        themeId: "t1",
-        form: "sentence" as const,
-        playCount: 15,
-      })),
-    );
   }
   const all = ["u1", ...ids];
   for (let i = 0; i < all.length; i += 10) {
@@ -83,11 +71,18 @@ async function fillBoard() {
   }
 }
 
-async function post(body: unknown) {
+let ticketSeq = 0;
+
+/**
+ * 登録。**チケットの印は呼ぶたびに新しくする**（使い捨てなので、同じ印だと2回目が弾かれる）。
+ * 使い回しを確かめるときだけ `ticketId` を渡す
+ */
+async function post(body: Record<string, unknown>) {
+  ticketSeq += 1;
   const res = await SELF.fetch("http://backend/rankings", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(body),
+    body: JSON.stringify({ ticketId: `j${ticketSeq}`, ticketTtlSeconds: 7200, ...body }),
   });
   return { status: res.status, body: (await res.json()) as Record<string, unknown> };
 }
@@ -99,12 +94,11 @@ async function list(themeId: string, form = "sentence") {
 
 beforeEach(async () => {
   await db.delete(rankings);
-  await db.delete(userThemeProgress);
+  await db.delete(prompts);
   await db.delete(themes);
   await db.delete(user);
   await seedTheme("t1");
   await seedUser("u1", "影丸");
-  await seedPlayed("u1", "t1");
 });
 
 describe("POST /rankings", () => {
@@ -145,7 +139,6 @@ describe("POST /rankings", () => {
   });
 
   it("短文と単語は別のランキング", async () => {
-    await seedPlayed("u1", "t1", "word");
     await post({ userId: "u1", themeId: "t1", form: "sentence", stats: statsOf(300) });
     await post({ userId: "u1", themeId: "t1", form: "word", stats: statsOf(200) });
 
@@ -164,25 +157,32 @@ describe("POST /rankings", () => {
     expect((body.error as { code: string }).code).toBe("NOT_FOUND");
   });
 
-  it("そのプールを遊んでいなければ FORBIDDEN（プレイせずに記録だけ送れない）", async () => {
-    await seedUser("u2", "半蔵");
+  it("同じチケットでは2回登録できない（使い捨て）", async () => {
+    const body = { userId: "u1", themeId: "t1", form: "sentence", stats: statsOf(300) };
+    expect((await post({ ...body, ticketId: "same" })).status).toBe(200);
 
-    const { status, body } = await post({
-      userId: "u2",
-      themeId: "t1",
-      form: "sentence",
-      stats: statsOf(300),
-    });
+    const { status, body: second } = await post({ ...body, ticketId: "same", stats: statsOf(500) });
 
     expect(status).toBe(403);
-    expect((body.error as { code: string }).code).toBe("FORBIDDEN");
-    expect(await list("t1")).toEqual([]);
+    expect((second.error as { code: string }).code).toBe("FORBIDDEN");
+    expect((await list("t1"))[0]?.score).toBe(300);
+    expect(await env.KV.get(rankingTicketKey("same"))).not.toBeNull();
+  });
+
+  it("テーマが無ければチケットを使ったことにしない", async () => {
+    await post({
+      userId: "u1",
+      themeId: "nope",
+      form: "sentence",
+      stats: statsOf(300),
+      ticketId: "unused",
+    });
+    expect(await env.KV.get(rankingTicketKey("unused"))).toBeNull();
   });
 
   it("101位以下は消え、順位は null で返る", async () => {
     await fillBoard();
     await seedUser("late");
-    await seedPlayed("late", "t1");
 
     const { body } = await post({
       userId: "late",
@@ -200,7 +200,6 @@ describe("POST /rankings", () => {
   it("上位に割り込むと最下位が押し出される", async () => {
     await fillBoard();
     await seedUser("late");
-    await seedPlayed("late", "t1");
 
     const { body } = await post({
       userId: "late",
@@ -217,10 +216,35 @@ describe("POST /rankings", () => {
   });
 });
 
+describe("POST /rankings/prompts", () => {
+  it("IDで引いた読みを返す。無いIDは返らない", async () => {
+    await db.insert(prompts).values({
+      id: "p1",
+      themeId: "t1",
+      form: "word",
+      text: "猫",
+      readingKana: "ねこ",
+      readingRomanJson: '[["ne"],["ko","co"]]',
+      keystrokeCount: 4,
+      source: "workers_ai",
+      sequenceNumber: 1,
+    });
+
+    const res = await SELF.fetch("http://backend/rankings/prompts", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ ids: ["p1", "gone"] }),
+    });
+
+    expect(await res.json()).toEqual({
+      prompts: [{ id: "p1", themeId: "t1", form: "word", readingRoman: [["ne"], ["ko", "co"]] }],
+    });
+  });
+});
+
 describe("GET /rankings", () => {
   it("スコアの降順、同点は先に出した方が上。名前は user.display_name を結合する", async () => {
     await seedUser("u2", "半蔵");
-    await seedPlayed("u2", "t1");
     await db.insert(rankings).values([
       {
         themeId: "t1",

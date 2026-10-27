@@ -2,6 +2,7 @@ import {
   accuracyRatio,
   etypingScore,
   keysPerSecond,
+  type PlayLog,
   type PlayStats,
   type PromptForm,
   type ThemeKind,
@@ -32,6 +33,8 @@ const MISSED_KEY_LIMIT = 6;
 export function Result({
   themeId,
   stats,
+  ticket,
+  playLog,
   missedKeys,
   targetTally,
   onRetry,
@@ -48,6 +51,10 @@ export function Result({
   /** ランキングの登録に使う。名前ではなくIDで送る（`kind` を落とすと別のプールになる） */
   themeId: string;
   stats: PlayStats;
+  /** プレイチケット（出したお題の証明）。ランキングの登録に使う。署名鍵が無ければ null */
+  ticket: string | null;
+  /** このプレイの打鍵ログ。ランキングの登録でサーバーが再生して記録を出す */
+  playLog: PlayLog;
   /** 打ち損ねた文字と回数。1プレイ（短文10問／単語20問）の通算 */
   missedKeys: ReadonlyMap<string, number>;
   /**
@@ -174,7 +181,9 @@ export function Result({
             <RankingRegister
               themeId={themeId}
               form={form}
-              stats={stats}
+              score={etypingScore(stats)}
+              ticket={ticket}
+              playLog={playLog}
               rankingHref={rankingHref(kind, themeName, form)}
             />
 

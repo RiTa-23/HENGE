@@ -6,6 +6,7 @@ export {
   MIX_CHAOS_NAME,
   MIX_MODES,
   MIX_STANDARD_NAME,
+  MIX_SUPER_CHAOS_NAME,
   type MixName,
   mixWordsPerSentence,
   normalizeConstraintChar,

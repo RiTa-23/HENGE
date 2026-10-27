@@ -83,13 +83,14 @@ describe("GET /themes（ごちゃまぜ）", () => {
     expect((body.themes as { name: string }[]).map((t) => t.name)).toEqual([
       "おまかせ",
       "ごちゃまぜ",
+      "超ごちゃまぜ",
     ]);
   });
 
   it("テーマ・最適化の一覧には出ない（公開一覧にお題0件の行を出さない）", async () => {
     await get("/themes?kind=mix");
 
-    expect(await db.select().from(themes)).toHaveLength(2);
+    expect(await db.select().from(themes)).toHaveLength(3);
     expect((await get("/themes?kind=theme")).body.themes).toEqual([]);
     expect((await get("/themes?kind=constraint")).body.themes).toEqual([]);
   });

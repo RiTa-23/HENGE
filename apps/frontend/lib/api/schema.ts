@@ -34,6 +34,9 @@ export const fingeringPostSchema = z.object({
 /** 投稿一覧の取得（`GET /api/fingerings?themeId=`） */
 export const fingeringListQuerySchema = z.object({ themeId: z.string().min(1) });
 
+/** お気に入りの登録・解除（`PUT` / `DELETE /api/favorites`）。kind はテーマ行から Hono 側で見る */
+export const favoriteSchema = z.object({ themeId: z.string().min(1) });
+
 /** 投稿ID（パスパラメータ） */
 export const fingeringIdParamSchema = z.object({ id: z.string().min(1) });
 

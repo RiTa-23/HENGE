@@ -347,6 +347,35 @@ export const fingeringPicks = sqliteTable(
 );
 
 /**
+ * お気に入り。**ログインユーザーが登録したテーマ／最適化する音**を1件1行で持つ。
+ * マイページの「お気に入り」に登録の新しい順で並べ、一覧から探し直さずに戻れるようにする。
+ *
+ * - 対象は `kind: 'theme' | 'constraint'` だけ（おまかせ・ごちゃまぜは対象外。Hono 側で弾く）
+ * - 匿名は持たない（匿名ユーザーのデータをサーバーに持たない＝不変条件10）
+ * - テーマ・ユーザーの削除は CASCADE で消える。KV には持たないので、テーマ削除で
+ *   KV を消す処理（不変条件6）に足すものは無い
+ */
+export const favorites = sqliteTable(
+  "favorites",
+  {
+    userId: text("user_id")
+      .notNull()
+      .references(() => user.id, { onDelete: "cascade" }),
+    themeId: text("theme_id")
+      .notNull()
+      .references(() => themes.id, { onDelete: "cascade" }),
+    createdAt: integer("created_at")
+      .notNull()
+      .default(sql`(unixepoch())`),
+  },
+  (t) => [
+    primaryKey({ columns: [t.userId, t.themeId] }),
+    // マイページの一覧（本人で絞って登録の新しい順）
+    index("favorites_user_created").on(t.userId, desc(t.createdAt)),
+  ],
+);
+
+/**
  * Better Auth 管理下のテーブル。Better Auth の CLI（auth パッケージ）が生成したものを
  * packages/shared に置き、両Workerから参照する。
  *

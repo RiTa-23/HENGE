@@ -1,6 +1,7 @@
 import { PROMPT_FORMS } from "@henge/shared";
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
+import { FavoriteButton } from "@/components/FavoriteButton";
 import { DetailScroll } from "@/components/DetailScroll";
 import { difficultForms } from "@/components/DifficultBadge";
 import { FormButton } from "@/components/FormButton";
@@ -8,6 +9,7 @@ import { RankingBoard } from "@/components/RankingBoard";
 import { ThemeMark } from "@/components/ModeMark";
 import { SiteFooter } from "@/components/SiteFooter";
 import { SiteHeader } from "@/components/SiteHeader";
+import { favoriteStatus } from "@/lib/api/favorites";
 import { ogFields, pageTitle } from "@/lib/og";
 import { listRankings } from "@/lib/api/rankings";
 import { decodePageParam, findTheme } from "@/lib/api/themes";
@@ -57,9 +59,12 @@ export default async function ThemeDetailPage({
 
   const difficult = difficultForms(theme);
   // ランキングは形式ごとに別。全部引いてタブで切り替える（`RankingBoard`）
-  const boards = await Promise.all(
-    PROMPT_FORMS.map(async (form) => ({ form, entries: await listRankings(theme.id, form) })),
-  );
+  const [boards, favorite] = await Promise.all([
+    Promise.all(
+      PROMPT_FORMS.map(async (form) => ({ form, entries: await listRankings(theme.id, form) })),
+    ),
+    favoriteStatus(theme.id),
+  ]);
 
   return (
     <>
@@ -69,6 +74,11 @@ export default async function ThemeDetailPage({
           mark={<ThemeMark className="h-5 w-5" />}
           eyebrow="テーマ"
           title={theme.name}
+          favorite={
+            favorite !== null && (
+              <FavoriteButton themeId={theme.id} initialFavorited={favorite.favorited} />
+            )
+          }
           description={
             <>
               「{theme.name}」をテーマにしたお題です。単語・短文・長文の3つの打ち方があり、

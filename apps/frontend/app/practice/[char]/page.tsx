@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
+import { FavoriteButton } from "@/components/FavoriteButton";
 import { DefaultFingeringEditor } from "@/components/DefaultFingeringEditor";
 import { DetailMato } from "@/components/DetailScroll";
 import { FingeringPanel } from "@/components/FingeringPanel";
@@ -9,6 +10,7 @@ import { SealButton } from "@/components/SealButton";
 import { SiteFooter } from "@/components/SiteFooter";
 import { SiteHeader } from "@/components/SiteHeader";
 import { defaultFingeringEditable } from "@/lib/api/fingering";
+import { favoriteStatus } from "@/lib/api/favorites";
 import { ogFields, pageTitle } from "@/lib/og";
 import { listRankings } from "@/lib/api/rankings";
 import { decodePageParam, findTheme } from "@/lib/api/themes";
@@ -53,12 +55,14 @@ export default async function PracticeDetailPage({
 
   // 作成者が決めた運指。音と照らして形が合わなければ標準運指に倒す
   const defaultFingering = decodeFingering(theme.defaultFingering, theme.name);
-  // 既定の運指を変えられるのは作成者と運営だけ。守っているのは公開API（PUT /api/themes/fingering）で、
-  // ここは欄を出すかどうか
-  const editable = await defaultFingeringEditable(theme.id);
-
+  // 既定の運指を変えられるのは作成者と運営だけ（editable）。守っているのは公開API
+  // （PUT /api/themes/fingering）で、ここは欄を出すかどうか
   // 最適化する音は短文だけなので、ランキングも1つ
-  const entries = await listRankings(theme.id, "sentence");
+  const [editable, entries, favorite] = await Promise.all([
+    defaultFingeringEditable(theme.id),
+    listRankings(theme.id, "sentence"),
+    favoriteStatus(theme.id),
+  ]);
 
   return (
     <>
@@ -68,6 +72,11 @@ export default async function PracticeDetailPage({
           mark={<PracticeMark className="h-5 w-5" />}
           eyebrow="最適化する音"
           title={theme.name}
+          favorite={
+            favorite !== null && (
+              <FavoriteButton themeId={theme.id} initialFavorited={favorite.favorited} />
+            )
+          }
           description={
             <>
               読み仮名に「{theme.name}」を含む文章だけが出ます。表記に現れていなくても構いません。

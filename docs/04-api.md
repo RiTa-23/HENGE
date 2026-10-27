@@ -31,6 +31,8 @@
 | POST | `/api/fingerings` | 必須（ユーザー名あり） | 運指の投稿 |
 | DELETE | `/api/fingerings/[id]` | 投稿者・運営 | 投稿の削除 |
 | PUT | `/api/fingerings/[id]/pick` | 必須 | この投稿を選んだ、の記録（1人1つの最適化につき1票） |
+| PUT | `/api/favorites` | 必須 | お気に入りに登録（登録済みなら何もしない） |
+| DELETE | `/api/favorites` | 必須 | お気に入りから外す |
 | GET | `/api/admin/themes` | 管理者 | 管理用一覧 |
 | DELETE | `/api/admin/themes/[id]` | 管理者 | 削除（prompts・KVも連鎖） |
 | GET | `/api/admin/themes/[id]/prompts` | 管理者 | テーマ1つ分のお題一覧（管理用） |
@@ -146,6 +148,20 @@
 - **1人1つの最適化につき5件まで**（`VALIDATION_ERROR`）。最適化をまたいだ連投は `FINGERING_RATE_LIMIT` で弾く
 - 削除は投稿者本人か運営。消すと、その投稿を選んだ記録も消える
 - **選んだ記録（`/pick`）はログインユーザーだけ。** 匿名は数えない（不変条件10）。運指の適用そのものはクライアントの localStorage で済ませてあり、ここは数えるだけ。選び直せば票が移る
+
+### お気に入り（/api/favorites）
+
+```jsonc
+// PUT / DELETE /api/favorites のリクエスト
+{ "themeId": "..." }
+// レスポンス
+{ "favorited": true }
+```
+
+- **ログインユーザーだけ**（`UNAUTHORIZED`）。匿名のお気に入りは持たない（不変条件10）ので、匿名の画面にはボタンを出さない
+- `userId` は本文で受けず、セッションから取る（他人のお気に入りを触る口を作らない）
+- 対象はテーマと最適化する音（`kind: 'theme' | 'constraint'`）。テーマが無い・おまかせ／ごちゃまぜ（`mix`）は `NOT_FOUND`
+- 一覧の取得は公開APIに置かない。マイページ（SSR）が Service Bindings で Hono の `GET /favorites` を直接引く。詳細ページのボタンの初期状態も同じく SSR で `GET /favorites/status` を引く
 
 ### POST /api/prompts/regenerate
 
@@ -324,6 +340,10 @@
 | POST | `/fingerings` | 投稿。同じ運指・1人5件超えは `VALIDATION_ERROR` |
 | DELETE | `/fingerings/:id` | 投稿の削除 |
 | PUT | `/fingerings/picks` | 選んだ投稿の記録（`userId` × 最適化で1行。上書き） |
+| GET | `/favorites` | ある利用者のお気に入り（`userId` をクエリで受ける）。登録の新しい順に最大100件、一覧と同じ形。マイページ用 |
+| GET | `/favorites/status` | お気に入りにしているか（`userId` / `themeId` をクエリで受ける）。詳細ページのボタン用 |
+| PUT | `/favorites` | 登録（`userId` / `themeId` は本文）。登録済みなら何もしない。テーマが無い・`mix` は `NOT_FOUND` |
+| DELETE | `/favorites` | 解除（同上）。登録していなくてもエラーにしない |
 | GET | `/users/themes` | ある利用者が作ったテーマ／含む文字の一覧（`userId` / `limit` / `cursor` をクエリで受ける）。`kind` で絞らず作成順。マイページ用 |
 | GET | `/admin/themes` | 管理用一覧 |
 | DELETE | `/admin/themes/:id` | 削除 |

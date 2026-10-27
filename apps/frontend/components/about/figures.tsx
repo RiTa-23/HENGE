@@ -249,48 +249,101 @@ export function RomanBranchFigure() {
   );
 }
 
-/** 文の中で、最適化する音（き）に金の下線を引く */
-function Sentence({ text, faded = false }: { text: string; faded?: boolean }) {
+/** お題1枚。文の中身は描かず、札の字で「どの文か」だけを見せる */
+function Slip({ label, tone }: { label: string; tone: "stock" | "again" | "new" }) {
+  const style = {
+    stock: "border-kinari/30 text-kinari/70",
+    again: "border-kinari/15 text-kinari/30",
+    new: "border-kin/70 text-kin",
+  }[tone];
   return (
-    <p
-      className={`font-mincho text-base tracking-widest ${faded ? "text-kinari/40" : "text-kinari"}`}
+    <span
+      className={`flex h-11 w-8 shrink-0 flex-col items-center justify-between rounded-sm border px-1 pt-1 pb-1.5 font-mincho text-sm ${style}`}
     >
-      {[...text].map((char, index) =>
-        char === "き" ? (
-          <span key={index} className="border-b-2 border-kin text-kin">
-            {char}
-          </span>
-        ) : (
-          <span key={index}>{char}</span>
-        ),
-      )}
-    </p>
+      {label}
+      <span className="flex w-full flex-col gap-0.5">
+        <span className="h-px w-full bg-current opacity-40" />
+        <span className="h-px w-2/3 bg-current opacity-40" />
+      </span>
+    </span>
+  );
+}
+
+/** 出どころから、出る順の列へ下ろす矢印 */
+function DownArrow({ label }: { label: string }) {
+  return (
+    <div className="my-2 flex items-center justify-center gap-2 text-kinari/40">
+      <svg viewBox="0 0 12 28" className="h-7 w-3" fill="none" stroke="currentColor" aria-hidden>
+        <path d="M6 1v25M1.5 21.5 6 26l4.5-4.5" strokeWidth="1.2" />
+      </svg>
+      <span className="text-[11px] tracking-widest">{label}</span>
+    </div>
+  );
+}
+
+/** AI が作ることの印（きらめき） */
+function SparkMark() {
+  return (
+    <svg viewBox="0 0 24 24" className="h-5 w-5" fill="currentColor" aria-hidden>
+      <path d="M10 2c.6 4.4 2.6 6.4 7 7-4.4.6-6.4 2.6-7 7-.6-4.4-2.6-6.4-7-7 4.4-.6 6.4-2.6 7-7Z" />
+      <path d="M18.5 13c.3 2 1.2 2.9 3.2 3.2-2 .3-2.9 1.2-3.2 3.2-.3-2-1.2-2.9-3.2-3.2 2-.3 2.9-1.2 3.2-3.2Z" />
+    </svg>
   );
 }
 
 /**
- * 反復の仕方。同じ文の繰り返しは文ごと覚えてしまうが、毎回違う文なら
- * 「き」の指の運びだけが残る。HENGE がお題を毎回作る理由そのもの
+ * お題の出どころ。これまでは運営が用意した文の在庫から出すので、一巡すると同じ文に戻る。
+ * HENGE は運営が文を書かず、AI がその場で作るので毎回新しい。HENGE がお題を毎回作る理由そのもの。
+ *
+ * **例文を並べて比べない。** 文を読み比べさせると「何が違うのか」が伝わりにくかったので、
+ * 文は札（字だけ）にして、出どころと出る順の形の違いで見せる
  */
 export function RepetitionFigure() {
   return (
-    <Figure caption="同じ文を繰り返すと、文の流れごと覚えてしまう。毎回違う文なら、その音の指の運びだけが残る">
-      <div className="grid gap-6 sm:grid-cols-2">
-        <div>
-          <p className="text-xs tracking-widest text-kinari/50">同じ文を繰り返す</p>
-          <div className="mt-3 space-y-2">
-            <Sentence text="きのうはげんきだった" faded />
-            <Sentence text="きのうはげんきだった" faded />
-            <Sentence text="きのうはげんきだった" faded />
+    <Figure caption="決まった文はいずれ一巡し、文の流れごと覚えてしまう。毎回新しい文なら、その音の指の運びだけが残る">
+      <div className="grid gap-8 sm:grid-cols-2 sm:gap-6">
+        <div className="flex flex-col items-center">
+          <p className="text-xs tracking-widest text-kinari/50">これまで</p>
+          <div className="mt-3 flex flex-col items-center rounded border border-kinari/20 px-4 py-3">
+            <span className="text-[11px] tracking-widest text-kinari/60">運営が用意した文</span>
+            <div className="mt-2 flex gap-1.5">
+              {["A", "B", "C"].map((label) => (
+                <Slip key={label} label={label} tone="stock" />
+              ))}
+            </div>
           </div>
+          <DownArrow label="この中から出す" />
+          <div className="flex items-end gap-1.5">
+            {["A", "B", "C"].map((label) => (
+              <Slip key={label} label={label} tone="stock" />
+            ))}
+            {["A", "B", "C"].map((label) => (
+              <Slip key={`again-${label}`} label={label} tone="again" />
+            ))}
+          </div>
+          <p className="mt-2 text-[11px] tracking-widest text-kinari/50">
+            一巡すると、同じ文に戻る
+          </p>
         </div>
-        <div>
-          <p className="text-xs tracking-widest text-kin">HENGE：毎回違う文</p>
-          <div className="mt-3 space-y-2">
-            <Sentence text="きのうはげんきだった" />
-            <Sentence text="すきなきせつはあき" />
-            <Sentence text="てんきよほうをきく" />
+        <div className="flex flex-col items-center">
+          <p className="text-xs tracking-widest text-kin">HENGE</p>
+          <div className="mt-3 flex flex-col items-center rounded border border-kin/50 px-4 py-3 text-kin">
+            <SparkMark />
+            <span className="mt-1.5 text-[11px] tracking-widest">AIがその場で作る</span>
+            <span className="mt-0.5 text-[11px] tracking-widest text-kinari/50">
+              運営は1文も書かない
+            </span>
           </div>
+          <DownArrow label="打つたびに生まれる" />
+          <div className="flex items-end gap-1.5">
+            {["1", "2", "3", "4", "5"].map((label) => (
+              <Slip key={label} label={label} tone="new" />
+            ))}
+            <span className="pb-3 text-kin/70">…</span>
+          </div>
+          <p className="mt-2 text-[11px] tracking-widest text-kin/80">
+            毎回新しい文。同じ文は出ない
+          </p>
         </div>
       </div>
     </Figure>

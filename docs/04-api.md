@@ -323,6 +323,8 @@
 | `'theme'` | 任意の文字列（1〜30文字） |
 | `'constraint'` | **ひらがなのみ**（1〜4文字）。**小書きのかな（ぁぃぅぇぉゃゅょゎゕゖ）で始まる音は弾く**（`constraintCharRejection`。「ゃ」は「きゃ」の一部として打ち、単独では現れない。`docs/05-generation.md`「打鍵の単位で照合する」）。「っ」は弾かない |
 
+**どちらの kind も、NG 語の入った名前は弾く**（`containsNgWordInName`。文言は「この名前ではお題を作れません。別の名前でお試しください」で、どこがだめかは示さない）。照合は `docs/05-generation.md`「入力の照合」。
+
 ## ②内部API（Hono）
 
 | Method | Path | 説明 |

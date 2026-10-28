@@ -31,21 +31,23 @@ import { MODERATION_CASES, type ModerationCase, type ModerationKind } from "./mo
  * 試験セットは約80件。single は件数分呼ぶので、既定（2モデル × 2方式）で数百〜千ニューロン程度を
  * 使う見込み（アカウント全体の無料枠は1日10,000。**利用者の生成と同じ枠**なので空いている時間に）。
  *
- * **Clef の入出力の形は公式ページで確かめきれていない。** 依頼は `{ model, state, questions }`、
- * noul の答えは「はい」の確率という前提で組み、答えの読み取りは複数の形を試す（`probabilityOf`）。
- * 読めなかった応答は生のまま出力に残すので、最初の1回はそれを見て形を確かめる。
+ * 依頼は `{ model, state, questions }`、応答は `{ model, answers: { q0: { type: "noul", noul } }, usage }`
+ * （noul は「はい」の確率）。実際に呼んで確かめた形。読めなかった応答は生のまま出力に残す。
  *
  * 出力: 画面にしきい値ごとの集計、`--out`（既定 moderation-models.md）に件ごとの確率と生の応答。
  */
 
-const CLEF = "@cf/cloudflare/clef";
 type ClefModel = "clef" | "clef-flash";
+/** モデルごとに ID が分かれていて、依頼の `model` と揃える（公式ページ） */
+const MODEL_ID: Record<ClefModel, string> = {
+  clef: "@cf/cloudflare/clef",
+  "clef-flash": "@cf/cloudflare/clef-flash",
+};
 type Mode = "batch" | "single";
 
 /**
- * 入力100万トークンあたりのニューロン。**第三者記事の単価からの換算で、未確認**
- * （Clef $0.24 → 21,818。Clef-flash は $0.038 と $0.09 の記事があり、安い側の 3,455 を置く）。
- * 出力は無料とされる。公式の単価が分かったら直す
+ * 入力100万トークンあたりのニューロン。公式の料金表の値（Clef $0.24、Clef-flash $0.038）。
+ * 出力は課金されない
  */
 const NEURONS_PER_M_INPUT: Record<ClefModel, number> = {
   clef: 21_818,
@@ -135,48 +137,24 @@ function buildRequest(
 }
 
 /**
- * noul の答えから「はい」の確率を取り出す。**形が未確認なので、ありそうな形を順に試す。**
+ * noul の答え `{ type: "noul", noul: 0.89 }` から「はい」の確率を取り出す（実際の応答で確認済み）。
  * 読めなければ undefined（生の応答を出力に残す）
  */
 function probabilityOf(answer: unknown): number | undefined {
-  if (typeof answer === "number") return answer;
-  if (typeof answer !== "object" || answer === null) return undefined;
-  const a = answer as Record<string, unknown>;
-  for (const key of ["probability", "p_yes", "yes", "true", "score"]) {
-    if (typeof a[key] === "number") return a[key];
-  }
-  for (const key of ["probabilities", "distribution", "scores"]) {
-    const inner = a[key];
-    if (typeof inner === "object" && inner !== null) {
-      const p = inner as Record<string, unknown>;
-      for (const yes of ["yes", "true", "Yes", "YES", "はい"]) {
-        if (typeof p[yes] === "number") return p[yes];
-      }
-    }
-  }
-  return undefined;
+  const noul = (answer as { noul?: unknown } | null | undefined)?.noul;
+  return typeof noul === "number" ? noul : undefined;
 }
 
-/** 応答のどこに答えの表があるかも未確認なので、ありそうな場所を順に見る */
+/** 応答は `{ model, answers: { q0: …, q1: … }, usage }` */
 function answersOf(result: unknown): Record<string, unknown> | undefined {
-  const r = result as Record<string, unknown> | null;
-  const candidates = [
-    r?.answers,
-    (r?.response as Record<string, unknown> | undefined)?.answers,
-    (r?.result as Record<string, unknown> | undefined)?.answers,
-    r?.response,
-    r?.result,
-  ];
-  for (const c of candidates) {
-    if (typeof c === "object" && c !== null && "q0" in c) return c as Record<string, unknown>;
-  }
-  return undefined;
+  const answers = (result as { answers?: unknown } | null)?.answers;
+  return typeof answers === "object" && answers !== null
+    ? (answers as Record<string, unknown>)
+    : undefined;
 }
 
 function inputTokensOf(result: unknown): number {
-  const usage = (result as { usage?: { prompt_tokens?: number; input_tokens?: number } } | null)
-    ?.usage;
-  return usage?.prompt_tokens ?? usage?.input_tokens ?? 0;
+  return (result as { usage?: { input_tokens?: number } } | null)?.usage?.input_tokens ?? 0;
 }
 
 type RemoteRun = (model: string, body: ClefRequest) => Promise<unknown>;
@@ -232,7 +210,7 @@ async function runOnce(model: ClefModel, mode: Mode, remoteRun: RemoteRun | unde
       const started = performance.now();
       let result: unknown;
       try {
-        result = await remoteRun(CLEF, request);
+        result = await remoteRun(MODEL_ID[model], request);
       } catch (error) {
         stats.failures += 1;
         stats.raw.push(`${kind} の依頼が失敗: ${String(error)}`);
@@ -316,7 +294,7 @@ for (const model of options.models) {
         `## ${label}`,
         "",
         `- 呼び出し ${stats.calls} 回（失敗 ${stats.failures}）、読めなかった答え ${unreadable}/${stats.judged.length} 件`,
-        `- 入力 ${stats.inputTokens} トークン、推定 ${neurons.toFixed(1)} ニューロン（単価は未確認）`,
+        `- 入力 ${stats.inputTokens} トークン、推定 ${neurons.toFixed(1)} ニューロン`,
         `- 所要時間の中央値 ${Math.round(median(stats.millis))}ms`,
         "",
         ...thresholdTable(stats.judged),

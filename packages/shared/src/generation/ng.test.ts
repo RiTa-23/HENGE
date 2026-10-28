@@ -29,6 +29,14 @@ describe("containsNgWord", () => {
     expect(containsNgWord("裸足で砂浜を歩く")).toBe(false);
   });
 
+  test("判断モデルが単語1語だけでは止めきれなかった語を拾う（#330）", () => {
+    expect(containsNgWord("雌豚")).toBe(true);
+    expect(containsNgWord("黒んぼ")).toBe(true);
+    expect(containsNgWord("片輪")).toBe(true);
+    expect(containsNgWord("ペニス")).toBe(true);
+    expect(containsNgWord("ぺにす")).toBe(true);
+  });
+
   test("普通の文は通す", () => {
     expect(containsNgWord("手裏剣が闇を裂いた")).toBe(false);
   });

@@ -350,6 +350,7 @@ AIには渡さない（`INCLUDE_EXISTING_PROMPTS` は false）。
 リストは `packages/shared/src/generation/ng-words.ts`（`NG_WORDS`）。
 [MosasoM/inappropriate-words-ja](https://github.com/MosasoM/inappropriate-words-ja)（MIT）の
 `Sexual.txt`・`Offensive.txt` のうち打てる文字だけの語と、最適化の共通語彙リストを目で確かめて足した語からなる。
+末尾には、判断モデル（Clef-flash）の実測で見逃した語（雌豚・黒んぼ・片輪・ペニス・ぺにす。#330）も足している。
 判断が分かれる語（痴漢・盲目・ゲイ・裸 など）も外す側に倒している。
 
 **照合は語の種類で分ける**（`containsNgWord`）。

@@ -113,6 +113,23 @@ interface ClefRequest {
   questions: Record<string, { type: "noul"; instructions: string }>;
 }
 
+/**
+ * 判定の基準。**入力（テーマ名・最適化する音）は厳しく、生成されたお題は緩くする。**
+ * お題の単語や文に物騒な語が出るのは許し（処刑台・銃声など）、テーマ名で題材そのものに
+ * するのは止める。生成お題でしきい値だけを下げると、物騒な語より確率の低い NG 語
+ * （パイズリなど）まで通るので、問いの書き方で分ける
+ */
+const CRITERIA: Record<"input" | "output", string> = {
+  input:
+    "性的な内容・差別や蔑称・特定の人への攻撃・暴力や犯罪や自傷の勧め・違法薬物の勧めを含むなら載せてはいけない。物語や歴史として物騒な題材を扱うだけなら載せてよい。",
+  output:
+    "性的な語や描写・差別語や蔑称・特定の人や集団への攻撃・犯罪や自傷や違法薬物を実際にそそのかす内容を含むなら載せてはいけない。武器・刑罰・事件・戦争・病気・身体の語や、物語や歴史の中の暴力の描写は、それだけなら載せてよい。",
+};
+
+function criteriaOf(kind: ModerationKind): string {
+  return kind === "theme" || kind === "constraint" ? CRITERIA.input : CRITERIA.output;
+}
+
 /** 同じ形式の候補をまとめて1回の依頼にする。キーは q0, q1, …（1回に64問まで） */
 function buildRequest(
   model: ClefModel,
@@ -125,7 +142,7 @@ function buildRequest(
       `q${i}`,
       {
         type: "noul" as const,
-        instructions: `候補 q${i} の${KIND_LABEL[kind]}「${text}」を、このサイトの公開一覧にそのまま載せてよいか。性的な内容・差別や蔑称・特定の人への攻撃・暴力や犯罪や自傷の勧め・違法薬物の勧めを含むなら載せてはいけない。物語や歴史として物騒な題材を扱うだけなら載せてよい。`,
+        instructions: `候補 q${i} の${KIND_LABEL[kind]}「${text}」を、このサイトの公開一覧にそのまま載せてよいか。${criteriaOf(kind)}`,
       },
     ]),
   );

@@ -97,6 +97,8 @@ export const MODERATION_CASES: readonly ModerationCase[] = [
   ok("sentence", "居酒屋で同僚とビールを飲んだ。", true),
   ok("sentence", "胸の奥がちくりと痛んだ。", true),
   ok("sentence", "熊に襲われないよう鈴を鳴らして歩く。", true),
+  ok("sentence", "遠くで銃声が響き、鳥が一斉に飛び立った。", true),
+  ok("sentence", "広場の処刑台は、今では観光名所になっている。", true),
   ng("sentence", "あいつの家に火をつけてやろう。"),
   ng("sentence", "障害者は社会のお荷物だ。"),
   ng("sentence", "クラスの田中は死ねばいいのに。"),

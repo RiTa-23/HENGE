@@ -5,6 +5,7 @@
  */
 import { writeFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
+import { containsNgWord } from "@henge/shared";
 import { getPlatformProxy } from "wrangler";
 import { MODERATION_CASES, type ModerationCase, type ModerationKind } from "./moderation-cases";
 
@@ -83,6 +84,9 @@ type Options = {
   runs: number;
   out: string;
   dryRun: boolean;
+  /** 判定する形式（既定は全部）。入力は確率が毎回同じなので、生成お題だけ回し直すときに絞る */
+  kinds: ModerationKind[];
+  themeContext: boolean;
 };
 
 function parseArgs(argv: readonly string[]): Options {
@@ -98,12 +102,19 @@ function parseArgs(argv: readonly string[]): Options {
   if (!modes.every((m) => m === "batch" || m === "single")) {
     throw new Error("--modes= は batch と single だけ");
   }
+  const allKinds = Object.keys(BATCH_SIZE);
+  const kinds = value("kinds")?.split(",") ?? allKinds;
+  if (!kinds.every((k) => allKinds.includes(k))) {
+    throw new Error(`--kinds= は ${allKinds.join(" / ")} だけ`);
+  }
   return {
     models: models as ClefModel[],
     modes: modes as Mode[],
     runs,
     out: value("out") ?? "moderation-models.md",
     dryRun: argv.includes("--dry-run"),
+    kinds: kinds as ModerationKind[],
+    themeContext: argv.includes("--theme-context"),
   };
 }
 
@@ -130,25 +141,36 @@ function criteriaOf(kind: ModerationKind): string {
   return kind === "theme" || kind === "constraint" ? CRITERIA.input : CRITERIA.output;
 }
 
-/** 同じ形式の候補をまとめて1回の依頼にする。キーは q0, q1, …（1回に64問まで） */
+/**
+ * 同じ形式の候補をまとめて1回の依頼にする。キーは q0, q1, …（1回に64問まで）。
+ * `theme` を渡すと、生成お題がどのテーマのものかを判定に添える（`--theme-context`）。
+ * 単語は単独だと文脈が無く、「刺殺」「キス」のような語を止めやすいため
+ */
 function buildRequest(
   model: ClefModel,
   kind: ModerationKind,
   texts: readonly string[],
+  theme?: string,
 ): ClefRequest {
   const candidates = Object.fromEntries(texts.map((text, i) => [`q${i}`, text]));
+  const of = theme === undefined ? "" : `、テーマ「${theme}」で生成した`;
   const questions = Object.fromEntries(
     texts.map((text, i) => [
       `q${i}`,
       {
         type: "noul" as const,
-        instructions: `候補 q${i} の${KIND_LABEL[kind]}「${text}」を、このサイトの公開一覧にそのまま載せてよいか。${criteriaOf(kind)}`,
+        instructions: `候補 q${i} の${of}${KIND_LABEL[kind]}「${text}」を、このサイトの公開一覧にそのまま載せてよいか。${criteriaOf(kind)}`,
       },
     ]),
   );
   return {
     model,
-    state: { サイト: SITE, 種類: KIND_LABEL[kind], 候補: candidates },
+    state: {
+      サイト: SITE,
+      種類: KIND_LABEL[kind],
+      ...(theme === undefined ? {} : { テーマ: theme }),
+      候補: candidates,
+    },
     questions,
   };
 }
@@ -190,11 +212,17 @@ interface RunStats {
   raw: string[];
 }
 
+/** 生成お題はテーマ（`group`）ごとに分けてから切る。本番の1ラウンドは1つのテーマだけを含む */
 function chunksOf(kind: ModerationKind, mode: Mode): ModerationCase[][] {
-  const cases = MODERATION_CASES.filter((c) => c.kind === kind);
   const size = mode === "single" ? 1 : BATCH_SIZE[kind];
+  const groups = Map.groupBy(
+    MODERATION_CASES.filter((c) => c.kind === kind),
+    (c) => c.group,
+  );
   const chunks: ModerationCase[][] = [];
-  for (let i = 0; i < cases.length; i += size) chunks.push(cases.slice(i, i + size));
+  for (const cases of groups.values()) {
+    for (let i = 0; i < cases.length; i += size) chunks.push(cases.slice(i, i + size));
+  }
   return chunks;
 }
 
@@ -207,19 +235,22 @@ async function runOnce(model: ClefModel, mode: Mode, remoteRun: RemoteRun | unde
     millis: [],
     raw: [],
   };
-  const kinds = Object.keys(BATCH_SIZE) as ModerationKind[];
-  for (const kind of kinds) {
+  for (const kind of options.kinds) {
     for (const chunk of chunksOf(kind, mode)) {
       const request = buildRequest(
         model,
         kind,
         chunk.map((c) => c.text),
+        options.themeContext ? chunk[0]?.group : undefined,
       );
       stats.calls += 1;
       if (remoteRun === undefined) {
         // 配線の確認用。期待どおりの確率を返す
         stats.judged.push(
-          ...chunk.map((c) => ({ testCase: c, probability: c.expected === "ok" ? 0.9 : 0.1 })),
+          ...chunk.map((c) => ({
+            testCase: c,
+            probability: { ok: 0.9, ng: 0.1, gray: 0.5 }[c.expected],
+          })),
         );
         if (stats.raw.length === 0) stats.raw.push(JSON.stringify(request, null, 2));
         continue;
@@ -264,26 +295,94 @@ function blocked(j: Judged, threshold: number): boolean {
 }
 
 /**
+ * NG 語リスト（`containsNgWord`）を先に当てたうえで弾いたか。本番は生成お題をリストで
+ * 落としてから AI に回す。入力はリストの照合を別に作る（#331）ので、ここでは目安
+ */
+function blockedWithList(j: Judged, threshold: number): boolean {
+  return containsNgWord(j.testCase.text) || blocked(j, threshold);
+}
+
+/**
  * しきい値ごとの成績。**読めなかった・失敗した件は弾いた扱い**（判定不能は止める方針）。
- * 「NG を止めた」は高いほど、「OK を止めた」は低いほどよい
+ * 「NG を止めた」は高いほど、「OK を止めた」は低いほどよい。gray は数えない
  */
 function thresholdTable(judged: readonly Judged[]): string[] {
   const ngCases = judged.filter((j) => j.testCase.expected === "ng");
   const okCases = judged.filter((j) => j.testCase.expected === "ok");
   const trickyCases = okCases.filter((j) => j.testCase.tricky === true);
   const lines = [
-    "| しきい値 | NG を止めた | OK を止めた | うち紛らわしい OK を止めた |",
-    "|---|---|---|---|",
+    "| しきい値 | NG を止めた | リスト併用で NG を止めた | OK を止めた | うち紛らわしい OK を止めた |",
+    "|---|---|---|---|---|",
   ];
   for (const t of THRESHOLDS) {
     const caught = ngCases.filter((j) => blocked(j, t)).length;
+    const caughtWithList = ngCases.filter((j) => blockedWithList(j, t)).length;
     const falseBlock = okCases.filter((j) => blocked(j, t)).length;
     const trickyBlock = trickyCases.filter((j) => blocked(j, t)).length;
     lines.push(
-      `| ${t} | ${caught}/${ngCases.length}（${pct(caught, ngCases.length)}） | ${falseBlock}/${okCases.length}（${pct(falseBlock, okCases.length)}） | ${trickyBlock}/${trickyCases.length} |`,
+      `| ${t} | ${caught}/${ngCases.length}（${pct(caught, ngCases.length)}） | ${caughtWithList}/${ngCases.length}（${pct(caughtWithList, ngCases.length)}） | ${falseBlock}/${okCases.length}（${pct(falseBlock, okCases.length)}） | ${trickyBlock}/${trickyCases.length} |`,
     );
   }
   return lines;
+}
+
+/** 推奨のしきい値での、形式ごとの成績 */
+const FOCUS_THRESHOLD = 0.4;
+
+function kindTable(judged: readonly Judged[]): string[] {
+  const lines = [
+    `| 形式（しきい値 ${FOCUS_THRESHOLD}） | NG を止めた | リスト併用で NG を止めた | OK を止めた |`,
+    "|---|---|---|---|",
+  ];
+  for (const kind of Object.keys(BATCH_SIZE) as ModerationKind[]) {
+    const ofKind = judged.filter((j) => j.testCase.kind === kind);
+    const ngCases = ofKind.filter((j) => j.testCase.expected === "ng");
+    const okCases = ofKind.filter((j) => j.testCase.expected === "ok");
+    const caught = ngCases.filter((j) => blocked(j, FOCUS_THRESHOLD)).length;
+    const caughtWithList = ngCases.filter((j) => blockedWithList(j, FOCUS_THRESHOLD)).length;
+    const falseBlock = okCases.filter((j) => blocked(j, FOCUS_THRESHOLD)).length;
+    lines.push(
+      `| ${KIND_LABEL[kind]} | ${caught}/${ngCases.length} | ${caughtWithList}/${ngCases.length} | ${falseBlock}/${okCases.length} |`,
+    );
+  }
+  return lines;
+}
+
+function describe(j: Judged): string {
+  const p = j.probability === undefined ? "読めず" : j.probability.toFixed(3);
+  const group = j.testCase.group === undefined ? "" : `［${j.testCase.group}］`;
+  return `- ${j.testCase.kind}${group} ${p} ${j.testCase.text}`;
+}
+
+/** 推奨のしきい値で誤ったもの（リスト併用でも見逃した NG・止めた OK）と、gray の確率 */
+function mistakes(judged: readonly Judged[]): string[] {
+  const missed = judged.filter(
+    (j) => j.testCase.expected === "ng" && !blockedWithList(j, FOCUS_THRESHOLD),
+  );
+  const listOnly = judged.filter(
+    (j) =>
+      j.testCase.expected === "ng" &&
+      !blocked(j, FOCUS_THRESHOLD) &&
+      containsNgWord(j.testCase.text),
+  );
+  const falseBlocks = judged.filter(
+    (j) => j.testCase.expected === "ok" && blocked(j, FOCUS_THRESHOLD),
+  );
+  const gray = judged.filter((j) => j.testCase.expected === "gray");
+  return [
+    `### しきい値 ${FOCUS_THRESHOLD} で、リスト併用でも見逃した NG（${missed.length}件）`,
+    ...missed.map(describe),
+    "",
+    `### AI は通したが、NG 語リストで止まる NG（${listOnly.length}件）`,
+    ...listOnly.map(describe),
+    "",
+    `### しきい値 ${FOCUS_THRESHOLD} で止めた OK（${falseBlocks.length}件）`,
+    ...falseBlocks.map(describe),
+    "",
+    `### gray（成績に数えない。${gray.length}件）`,
+    ...gray.map(describe),
+    "",
+  ];
 }
 
 const options = parseArgs(process.argv.slice(2));
@@ -316,15 +415,18 @@ for (const model of options.models) {
         "",
         ...thresholdTable(stats.judged),
         "",
+        ...kindTable(stats.judged),
+        "",
+        ...mistakes(stats.judged),
       ];
       summary.push(...head);
       report.push(
         ...head,
-        "| 形式 | 正解 | 載せてよい確率 | お題 |",
-        "|---|---|---|---|",
+        "| 形式 | テーマ | 正解 | 載せてよい確率 | NG 語リスト | お題 |",
+        "|---|---|---|---|---|---|",
         ...stats.judged.map(
           (j) =>
-            `| ${j.testCase.kind} | ${j.testCase.expected}${j.testCase.tricky === true ? "（紛）" : ""} | ${j.probability === undefined ? "読めず" : j.probability.toFixed(3)} | ${j.testCase.text} |`,
+            `| ${j.testCase.kind} | ${j.testCase.group ?? ""} | ${j.testCase.expected}${j.testCase.tricky === true ? "（紛）" : ""} | ${j.probability === undefined ? "読めず" : j.probability.toFixed(3)} | ${containsNgWord(j.testCase.text) ? "当たる" : ""} | ${j.testCase.text} |`,
         ),
         "",
         "<details><summary>生の応答（最初の1件と、読めなかったもの）</summary>",

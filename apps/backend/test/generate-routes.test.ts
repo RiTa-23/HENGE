@@ -825,7 +825,7 @@ describe("POST /prompts/regenerate", () => {
     expect(passed).toHaveLength(2);
     const known = new Set(mixVocabulary().map((w) => w.text));
     for (const word of passed) expect(known.has(word)).toBe(true);
-    // 5000語の JSON を D1 に持たない（毎回共通リストから取る）
+    // 数千語の JSON を D1 に持たない（毎回共通リストから取る）
     expect(await db.select().from(constraintVocabularies)).toHaveLength(0);
   });
 

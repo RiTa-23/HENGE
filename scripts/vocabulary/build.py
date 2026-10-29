@@ -23,6 +23,8 @@
 #   6. 手で判定して外す語（excluded.tsv）を除く。語の断片・意味の取りにくい語・お題に向かない語・
 #      読み違いで、UniDic の品詞や頻度では拾えないもの
 #   7. zipf の高い順に並べる（最適化ごとの語彙は先頭から最大1000語を取る）
+#   8. おまかせ・ごちゃまぜの語彙の境目を書き出す: zipf が MIX_ZIPF_MIN 以上の語数。高い順に並んで
+#      いるので、閾値以上の語は先頭から連続している。リストに頻度の値は載せない（README の「ライセンス」）
 import csv, math, re, sys
 from collections import defaultdict
 from pathlib import Path
@@ -37,6 +39,9 @@ EXCLUDED_TSV = Path(__file__).resolve().parent / "excluded.tsv"
 DEFAULT_OUT = ROOT / "apps/backend/src/generation/vocabulary.generated.ts"
 
 ZIPF_MIN = 2.0
+# おまかせ・ごちゃまぜで使う語の下限。zipf 3 が100万語に1回で、3 以下を低頻度語・4 以上を高頻度語と
+# する区切りの中間。3.0 からは専門寄りの語（オーバーホール・ゼネコン）が混ざり始める（README の「選び方」）
+MIX_ZIPF_MIN = 3.5
 # lex の列（表層,lid,rid,cost の後に特徴29列）
 SURF, COST, POS1, POS2, POS3, CTYPE, LFORM, LEMMA, ORTH_BASE, KANA_BASE = 0, 3, 4, 5, 6, 8, 10, 11, 14, 25
 
@@ -144,7 +149,13 @@ def main():
     for k in excluded: words.pop(k, None)
 
     rows = sorted(words.items(), key=lambda kv: (-kv[1], kv[0][0], kv[0][1]))
-    tsv = "\n".join(f"{t}\t{r}" for (t, r), _ in rows)
+    write(out, [(t, r, z) for (t, r), z in rows])
+
+
+def write(out, rows):
+    """rows は (表記, 読み, zipf) を zipf の高い順に並べたもの"""
+    tsv = "\n".join(f"{t}\t{r}" for t, r, _ in rows)
+    mix_size = sum(1 for _, _, z in rows if z >= MIX_ZIPF_MIN)
     out.write_text(
         "// 生成物。**手で編集しない。** 作り直すときは scripts/vocabulary/README.md の手順で\n"
         "// scripts/vocabulary/build.py を実行する。\n"
@@ -153,10 +164,14 @@ def main():
         "// （wordfreq の zipf の高い順）に並べたもの。UniDic cwj-3.1.1 由来（BSD。\n"
         "// apps/reading/assets/LICENSE-BSD.unidic）。頻度は wordfreq 3.1.1。\n"
         f"// {len(rows)}語\n"
-        f"export const VOCABULARY_TSV = {quote(tsv)};\n",
+        f"export const VOCABULARY_TSV = {quote(tsv)};\n"
+        "\n"
+        "// おまかせ・ごちゃまぜの語彙の下限（zipf）と、それ以上の語数。閾値以上の語はリストの先頭から連続している\n"
+        f"export const MIX_ZIPF_MIN = {MIX_ZIPF_MIN};\n"
+        f"export const MIX_VOCABULARY_SIZE = {mix_size};\n",
         encoding="utf-8",
     )
-    print(f"{len(rows)}語を書き出した: {out}")
+    print(f"{len(rows)}語を書き出した（zipf {MIX_ZIPF_MIN} 以上は {mix_size}語）: {out}")
 
 
 def quote(s):

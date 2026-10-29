@@ -13,7 +13,7 @@ import { loadGenerationVocabulary } from "../db/vocabularies";
 import { acceptsPartialBatch, generateBatch } from "../generation/batch";
 import { AiQuotaExceededError, AiUnavailableError } from "../generation/ai";
 import { resolveModel } from "../generation/model";
-import { moderate, resolveModerationModel } from "../generation/moderation";
+import { createModerateOutputs, moderate, resolveModerationModel } from "../generation/moderation";
 import { existingContextSize } from "../generation/prompt";
 import { CONSTRAINT_VOCABULARY_MIN, vocabularyFor } from "../generation/vocabulary";
 import { fail } from "../http/error";
@@ -125,6 +125,7 @@ export const generateRoutes = new Hono<{ Bindings: Env }>()
         vocabulary,
         model,
         getReadings: createGetReadings(c.env),
+        moderate: createModerateOutputs(c.env, resolveModerationModel(c.env.MODERATION_MODEL)),
         waitUntil: (promise) => c.executionCtx.waitUntil(promise),
         onNeurons,
       });
@@ -204,6 +205,7 @@ export const generateRoutes = new Hono<{ Bindings: Env }>()
         vocabulary: await loadGenerationVocabulary(db, theme),
         model,
         getReadings: createGetReadings(c.env),
+        moderate: createModerateOutputs(c.env, resolveModerationModel(c.env.MODERATION_MODEL)),
         waitUntil: (promise) => c.executionCtx.waitUntil(promise),
         // 消費が確定した直後に記録する（POST /themes と同じ理由）
         onNeurons: async (used) => {

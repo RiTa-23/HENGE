@@ -287,6 +287,7 @@ describe("POST /themes（名前の判定）", () => {
   });
 
   it("しきい値（0.4）以上なら通し、判定と生成の消費を合わせて返す", async () => {
+    // 判定は名前と、生成お題（1ラウンド分を1回）の2回。どちらも同じ確率・トークン数で答える
     await seedUser("u1");
     stubJudge((body) => clefAnswer(body, 0.4, JUDGE_TOKENS));
 
@@ -298,8 +299,8 @@ describe("POST /themes（名前の判定）", () => {
 
     expect(status).toBe(200);
     expect(body.created).toBe(true);
-    expect(body.neuronsUsed).toBeCloseTo(JUDGE_NEURONS + PER_ROUND);
-    expect((await getUsage(db, "u1")).neurons).toBeCloseTo(JUDGE_NEURONS + PER_ROUND);
+    expect(body.neuronsUsed).toBeCloseTo(JUDGE_NEURONS * 2 + PER_ROUND);
+    expect((await getUsage(db, "u1")).neurons).toBeCloseTo(JUDGE_NEURONS * 2 + PER_ROUND);
   });
 
   it("名前を Clef-flash に、入力用の基準で聞く", async () => {
@@ -352,6 +353,40 @@ describe("POST /themes（名前の判定）", () => {
     expect(await db.select().from(themes)).toHaveLength(0);
   });
 
+  it("生成お題を判定で全部弾いたら GENERATION_FAILED（テーマ行を作らない）", async () => {
+    await seedUser("u1");
+    // 名前は通し、生成お題（候補が複数ある依頼）は弾く
+    stubJudge((body) => {
+      const { questions } = body as { questions: Record<string, unknown> };
+      return clefAnswer(body, Object.keys(questions).length === 1 ? 0.9 : 0.1);
+    });
+
+    const { status, body } = await post("/themes", {
+      kind: "theme",
+      name: "忍びの心得",
+      userId: "u1",
+    });
+
+    expect(status).toBe(422);
+    expect((body.error as { code: string }).code).toBe("GENERATION_FAILED");
+    expect(await db.select().from(themes)).toHaveLength(0);
+  });
+
+  it("テーマの生成お題は、テーマ名を添えて判定する", async () => {
+    await seedUser("u1");
+    stubJudge((body) => clefAnswer(body, 0.9));
+
+    await post("/themes", { kind: "theme", name: "忍びの心得", userId: "u1" });
+
+    const outputs = vi
+      .mocked(env.AI.run)
+      .mock.calls.filter(([model]) => isClef(model))
+      .map(([, request]) => request as unknown as { state: Record<string, unknown> });
+    // 名前の判定と、生成お題の判定（2ラウンド目は走らない）
+    expect(outputs).toHaveLength(2);
+    expect(outputs[1]?.state).toMatchObject({ 種類: "短文のお題", テーマ: "忍びの心得" });
+  });
+
   it("既存と一致した名前は判定しない（AIを呼ばない）", async () => {
     await db.insert(themes).values({
       id: "t1",
@@ -384,8 +419,8 @@ describe("同期生成の消費記録（成否によらず実消費を加算す�
     // 応答にもその回の消費を載せる（Next.js が残数の計算に使う）
     expect(body.neuronsUsed).toBeCloseTo(PER_ROUND);
     const usage = await getUsage(db, "u1");
-    // AIを呼んだ回数。名前の判定と、生成の1ラウンド
-    expect(usage.count).toBe(2);
+    // AIを呼んだ回数。名前の判定、生成の1ラウンド、生成お題の判定
+    expect(usage.count).toBe(3);
     expect(usage.neurons).toBeCloseTo(PER_ROUND);
   });
 
@@ -608,6 +643,32 @@ describe("POST /prompts/regenerate", () => {
     await post("/prompts/regenerate", { themeId: "t1", userId: "u1" });
 
     expect(await env.KV.get(themeLockKey("t1", "sentence"))).toBeNull();
+  });
+
+  /** **生成お題の判定ができなければ、その生成では1件も採用しない**（再試行を案内する） */
+  it("生成お題の判定が読めなければ AI_UNAVAILABLE を返し、何も足さずにロックを解放する", async () => {
+    await seedUser("u1");
+    await db.insert(themes).values({
+      id: "t1",
+      kind: "theme",
+      name: "忍びの心得",
+      normalizedName: "忍びの心得",
+    });
+    stubValidGeneration();
+    const generation = vi.mocked(env.AI.run).getMockImplementation();
+    vi.spyOn(env.AI, "run").mockImplementation((async (model: unknown, body: unknown) =>
+      isClef(model)
+        ? { answers: {} }
+        : generation?.(model as never, body as never)) as unknown as typeof env.AI.run);
+
+    const { status, body } = await post("/prompts/regenerate", { themeId: "t1", userId: "u1" });
+
+    expect(status).toBe(503);
+    expect((body.error as { code: string }).code).toBe("AI_UNAVAILABLE");
+    expect(await db.select().from(prompts)).toHaveLength(0);
+    expect(await env.KV.get(themeLockKey("t1", "sentence"))).toBeNull();
+    // 生成の消費は記録済み
+    expect((await getUsage(db, "u1")).neurons).toBeCloseTo(PER_ROUND);
   });
 
   it("存在しないテーマは NOT_FOUND を返す", async () => {

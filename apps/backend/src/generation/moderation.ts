@@ -117,27 +117,46 @@ interface ClefResponse {
  */
 export const MAX_MODERATION_QUESTIONS = 64;
 
-/** 依頼の組み立て。候補は `state` に、問いは候補ごとに1つずつ（#330 で測った形のまま） */
+/**
+ * 依頼の組み立て。候補は `state` に、問いは候補ごとに1つずつ。**書き方は入力と生成お題で違う**
+ * （どちらも実測した形のまま。変えたら `bun run compare:moderation` で測り直す）。
+ *
+ * - 入力: 判定基準を問いに書く（#330。1件だけなので繰り返しにならない）
+ * - 生成お題: **判定基準は `state` に1回だけ置き**、問いには候補の文と短い問いだけ書く（#333）。
+ *   基準を問いごとに繰り返すと、トークンの大半がその文になる。1件あたり約209 → 136トークン
+ *   （35%減）で、しきい値 0.4 での成績は変わらなかった。問いから候補の文まで外すと
+ *   （キーで指すだけにすると）、紛らわしい OK を止める数が3倍以上になったので採らない
+ */
 export function buildModerationRequest(model: ModerationModelId, target: ModerationTarget) {
-  const texts = target.type === "input" ? [target.name] : target.texts;
-  const label = target.type === "input" ? INPUT_LABEL[target.kind] : OUTPUT_LABEL[target.form];
-  const criteria = target.type === "input" ? CRITERIA.input : CRITERIA.output;
-  const theme = target.type === "output" ? target.theme : undefined;
-  const of = theme === undefined ? "" : `、テーマ「${theme}」で生成した`;
+  const name = MODERATION_MODELS[model].name;
+  if (target.type === "input") {
+    const label = INPUT_LABEL[target.kind];
+    return {
+      model: name,
+      state: { サイト: SITE, 種類: label, 候補: { q0: target.name } },
+      questions: {
+        q0: {
+          type: "noul" as const,
+          instructions: `候補 q0 の${label}「${target.name}」を、このサイトの公開一覧にそのまま載せてよいか。${CRITERIA.input}`,
+        },
+      },
+    } satisfies ClefRequest;
+  }
   return {
-    model: MODERATION_MODELS[model].name,
+    model: name,
     state: {
       サイト: SITE,
-      種類: label,
-      ...(theme === undefined ? {} : { テーマ: theme }),
-      候補: Object.fromEntries(texts.map((text, i) => [`q${i}`, text])),
+      種類: OUTPUT_LABEL[target.form],
+      ...(target.theme === undefined ? {} : { テーマ: target.theme }),
+      判定基準: CRITERIA.output,
+      候補: Object.fromEntries(target.texts.map((text, i) => [`q${i}`, text])),
     },
     questions: Object.fromEntries(
-      texts.map((text, i) => [
+      target.texts.map((text, i) => [
         `q${i}`,
         {
           type: "noul" as const,
-          instructions: `候補 q${i} の${of}${label}「${text}」を、このサイトの公開一覧にそのまま載せてよいか。${criteria}`,
+          instructions: `候補 q${i}「${text}」を、判定基準に照らして公開一覧にそのまま載せてよいか。`,
         },
       ]),
     ),
@@ -207,4 +226,41 @@ export async function moderate(
     return probability >= MODERATION_THRESHOLD;
   });
   return { allowed, neurons };
+}
+
+/**
+ * 生成されたお題の判定。`generateBatch` に渡す（読み取得の `GetReadings` と同じく、外から差し込む）。
+ * 1ラウンド分を1回で判定し、候補ごとに載せてよいかを返す。**消費は `onNeurons` で記録する**
+ */
+export type ModerateOutputs = (request: {
+  texts: readonly string[];
+  kind: ThemeKind;
+  form: PromptForm;
+  /** テーマ名、または最適化する音・練習モードの名前。**テーマのときだけ判定に添える** */
+  name: string;
+  themeId: string;
+  round: number;
+  onNeurons: (neurons: number) => Promise<void> | void;
+}) => Promise<boolean[]>;
+
+export function createModerateOutputs(env: Env, model: ModerationModelId): ModerateOutputs {
+  return async (request) => {
+    const { allowed } = await moderate(env, {
+      model,
+      target: {
+        type: "output",
+        form: request.form,
+        texts: request.texts,
+        ...(request.kind === "theme" ? { theme: request.name } : {}),
+      },
+      metadata: {
+        themeId: request.themeId,
+        kind: request.kind,
+        round: request.round,
+        path: "moderate:output",
+      },
+      onNeurons: request.onNeurons,
+    });
+    return allowed;
+  };
 }

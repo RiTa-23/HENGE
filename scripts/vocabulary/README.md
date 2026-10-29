@@ -36,6 +36,7 @@ python3 -m venv .venv && .venv/bin/pip install -r scripts/vocabulary/requirement
 | 断片を外す | 「っ」で終わる語（「がっ」「ぶっ」）、ひらがなだけの2文字以下の語（「たん」「きん」「うる」） | UniDic では擬音語の副詞として表記の持ち主になっているので、下の規則では外れない。頻度は別の語の断片から付く |
 | 表記の持ち主に絞る | その表記で書かれる行（外した品詞・活用形も含む UniDic 全体）で語コストが最も低い行が、その語彙素のものだけ。その行が助詞・助動詞・感動詞・接頭辞・接尾辞なら外す（連体詞・接続詞は外さない。「同じ」「一方」） | 頻度は表記単位なので、別の語の頻度が付く。「強い=じい」「生活=らいふ」のような珍しい読み、「ます」（升。助動詞の頻度）・「で」「と」（助詞）・「だっ」（「だった」）・「行き」（「行く」の活用形）が上位に来ていた |
 | 手で外す | `excluded.tsv` の「表記・読み」の組（下の「外す語の判定」） | 語の断片・意味の取りにくい語・お題に向かない語・読み違いのうち、UniDic の品詞や頻度では拾えないもの |
+| おまかせ・ごちゃまぜの境目 | zipf が `MIX_ZIPF_MIN`（3.5）以上の語数を `MIX_VOCABULARY_SIZE` として一緒に書き出す（2026-10-29 で 7,781語） | おまかせ・ごちゃまぜは先頭からこの語数を使う。頻度の値をリストに載せずに閾値で決めるため（`docs/05-generation.md`） |
 
 ### 実測（2026-10-24）
 
@@ -79,5 +80,5 @@ python3 -m venv .venv && .venv/bin/pip install -r scripts/vocabulary/requirement
 ## ライセンス
 
 - UniDic cwj は BSD を選択（`apps/reading/assets/LICENSE-BSD.unidic`）
-- wordfreq はコードが Apache-2.0、頻度データが CC BY-SA 4.0。リストには頻度の値を載せず、並び順と選別にだけ使っている
+- wordfreq はコードが Apache-2.0、頻度データが CC BY-SA 4.0。リストには頻度の値を載せず、並び順と選別（おまかせ・ごちゃまぜの境目の語数を含む）にだけ使っている
 - NG 語の元リストは MIT（`packages/shared/src/generation/LICENSE-inappropriate-words-ja`）

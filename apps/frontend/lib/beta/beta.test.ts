@@ -79,6 +79,16 @@ describe("betaThemeRejection", () => {
     );
   });
 
+  it("ベータ版の利用者が音と合わない運指を送ると、検証の文言が返る", async () => {
+    // 「き」1単位ぶんの運指を「きき」に付ける（音の切り方と合わない）
+    const ki = { units: [{ roman: "ki", fingers: ["right-index", "right-middle"] }] };
+    const raw = { kind: "constraint", name: "きき", fingering: ki };
+    expect(await betaThemeRejection(raw, limited)).toBeNull();
+    const parsed = themeNameSchema.safeParse(raw);
+    expect(parsed.success).toBe(false);
+    expect(parsed.error?.issues[0]?.message).toBe("運指が最適化する音と合いません");
+  });
+
   it("最適化ではセッションを照合しない", async () => {
     let called = false;
     const raw = { kind: "constraint", name: "き" };

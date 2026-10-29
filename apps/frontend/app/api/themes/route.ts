@@ -1,6 +1,7 @@
-import { canGenerate, quotaResetAt, remainingNeurons } from "@henge/shared";
+import { canGenerate, quotaResetAt } from "@henge/shared";
 import { backendClient, relay } from "@/lib/api/backend";
 import { errorResponse } from "@/lib/api/error";
+import { generationResponse } from "@/lib/api/generation";
 import { limitGeneration } from "@/lib/api/rate-limit";
 import { themeListQuerySchema, themeNameSchema } from "@/lib/api/schema";
 import { currentUserId } from "@/lib/api/session";
@@ -79,14 +80,6 @@ export async function POST(request: Request) {
       : canonicalFingering(name, fingering);
 
   const res = await client.themes.$post({ json: { kind, name, userId, defaultFingering } });
-  const body = await res.json();
-  if (!res.ok) return Response.json(body, { status: res.status });
-
-  // **その回の消費は Hono の応答（neuronsUsed）から受け取る。** D1をもう一度
-  // 読み直すと、加算と読み直しの間に別の生成が挟まったときにずれる
-  const { neuronsUsed } = body as { neuronsUsed?: number };
-  return Response.json({
-    ...body,
-    neuronsRemaining: remainingNeurons(neurons + (neuronsUsed ?? 0)),
-  });
+  // 失敗でも、AIを呼んだあとならその回の消費を足した残ニューロンを返す
+  return generationResponse(res, await res.json(), neurons);
 }

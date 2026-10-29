@@ -16,7 +16,7 @@ import { resolveModel } from "../generation/model";
 import { createModerateOutputs, moderate, resolveModerationModel } from "../generation/moderation";
 import { existingContextSize } from "../generation/prompt";
 import { CONSTRAINT_VOCABULARY_MIN, vocabularyFor } from "../generation/vocabulary";
-import { fail } from "../http/error";
+import { fail, failWithUsage } from "../http/error";
 import { cacheThemeId, getCachedThemeId } from "../kv/themes";
 import { acquireThemeLock, releaseThemeLock } from "../kv/lock";
 import { createGetReadings } from "../reading/index";
@@ -44,10 +44,14 @@ interface RegenerateBody {
  *
  * `GENERATION_FAILED`（テーマ名を変えて再試行）に落とすと、名前を変えても
  * 直らない原因に対して打ち直しを促すことになる。翻訳できない例外はそのまま投げる。
+ *
+ * 例外の前に判定や1ラウンド目で消費していることがあるので、その回の消費も載せる
  */
-function failFromAiError(c: Context, error: unknown) {
-  if (error instanceof AiQuotaExceededError) return fail(c, "AI_QUOTA_EXCEEDED");
-  if (error instanceof AiUnavailableError) return fail(c, "AI_UNAVAILABLE");
+function failFromAiError(c: Context, error: unknown, neuronsUsed: number) {
+  if (error instanceof AiQuotaExceededError) {
+    return failWithUsage(c, "AI_QUOTA_EXCEEDED", neuronsUsed);
+  }
+  if (error instanceof AiUnavailableError) return failWithUsage(c, "AI_UNAVAILABLE", neuronsUsed);
   throw error;
 }
 
@@ -85,7 +89,8 @@ export const generateRoutes = new Hono<{ Bindings: Env }>()
 
     const themeId = crypto.randomUUID();
     const model = resolveModel(c.env.GENERATION_MODEL);
-    // 応答に載せる合計。記録そのものは呼び出しごとに済ませる（onNeurons）
+    // 応答に載せる合計（成功でも、AIを呼んだあとのエラーでも載せる）。
+    // 記録そのものは呼び出しごとに済ませる（onNeurons）
     let neurons = 0;
     // **消費が確定した直後に記録する。** ここより後で何が起きても
     // （判定で弾いた、生成失敗、保存の失敗、クライアント切断によるキャンセル）記録は残る。
@@ -105,9 +110,9 @@ export const generateRoutes = new Hono<{ Bindings: Env }>()
         metadata: { themeId, kind: body.kind, round: 0, path: "moderate:input" },
         onNeurons,
       });
-      if (allowed[0] !== true) return fail(c, "INAPPROPRIATE_NAME");
+      if (allowed[0] !== true) return failWithUsage(c, "INAPPROPRIATE_NAME", neurons);
     } catch (error) {
-      return failFromAiError(c, error);
+      return failFromAiError(c, error, neurons);
     }
 
     let result;
@@ -130,12 +135,12 @@ export const generateRoutes = new Hono<{ Bindings: Env }>()
         onNeurons,
       });
     } catch (error) {
-      return failFromAiError(c, error);
+      return failFromAiError(c, error, neurons);
     }
 
     // **目標未達ならテーマ行を作らない。** 先に作ると、お題ゼロのテーマが
     // 公開一覧に残り、クリックしても何も遊べない状態になる
-    if (!result.reachedTarget) return fail(c, "GENERATION_FAILED");
+    if (!result.reachedTarget) return failWithUsage(c, "GENERATION_FAILED", neurons);
 
     await insertThemeWithPrompts(
       db,
@@ -189,6 +194,7 @@ export const generateRoutes = new Hono<{ Bindings: Env }>()
       return fail(c, "GENERATION_IN_PROGRESS");
     }
 
+    // 応答に載せる合計（POST /themes と同じく、エラーでも載せる）
     let neurons = 0;
 
     try {
@@ -225,7 +231,7 @@ export const generateRoutes = new Hono<{ Bindings: Env }>()
        * 1件も作れなかったときだけ失敗として返す。
        */
       const failed = acceptsPartialBatch(form) ? result.valid.length === 0 : !result.reachedTarget;
-      if (failed) return fail(c, "GENERATION_FAILED");
+      if (failed) return failWithUsage(c, "GENERATION_FAILED", neurons);
 
       await appendPrompts(db, theme.id, form, result.valid, model);
       // 生成できることが実証されたので「生成困難」の印を外す
@@ -239,7 +245,7 @@ export const generateRoutes = new Hono<{ Bindings: Env }>()
         neuronsUsed: neurons,
       });
     } catch (error) {
-      return failFromAiError(c, error);
+      return failFromAiError(c, error, neurons);
     } finally {
       // 記録は onNeurons で済んでいる。ここはロックを返すだけ
       await releaseThemeLock(c.env.KV, body.themeId, form);

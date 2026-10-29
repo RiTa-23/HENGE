@@ -70,6 +70,12 @@ export function CreateThemeForm({
   const [name, setName] = useState(initialName);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  /**
+   * 失敗したときの本日の残ニューロン。**失敗でも消費は確定している**（不変条件11）ので、
+   * AIを呼んだあとの失敗ならサーバーが返す。出さないと、残っているつもりで打ち直して
+   * `QUOTA_EXCEEDED` に当たる
+   */
+  const [errorNeurons, setErrorNeurons] = useState<number | undefined>(undefined);
   const [created, setCreated] = useState<{
     name: string;
     created: boolean;
@@ -130,6 +136,7 @@ export function CreateThemeForm({
       // POST /prompts/regenerate だけ）。仮に再送すると、1回ごとに
       // GENERATION_RATE_LIMIT（5回/60秒）を消費して RATE_LIMITED に落ちる
       setError(isApiError(body) ? body.error.message : "お題を作れませんでした");
+      setErrorNeurons((body as { neuronsRemaining?: number } | null)?.neuronsRemaining);
       setBusy(false);
       return;
     }
@@ -156,6 +163,7 @@ export function CreateThemeForm({
     }
     setBusy(true);
     setError(null);
+    setErrorNeurons(undefined);
     void create(trimmed, chosenFingering);
   };
 
@@ -272,6 +280,14 @@ export function CreateThemeForm({
       {error !== null && (
         <p className="mt-4 rounded-md border border-shu/50 bg-shu/10 px-4 py-3 text-sm text-kinari">
           {error}
+          {errorNeurons !== undefined && (
+            <span className="mt-2 block text-kinari/60">
+              本日の残りは
+              {/* 成功時と同じく切り捨てる。多く見せない側に倒す */}
+              <span className="mx-1 font-mono text-kinari/80">{Math.floor(errorNeurons)}</span>
+              ニューロンです。
+            </span>
+          )}
         </p>
       )}
 

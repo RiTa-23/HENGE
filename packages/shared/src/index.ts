@@ -53,7 +53,7 @@ export {
   WORD_KEYSTROKE_MAX,
   WORD_KEYSTROKE_MIN,
 } from "./generation/validate";
-export { containsNgWord } from "./generation/ng";
+export { containsNgWord, containsNgWordInName } from "./generation/ng";
 export { NG_WORDS } from "./generation/ng-words";
 export {
   apiError,

@@ -69,6 +69,16 @@ describe("betaThemeRejection", () => {
     expect(parsed.error?.issues[0]?.message).toBe(constraintCharRejection("ゃ") as string);
   });
 
+  it("ベータ版の利用者が NG 語の入った最適化の音を送ると、検証の文言が返る", async () => {
+    const raw = { kind: "constraint", name: "ちんこ" };
+    expect(await betaThemeRejection(raw, limited)).toBeNull();
+    const parsed = themeNameSchema.safeParse(raw);
+    expect(parsed.success).toBe(false);
+    expect(parsed.error?.issues[0]?.message).toBe(
+      "この名前ではお題を作れません。別の名前でお試しください",
+    );
+  });
+
   it("最適化ではセッションを照合しない", async () => {
     let called = false;
     const raw = { kind: "constraint", name: "き" };
@@ -85,13 +95,14 @@ describe("betaThemeRejection", () => {
     const raws = [
       { kind: "theme", name: "猫" },
       { kind: "theme", name: "" },
+      { kind: "theme", name: "ちんこ" },
     ];
     const results = await Promise.all(raws.map((raw) => betaThemeRejection(raw, limited)));
-    expect(results.map((res) => res?.status)).toEqual([403, 403]);
+    expect(results.map((res) => res?.status)).toEqual([403, 403, 403]);
     const bodies = await Promise.all(
       results.map((res) => res?.json() as Promise<{ error: { code: string } }>),
     );
-    expect(bodies.map((body) => body.error.code)).toEqual(["FORBIDDEN", "FORBIDDEN"]);
+    expect(bodies.map((body) => body.error.code)).toEqual(["FORBIDDEN", "FORBIDDEN", "FORBIDDEN"]);
   });
 
   it("kind が読めない壊れた入力はテーマ側に倒す", async () => {

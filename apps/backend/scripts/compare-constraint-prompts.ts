@@ -333,6 +333,8 @@ for (const char of options.mix === undefined ? options.chars : []) {
         wordsPerSentence,
         model: DEFAULT_MODEL,
         getReadings,
+        // 生成の指示を比べる測定なので、判断モデルの判定はかけない（すべて通す）
+        moderate: async (request) => request.texts.map(() => true),
       };
       const result = await generateBatch(env, input);
       const valid = result.valid.map((p) => p.text);

@@ -57,8 +57,15 @@ function stubReadingWorker(kana: string = AI_READING) {
   });
 }
 
+/** 生成の応答を差し替える。判断モデル（生成お題の判定）は全件を通す（トークン数は載せない） */
 function stubAi(response: unknown) {
-  vi.spyOn(env.AI, "run").mockResolvedValue(response as never);
+  vi.spyOn(env.AI, "run").mockImplementation((async (model: unknown, body: unknown) => {
+    if (!String(model).startsWith("@cf/cloudflare/clef")) return response;
+    const { questions } = body as { questions: Record<string, unknown> };
+    return {
+      answers: Object.fromEntries(Object.keys(questions).map((key) => [key, { noul: 0.9 }])),
+    };
+  }) as unknown as typeof env.AI.run);
   vi.spyOn(env.AI, "gateway").mockReturnValue({
     patchLog: async () => {},
   } as unknown as ReturnType<typeof env.AI.gateway>);
@@ -107,9 +114,10 @@ describe("kickRefill の消費記録（実際に使ったニューロンを加�
 
     const promptsAfter = await db.select().from(prompts);
     expect(promptsAfter).toHaveLength(35);
-    // 1ラウンドで目標に達したので1回分
+    // 1ラウンドで目標に達したので1回分。AIを呼んだ回数は、生成と生成お題の判定の2回
+    // （判定の応答はトークン数を載せていないので、消費は生成の分だけ）
     const usage = await getUsage(db, "u1");
-    expect(usage.count).toBe(1);
+    expect(usage.count).toBe(2);
     expect(usage.neurons).toBeCloseTo(PER_ROUND);
   });
 
@@ -239,6 +247,28 @@ describe("kickRefill の消費記録（実際に使ったニューロンを加�
     const [row] = await db.select().from(themes).where(eq(themes.id, "t1"));
     expect(row?.generationStatus).toBe("ok");
     // ロックは解放される（次のプレイで補充を再キックできる）
+    expect(await env.KV.get(themeLockKey("t1", "sentence"))).toBeNull();
+  });
+
+  it("生成お題の判定ができなければ、何も足さず 'difficult' も立てない（生成の消費は加算する）", async () => {
+    await seed();
+    stubAi({ response: AI_TEXT, usage: TOKENS });
+    const generation = vi.mocked(env.AI.run).getMockImplementation();
+    vi.spyOn(env.AI, "run").mockImplementation((async (model: unknown, body: unknown) => {
+      if (String(model).startsWith("@cf/cloudflare/clef")) throw new Error("unexpected");
+      return generation?.(model as never, body as never);
+    }) as unknown as typeof env.AI.run);
+    stubReadingWorker();
+    const { waitUntil, flush } = manualWaitUntil();
+
+    const theme = (await getThemeDetail(db, "t1"))!;
+    await kickRefill(env, waitUntil, { db, theme, form: "sentence", nextOffset: 15, userId: "u1" });
+    await flush();
+
+    expect(await db.select().from(prompts)).toHaveLength(34);
+    const [row] = await db.select().from(themes).where(eq(themes.id, "t1"));
+    expect(row?.generationStatus).toBe("ok");
+    expect((await getUsage(db, "u1")).neurons).toBeCloseTo(PER_ROUND);
     expect(await env.KV.get(themeLockKey("t1", "sentence"))).toBeNull();
   });
 

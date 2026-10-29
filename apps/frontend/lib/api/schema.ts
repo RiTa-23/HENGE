@@ -1,4 +1,4 @@
-import { constraintCharRejection, playStatsRejection } from "@henge/shared";
+import { constraintCharRejection, containsNgWordInName, playStatsRejection } from "@henge/shared";
 import { z } from "zod";
 import { decodeFingering, FINGERING_NOTE_MAX } from "@/lib/practice/fingering";
 
@@ -61,6 +61,15 @@ export const themeNameSchema = z
   ])
   // NFC正規化はバリデーションより先に行う必要があるため、constraintCharRejection の中で行っている
   .superRefine((value, ctx) => {
+    // **NG 語の入った名前は、AI を呼ぶ前にここで弾く**（無料。判断モデルの判定は Hono 側で
+    // 生成の前に行う）。文言はどこがだめかを示さない（言い換えて通す手がかりを与えない）
+    if (containsNgWordInName(value.name)) {
+      ctx.addIssue({
+        code: "custom",
+        message: "この名前ではお題を作れません。別の名前でお試しください",
+      });
+      return;
+    }
     if (value.kind !== "constraint") return;
     const rejection = constraintCharRejection(value.name);
     if (rejection !== null) {

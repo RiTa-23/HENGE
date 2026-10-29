@@ -19,3 +19,6 @@ lex_3_1.csv
 constraint-prompts.md
 mix-vocabulary.md
 .compare-constraint-prompts.mjs
+# apps/backend/scripts/compare-moderation-models.ts の既定の出力と、Node で動かすためのバンドル
+moderation-models.md
+.compare-moderation-models.mjs

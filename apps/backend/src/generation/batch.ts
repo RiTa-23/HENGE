@@ -21,6 +21,7 @@ import {
 import { type GetReadings, ReadingError } from "../reading/index";
 import { recordGenerationResult, requestPrompts } from "./ai";
 import type { ModelId } from "./model";
+import type { ModerateOutputs } from "./moderation";
 import { CONSTRAINT_WORDS_PER_SENTENCE, type WordsPerSentence } from "./prompt";
 import type { VocabularyWord } from "./vocabulary";
 
@@ -123,6 +124,12 @@ export interface RejectionCounts {
    */
   ng: number;
   /**
+   * 判断モデル（Clef-flash）が「載せてよい」と判定しなかった（`moderation.ts`）。
+   * **短文と長文だけ。単語は判定しない**（`MODERATED_OUTPUT_FORMS`）ので、単語では常に0。
+   * 無料の検査と読み取得を通った分だけを判定する
+   */
+  moderate: number;
+  /**
    * 既にプールにある（または同じ生成の中で重複した）ため落としたもの。
    *
    * **これが見えないと診断できない。** 重複は読み取得の前に無言で捨てていたので、
@@ -171,6 +178,11 @@ export interface GenerateBatchInput {
   /** シャッフルに使う乱数。テストで固定するときだけ渡す */
   random?: () => number;
   getReadings: GetReadings;
+  /**
+   * 生成お題の判定（`createModerateOutputs`）。**必須にしてある**（渡し忘れた経路が黙って
+   * 判定を飛ばさないように）。測定スクリプトとテストだけが、すべて通す関数を渡す
+   */
+  moderate: ModerateOutputs;
   /** 検証結果のログ書き戻しを遅らせる。Honoハンドラからは c.executionCtx.waitUntil を渡す */
   waitUntil?: (promise: Promise<unknown>) => void;
   /**
@@ -192,7 +204,8 @@ export interface GenerateBatchInput {
  * 3. getReadings() で読み仮名・ローマ字を取得
  * 4. 打鍵数の検査
  * 5. 「含む」モードなら指定文字の検査
- * 6. 目標に達していなければ、もう1ラウンドだけ繰り返す
+ * 6. 判断モデルで判定（ここまで通った分だけ。1ラウンド1回）
+ * 7. 目標に達していなければ、もう1ラウンドだけ繰り返す
  */
 export async function generateBatch(env: Env, input: GenerateBatchInput): Promise<BatchResult> {
   const valid: ValidPrompt[] = [];
@@ -204,6 +217,7 @@ export async function generateBatch(env: Env, input: GenerateBatchInput): Promis
     constraint: 0,
     punct: 0,
     ng: 0,
+    moderate: 0,
     dup: 0,
   };
   const seen = new Set(input.existing);
@@ -266,7 +280,22 @@ export async function generateBatch(env: Env, input: GenerateBatchInput): Promis
 
     const validBefore = valid.length;
     const rejectedBefore = { ...rejected };
-    await validateInto(texts, requested, input, seen, openings, valid, rejected);
+    // 判定の消費も、生成と同じく確定した直後に記録する（判定が例外で止まる経路でも残す）
+    const onModerationNeurons = async (used: number) => {
+      neurons += used;
+      await input.onNeurons?.(used);
+    };
+    await validateInto(
+      texts,
+      requested,
+      round,
+      input,
+      seen,
+      openings,
+      valid,
+      rejected,
+      onModerationNeurons,
+    );
 
     if (logId !== undefined) {
       // ログは1リクエスト（＝1ラウンド）に紐づくため、採用数も却下数も
@@ -343,6 +372,7 @@ function subtract(after: RejectionCounts, before: RejectionCounts): RejectionCou
     constraint: after.constraint - before.constraint,
     punct: after.punct - before.punct,
     ng: after.ng - before.ng,
+    moderate: after.moderate - before.moderate,
     dup: after.dup - before.dup,
   };
 }
@@ -356,11 +386,13 @@ async function validateInto(
   texts: string[],
   /** 読み取得に渡す上限。そのラウンドの依頼数 */
   limit: number,
+  round: number,
   input: GenerateBatchInput,
   seen: Set<string>,
   openings: Map<string, number>,
   valid: ValidPrompt[],
   rejected: RejectionCounts,
+  onModerationNeurons: (neurons: number) => Promise<void>,
 ): Promise<void> {
   const isWord = input.form === "word";
 
@@ -419,6 +451,7 @@ async function validateInto(
   // サブリクエストに数えるため、件数分呼ぶと外部サブリクエスト上限を食う
   const outcomes = await input.getReadings(candidates);
 
+  const passed: ValidPrompt[] = [];
   for (const [i, text] of candidates.entries()) {
     const outcome = outcomes[i];
     // 入力と応答は同じ長さで揃っている前提（プロバイダの契約）。崩れていたら実装の不具合
@@ -443,11 +476,28 @@ async function validateInto(
       continue;
     }
 
-    valid.push({
+    passed.push({
       text,
       readingKana: reading.kana,
       readingRomanJson: JSON.stringify(reading.roman),
       keystrokeCount,
     });
+  }
+
+  // **判断モデルは最後に、ここまで通った分だけに当てる。** 判定は1件ごとに課金されるので、
+  // 無料の検査や打鍵数で落ちるものに使わない。**判定できなかったら例外のまま外へ伝え、
+  // この生成では1件も採用しない**（通さない側に倒す。呼び出し側が AI_UNAVAILABLE にする）
+  const allowed = await input.moderate({
+    texts: passed.map((prompt) => prompt.text),
+    kind: input.kind,
+    form: input.form,
+    name: input.name,
+    themeId: input.themeId,
+    round,
+    onNeurons: onModerationNeurons,
+  });
+  for (const [i, prompt] of passed.entries()) {
+    if (allowed[i] === true) valid.push(prompt);
+    else rejected.moderate++;
   }
 }

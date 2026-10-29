@@ -340,6 +340,29 @@ describe("POST /themes（名前の判定）", () => {
     expect(body.neuronsUsed).toBeCloseTo(JUDGE_NEURONS);
   });
 
+  /** 名前の判定のあとに枠が切れた。**判定の分は消費済み**なので、応答にも載せる */
+  it("判定のあと生成が枠切れ(3036)で落ちたら AI_QUOTA_EXCEEDED に判定の消費を載せる", async () => {
+    await seedUser("u1");
+    stubJudge((body) => clefAnswer(body, 0.9, JUDGE_TOKENS));
+    const judge = vi.mocked(env.AI.run).getMockImplementation();
+    vi.spyOn(env.AI, "run").mockImplementation((async (model: unknown, body: unknown) => {
+      if (isClef(model)) return judge?.(model as never, body as never);
+      throw Object.assign(new Error("daily free allocation"), { code: 3036 });
+    }) as unknown as typeof env.AI.run);
+
+    const { status, body } = await post("/themes", {
+      kind: "theme",
+      name: "忍びの心得",
+      userId: "u1",
+    });
+
+    expect(status).toBe(429);
+    expect((body.error as { code: string }).code).toBe("AI_QUOTA_EXCEEDED");
+    expect(await db.select().from(themes)).toHaveLength(0);
+    expect((await getUsage(db, "u1")).neurons).toBeCloseTo(JUDGE_NEURONS);
+    expect(body.neuronsUsed).toBeCloseTo(JUDGE_NEURONS);
+  });
+
   it("判定の呼び出しが翻訳できない例外で落ちても AI_UNAVAILABLE を返す", async () => {
     await seedUser("u1");
     stubJudge(() => {

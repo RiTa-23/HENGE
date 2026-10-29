@@ -4,7 +4,7 @@ import { errorResponse } from "@/lib/api/error";
 import { limitGeneration } from "@/lib/api/rate-limit";
 import { themeListQuerySchema, themeNameSchema } from "@/lib/api/schema";
 import { currentUserId } from "@/lib/api/session";
-import { betaLimitation } from "@/lib/beta/beta";
+import { betaLimitation, betaThemeRejection } from "@/lib/beta/beta";
 import { canonicalFingering, decodeFingering, isDefaultFingering } from "@/lib/practice/fingering";
 
 export const dynamic = "force-dynamic";
@@ -33,17 +33,17 @@ export async function POST(request: Request) {
   const userId = await currentUserId(request);
   if (userId === null) return errorResponse("UNAUTHORIZED");
 
-  const parsed = themeNameSchema.safeParse(await request.json());
+  const raw: unknown = await request.json();
+  const parsed = themeNameSchema.safeParse(raw);
 
   // **ベータ版ではテーマの新規生成を弾く。** 最適化練習（kind: "constraint"）は公開済みなので
   // 通す。ベータ版利用者は既存プールのプレイと補充生成もできるため、
   // /api/prompts/regenerate と /api/sessions/start は通す。運営アカウントは制限しない
   // （lib/beta/beta.ts）。判定はレート制限やクォータの照会より前に置く（認可の決まり。
-  // docs/04-api.md）。形が壊れた入力は kind が分からないのでテーマ側に倒す
-  const isConstraint = parsed.success && parsed.data.kind === "constraint";
-  if (!isConstraint && (await betaLimitation(request))) {
-    return errorResponse("FORBIDDEN", "お題の生成は調整中です。既にあるお題は引き続き遊べます");
-  }
+  // docs/04-api.md）。kind は検証の成否によらず生の入力から読む（検証に失敗した最適化に
+  // 「調整中」ではなく検証の文言を返すため）。kind が読めない壊れた入力はテーマ側に倒す
+  const betaRejected = await betaThemeRejection(raw, () => betaLimitation(request));
+  if (betaRejected !== null) return betaRejected;
 
   // 連打はここで弾く。クォータの取得（D1アクセス）より先に判定する
   const limited = await limitGeneration(userId);

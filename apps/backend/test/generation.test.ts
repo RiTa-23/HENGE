@@ -22,7 +22,13 @@ import {
   parseGeneratedBlocks,
   parseGeneratedLines,
 } from "../src/generation/prompt";
-import { MIX_VOCABULARY_SIZE, mixVocabulary, vocabularyFor } from "../src/generation/vocabulary";
+import {
+  MIX_VOCABULARY_SIZE,
+  MIX_ZIPF_MIN,
+  mixVocabulary,
+  vocabularyFor,
+  vocabularySize,
+} from "../src/generation/vocabulary";
 import { fromSingle, type GetReading } from "./fake-readings";
 
 describe("parseGeneratedLines", () => {
@@ -203,9 +209,14 @@ describe("おまかせ・ごちゃまぜの生成（最適化と同じく語を�
     expect(prompts[0]).not.toContain("2語以上");
   });
 
-  it("共通リストの上から MIX_VOCABULARY_SIZE 語を使う", () => {
+  it("zipf 3.5 以上の語（共通リストの上から MIX_VOCABULARY_SIZE 語）を使う", () => {
     const words = mixVocabulary();
+    // 閾値で決める（語数を手で持たない）。境目は build.py が書き出す
+    expect(MIX_ZIPF_MIN).toBe(3.5);
     expect(words).toHaveLength(MIX_VOCABULARY_SIZE);
+    // 境目が壊れて、リスト全体や数語になっていない（2026-10-29 の実測で 7,781語）
+    expect(MIX_VOCABULARY_SIZE).toBeGreaterThan(5000);
+    expect(MIX_VOCABULARY_SIZE).toBeLessThan(vocabularySize() / 2);
     // よく使われる順の先頭から取る（珍しい語の組で文が不自然にならないように）
     expect(words.slice(0, 3).map((w) => w.text)).toEqual(["自分", "時間", "思う"]);
     for (const word of words) {

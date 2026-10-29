@@ -10,6 +10,8 @@ import {
   buildRomanCandidates,
   countConstraint,
   katakanaToHiragana,
+  MIX_MODES,
+  type MixName,
   UnsupportedKanaError,
 } from "@henge/shared";
 import { getPlatformProxy } from "wrangler";
@@ -18,7 +20,12 @@ import { generateBatch, type GenerateBatchInput } from "../src/generation/batch"
 import { DEFAULT_MODEL } from "../src/generation/model";
 import type { WordsPerSentence } from "../src/generation/prompt";
 import type { GetReadings, ReadingOutcome } from "../src/reading/types";
-import { vocabularyFor } from "../src/generation/vocabulary";
+import {
+  MIX_ZIPF_MIN,
+  mixVocabulary,
+  vocabularyFor,
+  type VocabularyWord,
+} from "../src/generation/vocabulary";
 
 /**
  * 最適化の生成で、1文に渡す語の数（2語の組か、3語から2語以上を選ばせるか）を比べる（#262）。
@@ -43,6 +50,11 @@ import { vocabularyFor } from "../src/generation/vocabulary";
  *
  * 出力: 画面に案ごとの集計、`--out`（既定 constraint-prompts.md）に全文。**文の自然さは
  * 機械では測れない**ので、全文を読んで比べる。
+ *
+ * `--mix=おまかせ,ごちゃまぜ` を付けると、最適化の代わりにおまかせ・ごちゃまぜの語彙を比べる（#337）。
+ * 旧（共通リストの上から5000語）と今（zipf `MIX_ZIPF_MIN` 以上）を同じ回数ずつ回し、今の語彙のうち
+ * 旧に無かった帯（5001語目〜）の語を渡した行の採用率も別に出す。既定の出力は mix-vocabulary.md。
+ *   bun run compare:constraint --mix=おまかせ,ごちゃまぜ --runs=5   # 約260ニューロン
  */
 
 type Options = {
@@ -51,6 +63,8 @@ type Options = {
   variants: WordsPerSentence[];
   out: string;
   dryRun: boolean;
+  /** おまかせ・ごちゃまぜの語彙を比べるモード。指定したら最適化は回さない */
+  mix: MixName[] | undefined;
 };
 
 function parseArgs(argv: readonly string[]): Options {
@@ -60,12 +74,18 @@ function parseArgs(argv: readonly string[]): Options {
   if (!Number.isInteger(runs) || runs <= 0) throw new Error("--runs= には1以上の整数を渡す");
   const variants = (value("variants") ?? "2,3").split(",").map(Number);
   if (!variants.every((v) => v === 2 || v === 3)) throw new Error("--variants= は 2 と 3 だけ");
+  const mix = value("mix")?.split(",");
+  const mixNames: readonly string[] = MIX_MODES.map((m) => m.name);
+  if (mix !== undefined && !mix.every((name) => mixNames.includes(name))) {
+    throw new Error(`--mix= は ${mixNames.join("・")} だけ`);
+  }
   return {
     chars: (value("chars") ?? "ざ,き,で").split(","),
     runs,
     variants: variants as WordsPerSentence[],
-    out: value("out") ?? "constraint-prompts.md",
+    out: value("out") ?? (mix === undefined ? "constraint-prompts.md" : "mix-vocabulary.md"),
     dryRun: argv.includes("--dry-run"),
+    mix: mix as MixName[] | undefined,
   };
 }
 
@@ -188,10 +208,98 @@ const proxy = options.dryRun
     });
 const remoteRun =
   proxy === undefined ? undefined : (proxy.env.AI.run.bind(proxy.env.AI) as unknown as RemoteRun);
-const report: string[] = ["# 最適化の生成: 1文に渡す語の数の比較", ""];
+const report: string[] = [
+  options.mix === undefined
+    ? "# 最適化の生成: 1文に渡す語の数の比較"
+    : "# おまかせ・ごちゃまぜの語彙の比較",
+  "",
+];
 const summary: string[] = [];
 
-for (const char of options.chars) {
+/** 旧（#337 の前）のおまかせ・ごちゃまぜの語彙の語数 */
+const OLD_MIX_SIZE = 5000;
+const current = mixVocabulary();
+/** 今の語彙のうち、旧に無かった語（zipf 3.80 未満 `MIX_ZIPF_MIN` 以上） */
+const band = new Set(current.slice(OLD_MIX_SIZE).map((w) => w.text));
+const mixVariants: { label: string; vocabulary: VocabularyWord[] }[] = [
+  { label: `上から${OLD_MIX_SIZE}語`, vocabulary: current.slice(0, OLD_MIX_SIZE) },
+  { label: `zipf ${MIX_ZIPF_MIN} 以上（${current.length}語）`, vocabulary: current },
+];
+
+for (const name of options.mix ?? []) {
+  for (const variant of mixVariants) {
+    const stats = {
+      calls: 0,
+      broken: 0,
+      lines: 0,
+      reached: 0,
+      valid: 0,
+      bandLines: 0,
+      bandValid: 0,
+    };
+    const rejected: Record<string, number> = {};
+    report.push(`## ${name}・${variant.label}`, "");
+    // 交互に回さず案ごとにまとめるが、混雑の時間帯の偏りが気になるなら --runs を増やす
+    for (let run = 1; run <= options.runs; run++) {
+      const calls: Call[] = [];
+      const env = { AI: proxiedAi(calls, remoteRun) } as unknown as Env;
+      const result = await generateBatch(env, {
+        kind: "mix",
+        form: "sentence",
+        name,
+        themeId: "compare",
+        path: "regenerate",
+        target: 10,
+        existing: [],
+        vocabulary: variant.vocabulary,
+        model: DEFAULT_MODEL,
+        getReadings,
+      });
+      const accepted = new Set(result.valid.map((p) => p.text));
+      stats.calls += calls.length;
+      stats.reached += result.reachedTarget ? 1 : 0;
+      stats.valid += accepted.size;
+      for (const [label, count] of Object.entries(result.rejected)) {
+        rejected[label] = (rejected[label] ?? 0) + count;
+      }
+      report.push(`### ${run}回目（${result.rounds}ラウンド・採用 ${accepted.size}）`, "");
+      for (const call of calls) {
+        const groups = groupsOf(call);
+        const lines = outputLines(call);
+        stats.lines += lines.length;
+        // 行数が組の数と合うときだけ、行と組を対応させて帯の語の採用率を数える
+        const aligned = lines.length === groups.length;
+        if (!aligned) stats.broken += 1;
+        lines.forEach((line, i) => {
+          const group = aligned ? (groups[i] ?? "") : "";
+          const inBand = group.split("／").some((w) => band.has(w));
+          if (inBand) {
+            stats.bandLines += 1;
+            if (accepted.has(line)) stats.bandValid += 1;
+          }
+          const mark = accepted.has(line) ? "○" : "×";
+          report.push(`- ${mark} ${line}${aligned ? `　〔${group}${inBand ? "・帯" : ""}〕` : ""}`);
+        });
+        report.push("");
+      }
+    }
+    summary.push(
+      [
+        `${name}・${variant.label}`,
+        `採用 ${stats.valid}/${stats.lines}行（${pct(stats.valid, stats.lines)}）`,
+        `10問に届いた ${stats.reached}/${options.runs}回`,
+        `形が崩れた ${stats.broken}/${stats.calls}呼び出し`,
+        `帯の語の行 ${stats.bandValid}/${stats.bandLines}（${pct(stats.bandValid, stats.bandLines)}）`,
+        `却下 ${Object.entries(rejected)
+          .filter(([, n]) => n > 0)
+          .map(([k, n]) => `${k}:${n}`)
+          .join(",")}`,
+      ].join("\t"),
+    );
+  }
+}
+
+for (const char of options.mix === undefined ? options.chars : []) {
   const vocabulary = vocabularyFor(char);
   for (const wordsPerSentence of options.variants) {
     const stats = {

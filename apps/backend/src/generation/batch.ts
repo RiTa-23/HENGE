@@ -125,7 +125,8 @@ export interface RejectionCounts {
   ng: number;
   /**
    * 判断モデル（Clef-flash）が「載せてよい」と判定しなかった（`moderation.ts`）。
-   * **最適化・テーマの全形式で見る。** 無料の検査と読み取得を通った分だけを判定する
+   * **短文と長文だけ。単語は判定しない**（`MODERATED_OUTPUT_FORMS`）ので、単語では常に0。
+   * 無料の検査と読み取得を通った分だけを判定する
    */
   moderate: number;
   /**

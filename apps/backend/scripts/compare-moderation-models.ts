@@ -21,7 +21,13 @@ import { MODERATION_CASES, type ModerationCase, type ModerationKind } from "./mo
  *   npx wrangler login                          # Workers AI を呼べるアカウントで（初回だけ）
  *   bun run compare:moderation                  # 既定: 両モデル × batch/single × 1回
  *   bun run compare:moderation --models=clef-flash --modes=batch
+ *   bun run compare:moderation --models=clef-flash --modes=batch --theme-context --prompt=compact,minimal
  *   --dry-run を付けると AI を呼ばずに（ログインも不要）、依頼の組み立てだけ確かめる
+ *
+ * `--prompt=` で問いの書き方を比べる（既定は full。#333 の前に、トークンを減らせるかを見る）:
+ * - `full`: 判定基準を問いごとに繰り返す（本番の `moderate()` と同じ形）
+ * - `compact`: 判定基準は `state` に1回だけ置き、問いには候補の文と短い問いだけ書く
+ * - `minimal`: さらに問いから候補の文も外し、`state` の候補をキー（q0…）で指すだけにする
  *
  * **Bun では直接動かさない**（wrangler のリモートバインディングは Bun の `fetch()` で動かない）。
  * `compare:moderation` は bun でバンドルし、Node で起動する。
@@ -78,8 +84,13 @@ const SITE =
 /** 「載せてよい」の確率がこれ未満なら弾く。灰色帯も弾く方針なので、しきい値は1本 */
 const THRESHOLDS = [0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9];
 
+/** 問いの書き方。トークンの大半は、問いごとに繰り返す判定基準の文が占めている */
+type PromptStyle = "full" | "compact" | "minimal";
+const PROMPT_STYLES: readonly PromptStyle[] = ["full", "compact", "minimal"];
+
 type Options = {
   models: ClefModel[];
+  prompts: PromptStyle[];
   modes: Mode[];
   runs: number;
   out: string;
@@ -102,6 +113,10 @@ function parseArgs(argv: readonly string[]): Options {
   if (!modes.every((m) => m === "batch" || m === "single")) {
     throw new Error("--modes= は batch と single だけ");
   }
+  const prompts = (value("prompt") ?? "full").split(",");
+  if (!prompts.every((p) => (PROMPT_STYLES as readonly string[]).includes(p))) {
+    throw new Error(`--prompt= は ${PROMPT_STYLES.join(" / ")} だけ`);
+  }
   const allKinds = Object.keys(BATCH_SIZE);
   const kinds = value("kinds")?.split(",") ?? allKinds;
   if (!kinds.every((k) => allKinds.includes(k))) {
@@ -109,6 +124,7 @@ function parseArgs(argv: readonly string[]): Options {
   }
   return {
     models: models as ClefModel[],
+    prompts: prompts as PromptStyle[],
     modes: modes as Mode[],
     runs,
     out: value("out") ?? "moderation-models.md",
@@ -150,17 +166,24 @@ function buildRequest(
   model: ClefModel,
   kind: ModerationKind,
   texts: readonly string[],
-  theme?: string,
+  theme: string | undefined,
+  style: PromptStyle,
 ): ClefRequest {
   const candidates = Object.fromEntries(texts.map((text, i) => [`q${i}`, text]));
   const of = theme === undefined ? "" : `、テーマ「${theme}」で生成した`;
+  const instructionsOf = (text: string, i: number) => {
+    if (style === "full") {
+      return `候補 q${i} の${of}${KIND_LABEL[kind]}「${text}」を、このサイトの公開一覧にそのまま載せてよいか。${criteriaOf(kind)}`;
+    }
+    if (style === "compact") {
+      return `候補 q${i}「${text}」を、判定基準に照らして公開一覧にそのまま載せてよいか。`;
+    }
+    return `候補 q${i} を、判定基準に照らして公開一覧にそのまま載せてよいか。`;
+  };
   const questions = Object.fromEntries(
     texts.map((text, i) => [
       `q${i}`,
-      {
-        type: "noul" as const,
-        instructions: `候補 q${i} の${of}${KIND_LABEL[kind]}「${text}」を、このサイトの公開一覧にそのまま載せてよいか。${criteriaOf(kind)}`,
-      },
+      { type: "noul" as const, instructions: instructionsOf(text, i) },
     ]),
   );
   return {
@@ -169,6 +192,8 @@ function buildRequest(
       サイト: SITE,
       種類: KIND_LABEL[kind],
       ...(theme === undefined ? {} : { テーマ: theme }),
+      // full では問いごとに書くので置かない（本番の形のまま測る）
+      ...(style === "full" ? {} : { 判定基準: criteriaOf(kind) }),
       候補: candidates,
     },
     questions,
@@ -226,7 +251,12 @@ function chunksOf(kind: ModerationKind, mode: Mode): ModerationCase[][] {
   return chunks;
 }
 
-async function runOnce(model: ClefModel, mode: Mode, remoteRun: RemoteRun | undefined) {
+async function runOnce(
+  model: ClefModel,
+  mode: Mode,
+  style: PromptStyle,
+  remoteRun: RemoteRun | undefined,
+) {
   const stats: RunStats = {
     judged: [],
     calls: 0,
@@ -242,6 +272,7 @@ async function runOnce(model: ClefModel, mode: Mode, remoteRun: RemoteRun | unde
         kind,
         chunk.map((c) => c.text),
         options.themeContext ? chunk[0]?.group : undefined,
+        style,
       );
       stats.calls += 1;
       if (remoteRun === undefined) {
@@ -401,40 +432,42 @@ const summary: string[] = [];
 
 for (const model of options.models) {
   for (const mode of options.modes) {
-    for (let run = 1; run <= options.runs; run += 1) {
-      const stats = await runOnce(model, mode, remoteRun);
-      const label = `${model} / ${mode} / ${run}回目`;
-      const neurons = (stats.inputTokens / 1_000_000) * NEURONS_PER_M_INPUT[model];
-      const unreadable = stats.judged.filter((j) => j.probability === undefined).length;
-      const head = [
-        `## ${label}`,
-        "",
-        `- 呼び出し ${stats.calls} 回（失敗 ${stats.failures}）、読めなかった答え ${unreadable}/${stats.judged.length} 件`,
-        `- 入力 ${stats.inputTokens} トークン、推定 ${neurons.toFixed(1)} ニューロン`,
-        `- 所要時間の中央値 ${Math.round(median(stats.millis))}ms`,
-        "",
-        ...thresholdTable(stats.judged),
-        "",
-        ...kindTable(stats.judged),
-        "",
-        ...mistakes(stats.judged),
-      ];
-      summary.push(...head);
-      report.push(
-        ...head,
-        "| 形式 | テーマ | 正解 | 載せてよい確率 | NG 語リスト | お題 |",
-        "|---|---|---|---|---|---|",
-        ...stats.judged.map(
-          (j) =>
-            `| ${j.testCase.kind} | ${j.testCase.group ?? ""} | ${j.testCase.expected}${j.testCase.tricky === true ? "（紛）" : ""} | ${j.probability === undefined ? "読めず" : j.probability.toFixed(3)} | ${containsNgWord(j.testCase.text) ? "当たる" : ""} | ${j.testCase.text} |`,
-        ),
-        "",
-        "<details><summary>生の応答（最初の1件と、読めなかったもの）</summary>",
-        "",
-        ...stats.raw.map((raw) => ["```json", raw, "```", ""].join("\n")),
-        "</details>",
-        "",
-      );
+    for (const style of options.prompts) {
+      for (let run = 1; run <= options.runs; run += 1) {
+        const stats = await runOnce(model, mode, style, remoteRun);
+        const label = `${model} / ${mode} / 問い ${style} / ${run}回目`;
+        const neurons = (stats.inputTokens / 1_000_000) * NEURONS_PER_M_INPUT[model];
+        const unreadable = stats.judged.filter((j) => j.probability === undefined).length;
+        const head = [
+          `## ${label}`,
+          "",
+          `- 呼び出し ${stats.calls} 回（失敗 ${stats.failures}）、読めなかった答え ${unreadable}/${stats.judged.length} 件`,
+          `- 入力 ${stats.inputTokens} トークン、推定 ${neurons.toFixed(1)} ニューロン`,
+          `- 所要時間の中央値 ${Math.round(median(stats.millis))}ms`,
+          "",
+          ...thresholdTable(stats.judged),
+          "",
+          ...kindTable(stats.judged),
+          "",
+          ...mistakes(stats.judged),
+        ];
+        summary.push(...head);
+        report.push(
+          ...head,
+          "| 形式 | テーマ | 正解 | 載せてよい確率 | NG 語リスト | お題 |",
+          "|---|---|---|---|---|---|",
+          ...stats.judged.map(
+            (j) =>
+              `| ${j.testCase.kind} | ${j.testCase.group ?? ""} | ${j.testCase.expected}${j.testCase.tricky === true ? "（紛）" : ""} | ${j.probability === undefined ? "読めず" : j.probability.toFixed(3)} | ${containsNgWord(j.testCase.text) ? "当たる" : ""} | ${j.testCase.text} |`,
+          ),
+          "",
+          "<details><summary>生の応答（最初の1件と、読めなかったもの）</summary>",
+          "",
+          ...stats.raw.map((raw) => ["```json", raw, "```", ""].join("\n")),
+          "</details>",
+          "",
+        );
+      }
     }
   }
 }

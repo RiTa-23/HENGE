@@ -671,6 +671,26 @@ describe("POST /prompts/regenerate", () => {
     expect((await getUsage(db, "u1")).neurons).toBeCloseTo(PER_ROUND);
   });
 
+  it("単語は判断モデルで判定しない（判断モデルを呼ばない）", async () => {
+    await seedUser("u1");
+    await db.insert(themes).values({
+      id: "t1",
+      kind: "theme",
+      name: "忍びの心得",
+      normalizedName: "忍びの心得",
+    });
+    stubGeneration([["忍者", "手裏剣", "城"]], "しのび");
+
+    const { status } = await post("/prompts/regenerate", {
+      themeId: "t1",
+      userId: "u1",
+      form: "word",
+    });
+
+    expect(status).toBe(200);
+    expect(vi.mocked(env.AI.run).mock.calls.filter(([model]) => isClef(model))).toHaveLength(0);
+  });
+
   it("存在しないテーマは NOT_FOUND を返す", async () => {
     const { status } = await post("/prompts/regenerate", { themeId: "none", userId: "u1" });
     expect(status).toBe(404);

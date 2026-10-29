@@ -243,8 +243,21 @@ export type ModerateOutputs = (request: {
   onNeurons: (neurons: number) => Promise<void> | void;
 }) => Promise<boolean[]>;
 
+/**
+ * 判断モデルで判定する形式。**単語は判定しない**（NG 語リストだけで弾く）。
+ *
+ * - 高い: 1ラウンド40件で、判定が最大約19ニューロン（短文の2倍）。生成お題の判定の中で一番重い
+ * - 誤検出が多い: 単語は単独だと文脈が無く、テーマ名を添えても紛らわしい OK を191件中8〜9件止めた
+ *   （交尾・キス・授乳など。#330・#333）。短文は77件中0〜1件
+ * - 単語は1語なので、言い換えや語の組み合わせで不適切になる余地が文より小さい。NG 語リストには、
+ *   判断モデルが単語で見逃した語も足してある（雌豚・黒んぼ・片輪など）
+ */
+const MODERATED_OUTPUT_FORMS: ReadonlySet<PromptForm> = new Set(["sentence", "long"]);
+
 export function createModerateOutputs(env: Env, model: ModerationModelId): ModerateOutputs {
   return async (request) => {
+    // 判定しない形式はAIを呼ばずに全件通す（消費も無い）
+    if (!MODERATED_OUTPUT_FORMS.has(request.form)) return request.texts.map(() => true);
     const { allowed } = await moderate(env, {
       model,
       target: {

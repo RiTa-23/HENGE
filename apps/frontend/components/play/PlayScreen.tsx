@@ -362,7 +362,10 @@ export function PlayScreen({
     const { code, message } = isApiError(body)
       ? body.error
       : { code: "UNKNOWN", message: "お題を作れませんでした" };
-    setPhase({ name: "error", code, message });
+    // **失敗でも消費は確定している**（不変条件11）。AIを呼んだあとの失敗なら残りが返るので、
+    // 失敗の画面に減った残ニューロンを出す
+    const { neuronsRemaining } = (body ?? {}) as { neuronsRemaining?: number };
+    setPhase({ name: "error", code, message, neuronsRemaining });
   }, [themeId, form]);
 
   const load = useCallback(async () => {
@@ -412,7 +415,13 @@ export function PlayScreen({
       }
 
       waitingSince.current = null;
-      setPhase({ name: "error", code, message, neuronsRemaining });
+      // 残りを出すのは枯渇の画面だけ。ほかのエラー（NOT_FOUND など）は生成と関係ない
+      setPhase({
+        name: "error",
+        code,
+        message,
+        neuronsRemaining: code === "THEME_EXHAUSTED" ? neuronsRemaining : undefined,
+      });
       return;
     }
 
@@ -837,6 +846,16 @@ export function PlayScreen({
                   ニューロンです。
                 </>
               )}
+            </p>
+          )}
+          {/* 作り足しに失敗したとき。失敗でも消費は確定しているので、減った残りを出す */}
+          {!exhausted && phase.neuronsRemaining !== undefined && (
+            <p className="mt-5 text-sm leading-relaxed text-kinari/60">
+              本日の残りは
+              <span className="mx-1 font-mono text-kinari">
+                {Math.floor(phase.neuronsRemaining)}
+              </span>
+              ニューロンです。
             </p>
           )}
           {exhausted && authSession === null && (

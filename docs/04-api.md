@@ -84,8 +84,12 @@
 // レスポンス
 { "theme": { "id": "...", "kind": "theme", "name": "忍びの心得",
              "promptCounts": { "sentence": 17, "word": 0, "long": 0 } },
-  "created": true }   // falseなら既存テーマの再利用（生成は走っていない）
+  "created": true,    // falseなら既存テーマの再利用（生成は走っていない）
+  "neuronsUsed": 16.0, // その回の消費。既存テーマの再利用では載らない
+  "neuronsRemaining": 484 }
 ```
+
+**失敗しても、AIを呼んだあとならその回の消費を返す。** `INAPPROPRIATE_NAME`・`GENERATION_FAILED`・`AI_UNAVAILABLE`・`AI_QUOTA_EXCEEDED` の応答には、`error` の外に `neuronsUsed` と `neuronsRemaining` が載る（「エラーレスポンス」）。作成画面はこれで残りの表示を更新する。
 
 **新規作成で作るのは短文だけ。** 単語・長文を同じリクエストで作れない（不変条件4）。2形式ぶんを同期で回すと、待たせる時間と失敗確率がそのまま倍になる（1形式でも最大2ラウンドある）。**単語・長文のプールは `POST /api/prompts/regenerate` で別リクエストとして作る。**
 
@@ -177,6 +181,8 @@
 { "theme": { ..., "promptCounts": { "sentence": 30, "word": 22, "long": 0 } },
   "added": 22, "neuronsUsed": 13.0, "neuronsRemaining": 487 }
 ```
+
+**失敗したときも `POST /api/themes` と同じく、AIを呼んだあとなら `error` の外に `neuronsUsed` と `neuronsRemaining` が載る**（`GENERATION_FAILED`・`AI_UNAVAILABLE`・`AI_QUOTA_EXCEEDED`）。プレイ画面は、作り足しに失敗した画面に残りを出す。ロック中（`GENERATION_IN_PROGRESS`）は AI を呼んでいないので載らない。
 
 **単語と長文は、目標に届かなくても取れた分を保存する。** 短文は目標（1プレイ分）未達なら `GENERATION_FAILED` を返して1件も保存しないが、単語は1回で作れるのが最大80件（40件×2ラウンド）、長文は最大10本（5本×2ラウンド）しかなく、届かないことが起こりうる。同じ扱いにすると**有効な20語と消費したニューロンを捨てて、何度も押させる**ことになる。追加先は既存テーマのプールなので、途中まで積むこと自体に害はない（「お題ゼロのテーマを作らない」新規作成とは事情が違う）。**1件も作れなかったときだけ失敗として返す。**
 
@@ -389,6 +395,7 @@ MVPは**500ニューロン/日**（月次上限なし）。**リセットは 00:
 - Next.js は `GET /usage/:userId` で当日の消費を取得し、`canGenerate()`（`packages/shared`）で許可を判定する。この取得はレスポンスの `neuronsRemaining` 表示にも使うため、リクエストごとに1回で済む
 - **1回分を予約しない。** 残っていれば通すので、最後の1回は上限を超えうる。超える幅は最大で約35（新規作成が2ラウンド回った場合。名前の判定約0.9＋生成約13＋短文の判定が最大約19）。見積りを先に引く方式にすると、モデルを変えるたびに見積り定数を手で直すことになり、外したときは「残っているのに生成できない」形で利用者側に出る
 - 同期生成の応答には、その回の消費（`neuronsUsed`）をHonoが載せる。Next.js はそれを足して `neuronsRemaining` を返す（D1を読み直すと、加算と読み直しの間に別の生成が挟まったときにずれる）
+- **AIを呼んだあとのエラーにも `neuronsUsed` を載せる。** 失敗でも消費は確定している（不変条件11）。載せないと画面の残りが減らず、残っているつもりで打ち直して `QUOTA_EXCEEDED` に当たる。AIを呼ぶ前のエラー（語彙不足・ロック中・`NOT_FOUND` など）には載せない（Hono の `failWithUsage`、Next.js の `generationResponse`）
 - 同期生成（`POST /api/themes` / `/api/prompts/regenerate`）: 残数0なら `QUOTA_EXCEEDED` を返し、Honoを呼ばない
 - バックグラウンド補充（`POST /api/sessions/start`）: Next.js が判定結果を **`allowRefill` フラグ**としてHonoに渡す。**Honoはポリシー値（上限500等）を持たず、フラグを信頼するだけ**。残数0でもプレイ自体は許可する（ニューロンを消費しない行為のため）。補充のキックだけスキップする
 
@@ -398,6 +405,14 @@ MVPは**500ニューロン/日**（月次上限なし）。**リセットは 00:
 
 ```jsonc
 { "error": { "code": "QUOTA_EXCEEDED", "message": "本日の生成量を使い切りました" } }
+```
+
+**同期生成（`POST /api/themes` / `/api/prompts/regenerate`）でAIを呼んだあとに失敗したときは、その回の消費と残りを `error` の外に足す。** `error` の形は変えないので、`isApiError()` で見るクライアントはそのまま動く。
+
+```jsonc
+{ "error": { "code": "GENERATION_FAILED", "message": "..." },
+  "neuronsUsed": 13.0,       // Hono が載せる、その回の消費
+  "neuronsRemaining": 474 }  // Next.js が足す、本日の残り
 ```
 
 | code | HTTP | 条件 | クライアントの対応 |

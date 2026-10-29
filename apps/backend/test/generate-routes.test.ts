@@ -275,15 +275,18 @@ describe("POST /themes（名前の判定）", () => {
     expect(env.AI.run).toHaveBeenCalledTimes(1);
   });
 
-  it("弾いても、判定の消費は加算する（不変条件11）", async () => {
+  it("弾いても、判定の消費は加算し、応答にも載せる（不変条件11）", async () => {
     await seedUser("u1");
     stubJudge((body) => clefAnswer(body, 0.1, JUDGE_TOKENS));
 
-    await post("/themes", { kind: "theme", name: "忍びの心得", userId: "u1" });
+    const { body } = await post("/themes", { kind: "theme", name: "忍びの心得", userId: "u1" });
 
     const usage = await getUsage(db, "u1");
     expect(usage.count).toBe(1);
     expect(usage.neurons).toBeCloseTo(JUDGE_NEURONS);
+    // Next.js が残りを返せるよう、error の外に載せる（error の形は変えない）
+    expect((body.error as { code: string }).code).toBe("INAPPROPRIATE_NAME");
+    expect(body.neuronsUsed).toBeCloseTo(JUDGE_NEURONS);
   });
 
   it("しきい値（0.4）以上なら通し、判定と生成の消費を合わせて返す", async () => {
@@ -334,6 +337,30 @@ describe("POST /themes（名前の判定）", () => {
     expect((body.error as { code: string }).code).toBe("AI_UNAVAILABLE");
     expect(await db.select().from(themes)).toHaveLength(0);
     expect((await getUsage(db, "u1")).neurons).toBeCloseTo(JUDGE_NEURONS);
+    expect(body.neuronsUsed).toBeCloseTo(JUDGE_NEURONS);
+  });
+
+  /** 名前の判定のあとに枠が切れた。**判定の分は消費済み**なので、応答にも載せる */
+  it("判定のあと生成が枠切れ(3036)で落ちたら AI_QUOTA_EXCEEDED に判定の消費を載せる", async () => {
+    await seedUser("u1");
+    stubJudge((body) => clefAnswer(body, 0.9, JUDGE_TOKENS));
+    const judge = vi.mocked(env.AI.run).getMockImplementation();
+    vi.spyOn(env.AI, "run").mockImplementation((async (model: unknown, body: unknown) => {
+      if (isClef(model)) return judge?.(model as never, body as never);
+      throw Object.assign(new Error("daily free allocation"), { code: 3036 });
+    }) as unknown as typeof env.AI.run);
+
+    const { status, body } = await post("/themes", {
+      kind: "theme",
+      name: "忍びの心得",
+      userId: "u1",
+    });
+
+    expect(status).toBe(429);
+    expect((body.error as { code: string }).code).toBe("AI_QUOTA_EXCEEDED");
+    expect(await db.select().from(themes)).toHaveLength(0);
+    expect((await getUsage(db, "u1")).neurons).toBeCloseTo(JUDGE_NEURONS);
+    expect(body.neuronsUsed).toBeCloseTo(JUDGE_NEURONS);
   });
 
   it("判定の呼び出しが翻訳できない例外で落ちても AI_UNAVAILABLE を返す", async () => {
@@ -429,11 +456,11 @@ describe("同期生成の消費記録（成否によらず実消費を加算す�
    * ニューロンはその2回分を消費している。ここを無料にすると、最も高い呼び出しだけが
    * 台帳から漏れる。
    */
-  it("POST /themes で生成に失敗しても、2ラウンド分の消費を加算する", async () => {
+  it("POST /themes で生成に失敗しても、2ラウンド分の消費を加算し、応答にも載せる", async () => {
     await seedUser("u1");
     stubGeneration([["あ"], ["あ"]]);
 
-    const { status } = await post("/themes", {
+    const { status, body } = await post("/themes", {
       kind: "theme",
       name: "忍びの心得",
       userId: "u1",
@@ -441,6 +468,8 @@ describe("同期生成の消費記録（成否によらず実消費を加算す�
 
     expect(status).toBe(422);
     expect((await getUsage(db, "u1")).neurons).toBeCloseTo(PER_ROUND * 2);
+    expect((body.error as { code: string }).code).toBe("GENERATION_FAILED");
+    expect(body.neuronsUsed).toBeCloseTo(PER_ROUND * 2);
   });
 
   it("既存テーマの再利用では消費しない（AIを呼んでいない）", async () => {
@@ -493,7 +522,7 @@ describe("同期生成の消費記録（成否によらず実消費を加算す�
     expect(await getUsage(db, "u1")).toEqual({ count: 0, neurons: 0 });
   });
 
-  it("POST /prompts/regenerate で生成に失敗しても消費を加算する", async () => {
+  it("POST /prompts/regenerate で生成に失敗しても消費を加算し、応答にも載せる", async () => {
     await seedUser("u1");
     await db.insert(themes).values({
       id: "t1",
@@ -503,9 +532,11 @@ describe("同期生成の消費記録（成否によらず実消費を加算す�
     });
     stubGeneration([["あ"], ["あ"]]);
 
-    await post("/prompts/regenerate", { themeId: "t1", userId: "u1" });
+    const { body } = await post("/prompts/regenerate", { themeId: "t1", userId: "u1" });
 
     expect((await getUsage(db, "u1")).neurons).toBeCloseTo(PER_ROUND * 2);
+    expect((body.error as { code: string }).code).toBe("GENERATION_FAILED");
+    expect(body.neuronsUsed).toBeCloseTo(PER_ROUND * 2);
   });
 });
 
@@ -553,7 +584,8 @@ describe("POST /themes（最適化の語彙）", () => {
     expect((body.error as { code: string }).code).toBe("GENERATION_FAILED");
     expect(run).not.toHaveBeenCalled();
     expect(await db.select().from(themes)).toHaveLength(0);
-    expect(await getUsage(db, "u1")).toEqual({ count: 0, neurons: 0 });
+    expect(await getUsage(db, "u1")).toEqual({ count: 0, neurons: 0 }); // AIを呼んでいないので消費を載せない
+    expect(body).not.toHaveProperty("neuronsUsed");
   });
 
   it("作成時に決めた運指を既定の運指として保存し、詳細で返す", async () => {
@@ -628,6 +660,8 @@ describe("POST /prompts/regenerate", () => {
 
     expect(status).toBe(409);
     expect((body.error as { code: string }).code).toBe("GENERATION_IN_PROGRESS");
+    // AIを呼んでいないので消費を載せない
+    expect(body).not.toHaveProperty("neuronsUsed");
   });
 
   it("失敗してもロックを解放する", async () => {
@@ -667,8 +701,9 @@ describe("POST /prompts/regenerate", () => {
     expect((body.error as { code: string }).code).toBe("AI_UNAVAILABLE");
     expect(await db.select().from(prompts)).toHaveLength(0);
     expect(await env.KV.get(themeLockKey("t1", "sentence"))).toBeNull();
-    // 生成の消費は記録済み
+    // 生成の消費は記録済みで、応答にも載せる
     expect((await getUsage(db, "u1")).neurons).toBeCloseTo(PER_ROUND);
+    expect(body.neuronsUsed).toBeCloseTo(PER_ROUND);
   });
 
   it("単語は判断モデルで判定しない（判断モデルを呼ばない）", async () => {

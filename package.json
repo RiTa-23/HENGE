@@ -25,11 +25,11 @@
   "devDependencies": {
     "@types/bun": "^1.4.0",
     "@types/node": "^24",
-    "auth": "~1.6.33",
-    "concurrently": "^10.0.5",
-    "oxfmt": "^0.66.0",
+    "auth": "~1.7.18",
+    "concurrently": "^10.0.6",
+    "oxfmt": "^0.76.0",
     "oxlint": "^1.81.0",
     "typescript": "^5.9.3",
-    "wrangler": "^4.152.0"
+    "wrangler": "^4.158.0"
   }
 }

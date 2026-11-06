@@ -23,7 +23,7 @@
     "@henge/reading": "workspace:*",
     "@henge/shared": "workspace:*",
     "drizzle-orm": "^0.45.2",
-    "hono": "^4.13.5"
+    "hono": "^4.13.16"
   },
   "devDependencies": {
     "@cloudflare/vitest-pool-workers": "^0.22.0",

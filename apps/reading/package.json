@@ -21,7 +21,7 @@
   "dependencies": {
     "@henge/reading-wasm": "workspace:*",
     "@henge/shared": "workspace:*",
-    "hono": "^4.13.5"
+    "hono": "^4.13.16"
   },
   "devDependencies": {
     "wrangler": "^4.152.0"

@@ -211,11 +211,21 @@ describe("おまかせ・ごちゃまぜの生成（最適化と同じく語を�
     expect(prompts[0]).not.toContain("2語以上");
   });
 
+  it("読みを読み違えやすい語はモデルに渡さない", () => {
+    const texts = mixVocabulary().map((w) => w.text);
+    expect(texts).not.toContain("市場");
+    expect(texts).not.toContain("辛い");
+    expect(vocabularyFor("じょ", 30000).map((w) => w.text)).not.toContain("市場");
+    expect(vocabularyFor("つら", 30000).map((w) => w.text)).not.toContain("辛い");
+  });
+
   it("zipf 3.5 以上の語（共通リストの上から MIX_VOCABULARY_SIZE 語）を使う", () => {
     const words = mixVocabulary();
     // 閾値で決める（語数を手で持たない）。境目は build.py が書き出す
     expect(MIX_ZIPF_MIN).toBe(3.5);
-    expect(words).toHaveLength(MIX_VOCABULARY_SIZE);
+    // 読みを読み違えやすい語を外す分だけ、わずかに減る
+    expect(words.length).toBeLessThanOrEqual(MIX_VOCABULARY_SIZE);
+    expect(words.length).toBeGreaterThan(MIX_VOCABULARY_SIZE - 10);
     // 境目が壊れて、リスト全体や数語になっていない（2026-10-29 の実測で 7,781語）
     expect(MIX_VOCABULARY_SIZE).toBeGreaterThan(5000);
     expect(MIX_VOCABULARY_SIZE).toBeLessThan(vocabularySize() / 2);
@@ -737,6 +747,22 @@ describe("generateBatch", () => {
     expect(result.rejected.ng).toBe(1);
   });
 
+  it("読みを読み違えやすい語の入ったお題は misread で却下する", async () => {
+    const result = await generateBatch(
+      envWithAiResponses([["カレーは辛いです。", "影が揺れた。"], []]),
+      input({ target: 1 }),
+    );
+    expect(result.valid.map((v) => v.text)).toEqual(["影が揺れた。"]);
+    expect(result.rejected.misread).toBe(1);
+  });
+
+  it("中国語の表記が混ざった単語は misread で却下する", async () => {
+    const word = await generateBatch(envWithAiResponses([["博多站"]]), {
+      ...input({ form: "word", target: 1 }),
+    });
+    expect(word.rejected.misread).toBe(1);
+  });
+
   it("NG 語は単語でも見る", async () => {
     const word = await generateBatch(envWithAiResponses([["ポルノ"]]), {
       ...input({ form: "word", target: 1 }),
@@ -770,11 +796,11 @@ describe("generateBatch", () => {
 
     expect(logs).toHaveLength(2);
     expect(logs[0]?.metadata?.counts).toBe(
-      "charset:1,kanji:0,opening:0,keystroke:0,constraint:0,punct:0,ng:0,moderate:0,dup:0",
+      "charset:1,kanji:0,opening:0,keystroke:0,constraint:0,punct:0,ng:0,misread:0,moderate:0,dup:0",
     );
     // 累積を渡していれば charset:2 になる
     expect(logs[1]?.metadata?.counts).toBe(
-      "charset:1,kanji:0,opening:0,keystroke:0,constraint:0,punct:0,ng:0,moderate:0,dup:0",
+      "charset:1,kanji:0,opening:0,keystroke:0,constraint:0,punct:0,ng:0,misread:0,moderate:0,dup:0",
     );
   });
 

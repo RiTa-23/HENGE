@@ -1,4 +1,10 @@
-import { includesConstraint } from "@henge/shared";
+import {
+  buildRomanCandidates,
+  countKeystrokes,
+  includesConstraint,
+  isKeystrokeCountInRange,
+  type RomanCandidates,
+} from "@henge/shared";
 import { MIX_VOCABULARY_SIZE, MIX_ZIPF_MIN, VOCABULARY_TSV } from "./vocabulary.generated";
 
 /**
@@ -79,6 +85,56 @@ export function mixVocabulary(): VocabularyWord[] {
       return { text: line.slice(0, tab), reading: line.slice(tab + 1) };
     });
   return mixVocabularyCache;
+}
+
+/** その場で取り出した単語1つ。`PlayablePrompt` と同じ形（プレイ画面は区別しない） */
+export interface DrawnWord {
+  /** 語彙リスト上の位置から作る。**D1 の行ではない**（保存しないので） */
+  id: string;
+  text: string;
+  readingKana: string;
+  readingRoman: RomanCandidates;
+}
+
+/**
+ * おまかせの単語。**語彙から `count` 語をその場でランダムに取り出す**（AI を使わず、プールにも積まない）。
+ *
+ * - 1回の中で同じ表記は出さない（同じ表記で読みの違う行が並んでいることがある）
+ * - 打鍵数が単語の範囲外の語・ローマ字に組めない読みの語は飛ばす（生成した単語と同じ検査）
+ * - 取り出しは部分的な Fisher–Yates。数千語の全体を混ぜない
+ *
+ * 語彙が足りなければ取れた分だけ返す（呼び出し側が判断する）。
+ */
+export function drawMixWords(
+  words: VocabularyWord[],
+  count: number,
+  random: () => number = Math.random,
+): DrawnWord[] {
+  const indexes = words.map((_, index) => index);
+  const seen = new Set<string>();
+  const drawn: DrawnWord[] = [];
+  for (let i = 0; i < indexes.length && drawn.length < count; i++) {
+    const j = i + Math.floor(random() * (indexes.length - i));
+    [indexes[i], indexes[j]] = [indexes[j] as number, indexes[i] as number];
+    const index = indexes[i] as number;
+    const word = words[index] as VocabularyWord;
+    if (seen.has(word.text)) continue;
+    let roman: RomanCandidates;
+    try {
+      roman = buildRomanCandidates(word.reading);
+    } catch {
+      continue;
+    }
+    if (!isKeystrokeCountInRange(countKeystrokes(roman), "word")) continue;
+    seen.add(word.text);
+    drawn.push({
+      id: `vocab-${index}`,
+      text: word.text,
+      readingKana: word.reading,
+      readingRoman: roman,
+    });
+  }
+  return drawn;
 }
 
 /** 共通リストの語数。テストで上限を検査する（膨らんでメモリの心配を始めないため） */

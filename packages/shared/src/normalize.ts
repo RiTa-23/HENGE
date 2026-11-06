@@ -1,3 +1,5 @@
+import type { PromptForm } from "./session";
+
 /**
  * テーマ名・含む文字の正規化。
  *
@@ -24,12 +26,20 @@ export type ThemeKind = "theme" | "constraint" | "mix";
  *
  * **4語以上は入れていない。** 3語でも短文の打鍵数の上限（35打）にぎりぎりで、却下・2ラウンド目・
  * 失敗が増えるおそれがある（docs/05-generation.md）。
+ *
+ * `forms` はそのモードで遊べる形式（画面の並び）。**おまかせの単語は AI で作らず、語彙リストの語を
+ * プレイのたびにその場で取り出す**（プールに積まない。docs/05-generation.md）。語を組み合わせる
+ * ごちゃまぜ・超ごちゃまぜに単語は無い。
  */
 export const MIX_MODES = [
-  { name: "おまかせ", wordsPerSentence: 1 },
-  { name: "ごちゃまぜ", wordsPerSentence: 2 },
-  { name: "超ごちゃまぜ", wordsPerSentence: 3 },
-] as const;
+  { name: "おまかせ", wordsPerSentence: 1, forms: ["word", "sentence"] },
+  { name: "ごちゃまぜ", wordsPerSentence: 2, forms: ["sentence"] },
+  { name: "超ごちゃまぜ", wordsPerSentence: 3, forms: ["sentence"] },
+] as const satisfies readonly {
+  name: string;
+  wordsPerSentence: 1 | 2 | 3;
+  forms: readonly PromptForm[];
+}[];
 
 export type MixName = (typeof MIX_MODES)[number]["name"];
 
@@ -44,6 +54,15 @@ export const MIX_SUPER_CHAOS_NAME = "超ごちゃまぜ" satisfies MixName;
 export function mixWordsPerSentence(name: string): 1 | 2 | 3 | null {
   const normalized = normalizeConstraintChar(name);
   return MIX_MODES.find((mode) => mode.name === normalized)?.wordsPerSentence ?? null;
+}
+
+/**
+ * その名前のモードで遊べる形式（画面の並び）。語を選んで作るモードの名前でなければ空。
+ * **おまかせの単語はプールを持たない**（`/sessions/start` が語彙リストからその場で取り出す）
+ */
+export function mixFormsOf(name: string): readonly PromptForm[] {
+  const normalized = normalizeConstraintChar(name);
+  return MIX_MODES.find((mode) => mode.name === normalized)?.forms ?? [];
 }
 
 /**

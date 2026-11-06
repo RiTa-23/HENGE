@@ -53,7 +53,10 @@ export default async function PlayPage({
       themeName={found.name}
       kind={themeKind}
       form={playForm}
-      poolEmpty={found.promptCounts[playForm] === 0}
+      // おまかせの単語はプールを持たない（その場で語彙から取り出す）ので、在庫0でも空ではない
+      poolEmpty={
+        !(themeKind === "mix" && playForm === "word") && found.promptCounts[playForm] === 0
+      }
       shareUrl={shareUrl}
       beta={beta}
       // 作成者が決めた運指。音と照らして形が合わなければ標準運指に倒す

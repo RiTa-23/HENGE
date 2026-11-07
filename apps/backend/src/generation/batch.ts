@@ -5,6 +5,7 @@
 import {
   containsKanji,
   containsNgWord,
+  containsReadingProneWord,
   countConstraint,
   countKeystrokes,
   countSentenceEnds,
@@ -123,6 +124,8 @@ export interface RejectionCounts {
    * 最適化では渡す語から外してあるが、モデルが文の中で書いてしまう語は防げない
    */
   ng: number;
+  /** 読みを読み違えやすい語（`reading-prone.ts`）が入っていた。最適化・テーマの全形式で見る */
+  misread: number;
   /**
    * 判断モデル（Clef-flash）が「載せてよい」と判定しなかった（`moderation.ts`）。
    * **短文と長文だけ。単語は判定しない**（`MODERATED_OUTPUT_FORMS`）ので、単語では常に0。
@@ -217,6 +220,7 @@ export async function generateBatch(env: Env, input: GenerateBatchInput): Promis
     constraint: 0,
     punct: 0,
     ng: 0,
+    misread: 0,
     moderate: 0,
     dup: 0,
   };
@@ -372,6 +376,7 @@ function subtract(after: RejectionCounts, before: RejectionCounts): RejectionCou
     constraint: after.constraint - before.constraint,
     punct: after.punct - before.punct,
     ng: after.ng - before.ng,
+    misread: after.misread - before.misread,
     moderate: after.moderate - before.moderate,
     dup: after.dup - before.dup,
   };
@@ -420,6 +425,11 @@ async function validateInto(
     // **NG 語の入ったお題を出さない。** 読み取得の前に無料で弾く
     if (containsNgWord(text)) {
       rejected.ng++;
+      return false;
+    }
+    // **読みを読み違えやすい語のお題を出さない。** 読み取得の前に無料で弾く
+    if (containsReadingProneWord(text)) {
+      rejected.misread++;
       return false;
     }
     // **表記がひらがなだけの文・語を通さない。** 打鍵は読み仮名に対して行うので

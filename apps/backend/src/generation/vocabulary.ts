@@ -1,5 +1,6 @@
 import {
   buildRomanCandidates,
+  containsReadingProneWord,
   countKeystrokes,
   includesConstraint,
   isKeystrokeCountInRange,
@@ -51,7 +52,10 @@ export function vocabularyFor(
     const tab = line.indexOf("\t");
     const reading = line.slice(tab + 1);
     if (!includesConstraint(reading, constraint)) continue;
-    words.push({ text: line.slice(0, tab), reading });
+    const text = line.slice(0, tab);
+    // 生成後の検査で必ず落ちる語を渡さない
+    if (containsReadingProneWord(text)) continue;
+    words.push({ text, reading });
     if (words.length >= limit) break;
   }
   return words;
@@ -83,7 +87,8 @@ export function mixVocabulary(): VocabularyWord[] {
     .map((line) => {
       const tab = line.indexOf("\t");
       return { text: line.slice(0, tab), reading: line.slice(tab + 1) };
-    });
+    })
+    .filter((word) => !containsReadingProneWord(word.text));
   return mixVocabularyCache;
 }
 

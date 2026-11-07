@@ -55,6 +55,7 @@ export {
   WORD_KEYSTROKE_MIN,
 } from "./generation/validate";
 export { containsNgWord, containsNgWordInName } from "./generation/ng";
+export { containsReadingProneWord } from "./generation/reading-prone";
 export { NG_WORDS } from "./generation/ng-words";
 export {
   apiError,

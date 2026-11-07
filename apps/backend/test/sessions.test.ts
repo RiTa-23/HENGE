@@ -366,3 +366,51 @@ describe("形式ごとに別のプール・別の進捗", () => {
     expect(body.prompts).toHaveLength(PLAY_SIZE);
   });
 });
+
+describe("おまかせの単語（語彙リストからその場で取り出す）", () => {
+  async function seedMix(name: string) {
+    await seed(0, { id: "t1", kind: "mix", name, normalizedName: name });
+  }
+
+  it("在庫が無くても、重複の無い単語を1プレイ分返す", async () => {
+    await seedMix("おまかせ");
+
+    const { status, body } = await start({ themeId: "t1", form: "word", offset: 0 });
+
+    expect(status).toBe(200);
+    const words = body.prompts as { text: string; readingRoman: string[][] }[];
+    expect(words).toHaveLength(PLAY_SIZE_WORD);
+    expect(new Set(words.map((w) => w.text)).size).toBe(PLAY_SIZE_WORD);
+    expect(body.refillKicked).toBe(false);
+  });
+
+  it("お題を D1 に保存しない（プールに積まない）", async () => {
+    await seedMix("おまかせ");
+
+    await start({ themeId: "t1", form: "word", userId: "u1", allowRefill: true });
+
+    expect(await db.select().from(prompts)).toHaveLength(0);
+    expect(env.AI.run).not.toHaveBeenCalled();
+  });
+
+  it("ログインユーザーは遊んだ記録が残る（ランキングの登録判定に使う）", async () => {
+    await seedMix("おまかせ");
+
+    await start({ themeId: "t1", form: "word", userId: "u1" });
+    await start({ themeId: "t1", form: "word", userId: "u1" });
+
+    const [row] = await db
+      .select()
+      .from(userThemeProgress)
+      .where(eq(userThemeProgress.form, "word"));
+    expect(row?.playCount).toBe(PLAY_SIZE_WORD * 2);
+  });
+
+  it("ごちゃまぜに単語は無い（プールを引いて枯渇になる）", async () => {
+    await seedMix("ごちゃまぜ");
+
+    const { body } = await start({ themeId: "t1", form: "word", offset: 0 });
+
+    expect((body.error as { code: string }).code).toBe("THEME_EXHAUSTED");
+  });
+});

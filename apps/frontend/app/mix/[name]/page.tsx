@@ -1,7 +1,8 @@
-import { mixWordsPerSentence, type MixName } from "@henge/shared";
+import { mixFormsOf, mixWordsPerSentence, type MixName } from "@henge/shared";
 import type { Metadata } from "next";
 import { notFound, permanentRedirect } from "next/navigation";
 import { DetailScroll } from "@/components/DetailScroll";
+import { FormButton } from "@/components/FormButton";
 import { MixMark, mixPips } from "@/components/ModeMark";
 import { RankingBoard } from "@/components/RankingBoard";
 import { SealButton } from "@/components/SealButton";
@@ -10,12 +11,12 @@ import { SiteHeader } from "@/components/SiteHeader";
 import { listRankings } from "@/lib/api/rankings";
 import { decodePageParam, findTheme } from "@/lib/api/themes";
 import { ogFields, pageTitle } from "@/lib/og";
-import { detailHref, playHref } from "@/lib/ui/kind";
+import { detailHref, parsePlayForm, playHref } from "@/lib/ui/kind";
 import { MIX_COPY, mixModesOnPage, mixPageOf, parseMixName } from "@/lib/ui/mix";
 
 interface Props {
   params: Promise<{ name: string }>;
-  searchParams: Promise<{ mode?: string }>;
+  searchParams: Promise<{ mode?: string; ranking?: string }>;
 }
 
 /**
@@ -23,7 +24,7 @@ interface Props {
  * ページ名がおまかせ・ごちゃまぜの名前でなければ null
  */
 async function resolve({ params, searchParams }: Props) {
-  const [{ name }, { mode }] = await Promise.all([params, searchParams]);
+  const [{ name }, { mode, ranking }] = await Promise.all([params, searchParams]);
   // ページのルートパラメータはエンコードされたまま渡ってくる
   const decoded = decodePageParam(name);
   const page = parseMixName(decoded ?? undefined);
@@ -31,7 +32,7 @@ async function resolve({ params, searchParams }: Props) {
   const modes = mixModesOnPage(page);
   const requested = parseMixName(mode);
   const selected: MixName = requested !== null && modes.includes(requested) ? requested : page;
-  return { page, modes, selected };
+  return { page, modes, selected, ranking };
 }
 
 /** シェアの着地ページ（結果のX投稿からここへ来る。docs/09-share.md） */
@@ -56,7 +57,7 @@ export const dynamic = "force-dynamic";
 export default async function MixDetailPage(props: Props) {
   const resolved = await resolve(props);
   if (resolved === null) notFound();
-  const { page, modes, selected } = resolved;
+  const { page, modes, selected, ranking } = resolved;
   // 独自のページを持たないモード（超ごちゃまぜ）の名前で来たら、それを選んだ親のページへ
   if (mixPageOf(page) !== page) permanentRedirect(detailHref("mix", page));
 
@@ -64,8 +65,12 @@ export default async function MixDetailPage(props: Props) {
   const theme = await findTheme("mix", selected);
   if (theme === null) notFound();
 
-  // 短文だけなので、ランキングも1つ
-  const entries = await listRankings(theme.id, "sentence");
+  // **おまかせは単語と短文**（単語はプールを持たず、語彙からその場で取り出す）。ほかは短文だけ。
+  // ランキングは形式ごとに別
+  const forms = mixFormsOf(selected);
+  const boards = await Promise.all(
+    forms.map(async (form) => ({ form, entries: await listRankings(theme.id, form) })),
+  );
   const words = mixWordsPerSentence(selected) ?? 1;
   const copy = MIX_COPY[selected];
 
@@ -77,9 +82,17 @@ export default async function MixDetailPage(props: Props) {
           mark={<MixMark pips={mixPips(words)} className="h-5 w-5" />}
           eyebrow={words === 1 ? copy.level : `${copy.level}モード`}
           title={page}
-          description={<>{copy.description}10問ひと組で、同じ文章は繰り返し出ません。</>}
+          description={
+            <>
+              {copy.description}10問ひと組で、同じ文章は繰り返し出ません。
+              {forms.includes("word") && copy.wordDescription}
+            </>
+          }
           stats={[
-            { label: "お題", value: theme.promptCounts.sentence },
+            {
+              label: forms.length > 1 ? "短文のお題" : "お題",
+              value: theme.promptCounts.sentence,
+            },
             { label: "プレイ", value: theme.totalPlayCount, unit: "回" },
           ]}
           actions={
@@ -108,18 +121,37 @@ export default async function MixDetailPage(props: Props) {
                   ))}
                 </nav>
               )}
-              {/* 形式が1つなので木札ではなく朱印（`SealButton`）。押すと選んだモードで打ち始める */}
-              <SealButton
-                key={selected}
-                href={playHref("mix", theme.name)}
-                note={modes.length > 1 ? `${copy.level}・1文に${words}語` : undefined}
-                difficult={theme.generationStatus === "difficult"}
-              />
+              {forms.length > 1 ? (
+                /* 形式を選ぶので木札（テーマ詳細と同じ）。単語は AI を使わないので「生成困難」は付かない */
+                <div className="flex flex-wrap justify-center gap-6">
+                  {forms.map((form) => (
+                    <FormButton
+                      key={form}
+                      form={form}
+                      size="lg"
+                      href={playHref("mix", theme.name, form)}
+                      difficult={form === "sentence" && theme.generationStatus === "difficult"}
+                    />
+                  ))}
+                </div>
+              ) : (
+                /* 形式が1つなので木札ではなく朱印（`SealButton`）。押すと選んだモードで打ち始める */
+                <SealButton
+                  key={selected}
+                  href={playHref("mix", theme.name)}
+                  note={modes.length > 1 ? `${copy.level}・1文に${words}語` : undefined}
+                  difficult={theme.generationStatus === "difficult"}
+                />
+              )}
             </div>
           }
         />
 
-        <RankingBoard key={selected} boards={[{ form: "sentence", entries }]} />
+        <RankingBoard
+          key={selected}
+          boards={boards}
+          initialForm={ranking === undefined ? undefined : parsePlayForm(ranking)}
+        />
 
         <p className="mt-10 text-sm text-kinari/50">
           <a href="/themes" className="hover:text-kinari">

@@ -8,6 +8,7 @@ export {
   MIX_STANDARD_NAME,
   MIX_SUPER_CHAOS_NAME,
   type MixName,
+  mixFormsOf,
   mixWordsPerSentence,
   normalizeConstraintChar,
   normalizeName,

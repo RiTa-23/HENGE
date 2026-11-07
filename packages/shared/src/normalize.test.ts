@@ -1,6 +1,7 @@
 import { describe, expect, test } from "bun:test";
 import {
   isHiraganaOnly,
+  mixFormsOf,
   mixWordsPerSentence,
   normalizeConstraintChar,
   normalizeName,
@@ -100,5 +101,17 @@ describe("mixWordsPerSentence", () => {
   test("知らない名前は null（その名前の行を作らせない）", () => {
     expect(mixWordsPerSentence("ざ")).toBeNull();
     expect(mixWordsPerSentence("")).toBeNull();
+  });
+});
+
+describe("mixFormsOf", () => {
+  test("おまかせだけ単語と短文、ごちゃまぜ・超ごちゃまぜは短文だけ", () => {
+    expect(mixFormsOf("おまかせ")).toEqual(["word", "sentence"]);
+    expect(mixFormsOf("ごちゃまぜ")).toEqual(["sentence"]);
+    expect(mixFormsOf("超ごちゃまぜ")).toEqual(["sentence"]);
+  });
+
+  test("知らない名前は空", () => {
+    expect(mixFormsOf("ざ")).toEqual([]);
   });
 });

@@ -142,6 +142,37 @@ export function drawMixWords(
   return drawn;
 }
 
+/** おまかせの単語のID（`drawMixWords` が振る `vocab-<位置>`）。D1 の行のIDとは重ならない */
+const MIX_WORD_ID = /^vocab-(\d+)$/;
+
+/**
+ * おまかせの単語をIDから引き直す。ランキングの登録で打鍵ログを再生するのに使う
+ * （その場で取り出した単語は D1 に無いので、プレイチケットのIDから語彙を引く）。
+ *
+ * 読めないID・範囲外の位置は返さない（呼び出し側が件数で断る）。語彙リストが入れ替わる
+ * デプロイをまたぐと別の語になりうるが、その記録は再生がお題と合わずに弾かれるだけ
+ */
+export function mixWordsByIds(ids: readonly string[]): DrawnWord[] {
+  const words = mixVocabulary();
+  const found: DrawnWord[] = [];
+  for (const id of ids) {
+    const index = Number(MIX_WORD_ID.exec(id)?.[1]);
+    const word = Number.isSafeInteger(index) ? words[index] : undefined;
+    if (word === undefined) continue;
+    try {
+      found.push({
+        id,
+        text: word.text,
+        readingKana: word.reading,
+        readingRoman: buildRomanCandidates(word.reading),
+      });
+    } catch {
+      // 取り出すときも飛ばしている（ローマ字に組めない読み）。ここに来るIDは偽物
+    }
+  }
+  return found;
+}
+
 /** 共通リストの語数。テストで上限を検査する（膨らんでメモリの心配を始めないため） */
 export function vocabularySize(): number {
   return VOCABULARY_TSV.split("\n").length;

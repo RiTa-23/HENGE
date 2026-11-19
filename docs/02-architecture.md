@@ -109,6 +109,7 @@ packages/
 | `BETTER_AUTH_SECRET` | セッション署名。`openssl rand -base64 32` 等で作る | 同上 |
 | `BETTER_AUTH_URL` | Better Auth の baseURL。ローカルは `http://localhost:3000`、本番は**公開ドメイン**。**認証だけでなく、シェアURLとOGPの基準URLもここから引く**（`lib/og.ts` の `siteUrl()`） | 同上（URLそのものは公開情報だが、環境ごとに値が変わるため vars ではなくシークレットとして管理する） |
 | `ADMIN_EMAILS` | 管理者判定（カンマ区切り） | 同上（Next.js側） |
+| `RANKING_TICKET_SECRET` | プレイチケット（ランキング登録で使う、出したお題の証明）の HMAC 署名鍵。`openssl rand -base64 32` 等で作る。**`BETTER_AUTH_SECRET` と別にする**（認証の鍵を替えたときに用途の違う署名を巻き込まない）。替えると発行済みのチケットが通らなくなる（最大2時間ぶんのプレイが登録できない）だけで、他は壊れない。**未設定ならチケットを発行せず、ランキングに登録できない**（プレイはできる） | 同上（Next.js側） |
 | `REPORTS_SYNC_TOKEN` | 辞書リポジトリ（RiTa-23/unidic-cwj-trim）の自動PRワークフローが、承認済みの読み違い報告を取りに来る・適用完了を返すときの機械認証（`Authorization: Bearer`）。**辞書リポジトリの Actions シークレットにも同じ値を置く。** 未設定なら機械アクセスは全て弾く | 同上（Next.js側） |
 
 ローカル開発では `.dev.vars` を使う。テンプレートは `apps/frontend/.dev.vars.example` / `apps/backend/.dev.vars.example`。**リポジトリにコミットしない。**

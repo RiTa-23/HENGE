@@ -57,7 +57,8 @@ export const sessionRoutes = new Hono<{ Bindings: Env }>().post("/sessions/start
   if (theme.kind === "mix" && form === "word" && mixFormsOf(theme.name).includes("word")) {
     const words = drawMixWords(mixVocabulary(), size);
     if (words.length < size) return fail(c, "THEME_EXHAUSTED");
-    // ログインユーザーは遊んだ回数だけ残す。**ランキングの登録判定**（遊んだ記録があるか）に使う
+    // ログインユーザーは遊んだ回数だけ残す。ランキングの登録はこれではなくプレイチケットで見る
+    // （お題は D1 に無いので、登録時に語彙から引き直す。routes/rankings.ts）
     if (body.userId !== undefined) {
       const played = await getPlayOffset(db, body.userId, body.themeId, form);
       await setPlayOffset(db, body.userId, body.themeId, form, played + size);

@@ -98,3 +98,10 @@ export {
   playStatsRejection,
   RANKING_SIZE,
 } from "./ranking";
+export {
+  MAX_PLAY_LOG_KEYS,
+  type PlayLog,
+  replayPlay,
+  type ReplayPrompt,
+  type ReplayResult,
+} from "./replay";

@@ -16,6 +16,7 @@ interface __BaseEnv_CloudflareEnv {
 	BETTER_AUTH_URL: string;
 	ADMIN_EMAILS: string;
 	REPORTS_SYNC_TOKEN: string;
+	RANKING_TICKET_SECRET: string;
 	BACKEND: Fetcher /* henge-backend */;
 }
 declare namespace Cloudflare {
@@ -29,7 +30,7 @@ type StringifyValues<EnvType extends Record<string, unknown>> = {
 	[Binding in keyof EnvType]: EnvType[Binding] extends string ? EnvType[Binding] : string;
 };
 declare namespace NodeJS {
-	interface ProcessEnv extends StringifyValues<Pick<Cloudflare.Env, "BETA_MODE" | "GOOGLE_CLIENT_ID" | "GOOGLE_CLIENT_SECRET" | "BETTER_AUTH_SECRET" | "BETTER_AUTH_URL" | "ADMIN_EMAILS" | "REPORTS_SYNC_TOKEN">> {}
+	interface ProcessEnv extends StringifyValues<Pick<Cloudflare.Env, "BETA_MODE" | "GOOGLE_CLIENT_ID" | "GOOGLE_CLIENT_SECRET" | "BETTER_AUTH_SECRET" | "BETTER_AUTH_URL" | "ADMIN_EMAILS" | "REPORTS_SYNC_TOKEN" | "RANKING_TICKET_SECRET">> {}
 }
 
 // Begin runtime types

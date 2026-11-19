@@ -393,7 +393,7 @@ describe("おまかせの単語（語彙リストからその場で取り出す�
     expect(env.AI.run).not.toHaveBeenCalled();
   });
 
-  it("ログインユーザーは遊んだ記録が残る（ランキングの登録判定に使う）", async () => {
+  it("ログインユーザーは遊んだ回数が残る", async () => {
     await seedMix("おまかせ");
 
     await start({ themeId: "t1", form: "word", userId: "u1" });

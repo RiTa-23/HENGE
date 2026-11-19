@@ -1,7 +1,14 @@
-import { type PlayStats, parsePromptForm, type PromptForm } from "@henge/shared";
+import {
+  mixFormsOf,
+  type PlayStats,
+  parsePromptForm,
+  type PromptForm,
+  type ReplayPrompt,
+} from "@henge/shared";
 import { Hono } from "hono";
 import { createDb } from "../db/client";
 import { fetchPromptsByIds } from "../db/prompts";
+import { mixWordsByIds } from "../generation/vocabulary";
 import { listRankings, registerRanking } from "../db/rankings";
 import { getThemeDetail } from "../db/themes";
 import { fail } from "../http/error";
@@ -39,12 +46,30 @@ export const rankingRoutes = new Hono<{ Bindings: Env }>()
     return c.json({ entries: await listRankings(createDb(c.env.DB), themeId, form) });
   })
   /**
-   * 打鍵ログの再生に使うお題の読み。Next.js がチケットのお題IDで引く。
-   * 消されたお題は返らない（件数が足りなければ Next.js が登録を断る）
+   * 打鍵ログの再生に使うお題の読み。Next.js がチケットのテーマ・形式・お題IDで引く。
+   * 消されたお題は返らない（件数が足りなければ Next.js が登録を断る）。
+   *
+   * **おまかせの単語は D1 に無い**（`sessions/start` が語彙からその場で取り出す）ので、
+   * 語彙リストから引き直す（`mixWordsByIds`）
    */
   .post("/rankings/prompts", async (c) => {
-    const { ids } = await c.req.json<{ ids: string[] }>();
-    return c.json({ prompts: await fetchPromptsByIds(createDb(c.env.DB), ids) });
+    const { themeId, form, ids } = await c.req.json<{
+      themeId: string;
+      form: PromptForm;
+      ids: string[];
+    }>();
+    const db = createDb(c.env.DB);
+    const theme = await getThemeDetail(db, themeId);
+    if (theme?.kind === "mix" && form === "word" && mixFormsOf(theme.name).includes("word")) {
+      const prompts: ReplayPrompt[] = mixWordsByIds(ids).map((word) => ({
+        id: word.id,
+        themeId,
+        form,
+        readingRoman: word.readingRoman,
+      }));
+      return c.json({ prompts });
+    }
+    return c.json({ prompts: await fetchPromptsByIds(db, ids) });
   })
   .post("/rankings", async (c) => {
     const body = await c.req.json<RegisterBody>();

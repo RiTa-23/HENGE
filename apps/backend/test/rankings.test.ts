@@ -233,12 +233,63 @@ describe("POST /rankings/prompts", () => {
     const res = await SELF.fetch("http://backend/rankings/prompts", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ ids: ["p1", "gone"] }),
+      body: JSON.stringify({ themeId: "t1", form: "word", ids: ["p1", "gone"] }),
     });
 
     expect(await res.json()).toEqual({
       prompts: [{ id: "p1", themeId: "t1", form: "word", readingRoman: [["ne"], ["ko", "co"]] }],
     });
+  });
+});
+
+/** 打鍵ログの再生に使う読みを、単語の形式で引く */
+async function lookup(themeId: string, ids: string[]) {
+  const res = await SELF.fetch("http://backend/rankings/prompts", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ themeId, form: "word", ids }),
+  });
+  return ((await res.json()) as { prompts: { id: string; readingRoman: string[][] }[] }).prompts;
+}
+
+describe("POST /rankings/prompts（おまかせの単語）", () => {
+  it("sessions/start が出した単語を、IDから同じ読みで引き直す（D1 に無いので語彙から）", async () => {
+    await db.insert(themes).values({
+      id: "m1",
+      kind: "mix",
+      name: "おまかせ",
+      normalizedName: "おまかせ",
+    });
+    const start = await SELF.fetch("http://backend/sessions/start", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ themeId: "m1", form: "word", offset: 0 }),
+    });
+    const drawn = ((await start.json()) as { prompts: { id: string; readingRoman: string[][] }[] })
+      .prompts;
+
+    const found = await lookup(
+      "m1",
+      drawn.map((word) => word.id),
+    );
+
+    expect(found.map((word) => [word.id, word.readingRoman])).toEqual(
+      drawn.map((word) => [word.id, word.readingRoman]),
+    );
+  });
+
+  it("おまかせ以外のテーマでは vocab- のIDを語彙から引かない", async () => {
+    expect(await lookup("t1", ["vocab-0"])).toEqual([]);
+  });
+
+  it("読めないID・範囲外の位置は返さない", async () => {
+    await db.insert(themes).values({
+      id: "m1",
+      kind: "mix",
+      name: "おまかせ",
+      normalizedName: "おまかせ",
+    });
+    expect(await lookup("m1", ["vocab-x", "vocab-99999999", "p1"])).toEqual([]);
   });
 });
 

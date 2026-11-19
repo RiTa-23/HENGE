@@ -45,7 +45,9 @@ export async function POST(request: Request) {
   const { ticket } = verified;
 
   const client = await backendClient();
-  const found = await client.rankings.prompts.$post({ json: { ids: ticket.promptIds } });
+  const found = await client.rankings.prompts.$post({
+    json: { themeId: ticket.themeId, form: ticket.form, ids: ticket.promptIds },
+  });
   const { prompts } = await found.json();
 
   const record = checkPlayRecord({ ticket, log: parsed.data.log, prompts, now });

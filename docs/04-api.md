@@ -79,8 +79,8 @@
 - **1プレイの問題数は形式で変わる**（短文10／単語20／長文1本）。プールもオフセットも形式ごとに別（`docs/03-data-model.md`）
 - **おまかせの単語（`kind: 'mix'` の「おまかせ」に `form: "word"`）はプールを引かない。** 語彙リストから
   その場でランダムに20語（重複なし）を返す。`id` は D1 の行ではなく `vocab-<語彙の位置>`、`nextOffset`・
-  `remainingInPool` は 0、`refillKicked` は常に false。ログイン時は遊んだ記録だけ進める（ランキングの登録判定に使う。
-  `docs/05-generation.md`）
+  `remainingInPool` は 0、`refillKicked` は常に false。ログイン時は遊んだ回数だけ進める（`docs/05-generation.md`）。
+  **ランキングの登録では、Hono の `POST /rankings/prompts` が `vocab-<位置>` から語彙を引き直して打鍵ログを再生する**
 - 問題はシャッフルして返す
 - **返却した時点でオフセット消費が確定する**（中断しても巻き戻さない）
 - ログイン時のみ、条件を満たせば`ctx.waitUntil()`でバックグラウンド生成をキックする
@@ -233,7 +233,7 @@ Next.js 側の検査は次の順（`lib/api/play-record.ts`）。どれも入力
 
 1. Zod で形を見る（キーは正規化後の文字だけ、時刻は0以上の整数、キーと時刻の数が同じ）
 2. チケットの署名・有効期限（2時間）・持ち主（`uid` があれば本人か）。だめなら `FORBIDDEN`
-3. Hono の `POST /rankings/prompts` でお題の読みを引き、チケットの出題順に並べる。消されたお題があれば `NOT_FOUND`
+3. Hono の `POST /rankings/prompts` でお題の読みを引き、チケットの出題順に並べる（おまかせの単語は語彙リストから引き直す）。消されたお題があれば `NOT_FOUND`
 4. 打鍵ログを再生する。全問を打ち切っていない・余分なキーがある・時刻が戻るなら `VALIDATION_ERROR`
 5. 再生した記録に `playStatsRejection`（1プレイの打鍵数の範囲・時間が0以下または1時間超・30打鍵/秒超）
 6. **実時間の検査。** 再生した時間が「発行から今まで」より長ければ `VALIDATION_ERROR`。チケットを受け取った直後に作ったログでは、そのログが言う時間が実際に経つまで通らない
@@ -369,7 +369,7 @@ Next.js 側の検査は次の順（`lib/api/play-record.ts`）。どれも入力
 | POST | `/prompts/regenerate` | 枯渇時の同期再生成 |
 | GET | `/usage/:userId` | 当日の `{ count, neurons }`（Next.js側の判定の材料）。**上限値はHono側に持たない** |
 | GET | `/rankings` | テーマ×形式の上位100件（`themeId` / `form` をクエリで受ける）。`displayName` を結合して返す |
-| POST | `/rankings/prompts` | 打鍵ログの再生に使うお題の読み（`ids` で引く）。消されたお題は返らない |
+| POST | `/rankings/prompts` | 打鍵ログの再生に使うお題の読み（`themeId` / `form` / `ids` で引く）。消されたお題は返らない。**おまかせの単語は語彙リストから引き直す**（D1 に無いため） |
 | POST | `/rankings` | 記録の登録。Next.js が再生した記録からスコアを計算し、ベストのときだけ書き換え、101位以下を消す。**チケットの `jti` が使用済みなら `FORBIDDEN`**（KV で使い捨てにする） |
 | GET | `/themes/:id/creator` | 作成者のユーザーID。既定の運指を変えてよいかの判定用。**公開APIで中継しない** |
 | PUT | `/themes/default-fingering` | 最適化の既定の運指を書き換える（`themeId` は本文） |

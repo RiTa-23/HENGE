@@ -50,20 +50,17 @@ export interface ModelConfig {
 type RegisteredModel = ModelConfig & { neurons: NeuronRates };
 
 export const MODELS = {
-  // 既定。速く安く品質も十分（実測 0.9〜1.6秒 / 3.7〜4.2 neurons / 採用6〜7件）
-  "@cf/qwen/qwen3-30b-a3b-fp8": {
-    promptSuffix: "/no_think",
-    neurons: { input: 4_625, output: 30_475 },
+  // 既定。テーマのお題の品質が最も高い（2026-11-08 の実測、1回の生成あたり 中央値3.7秒 /
+  // 平均25.5 neurons / 採用率77%）。思考をしないモデルなので、思考を切る指示は要らない。
+  // 以前の既定 @cf/qwen/qwen3-30b-a3b-fp8 は 2026-11-20 に Workers AI から廃止された
+  "@cf/aisingapore/gemma-sea-lion-v4-27b-it": {
+    neurons: { input: 31_876, output: 50_488 },
   },
   // 品質は最も高いが遅く高価（実測 24〜132秒 / 96〜215 neurons）
   // 思考が長いため上限を大きく取る。8件で最大5,878トークン使った実測がある
   "@cf/zai-org/glm-4.7-flash": {
     maxTokens: 16_000,
     neurons: { input: 5_500, output: 36_400 },
-  },
-  // 速く安いが書式を崩すことがある（実測 2〜8秒 / 4〜6 neurons）
-  "@cf/meta/llama-3.1-8b-instruct-fp8": {
-    neurons: { input: 13_778, output: 26_128 },
   },
 } as const satisfies Record<string, RegisteredModel>;
 
@@ -75,7 +72,7 @@ export type ModelId = keyof typeof MODELS;
  */
 export const DEFAULT_MAX_TOKENS = 4000;
 
-export const DEFAULT_MODEL: ModelId = "@cf/qwen/qwen3-30b-a3b-fp8";
+export const DEFAULT_MODEL: ModelId = "@cf/aisingapore/gemma-sea-lion-v4-27b-it";
 
 /** 環境変数で切り替える。未指定・未知の値なら既定のモデルを使う */
 export function resolveModel(value: string | undefined): ModelId {

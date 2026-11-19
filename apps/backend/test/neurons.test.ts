@@ -9,17 +9,17 @@ import { DEFAULT_MODEL, MODELS, neuronsUsed } from "../src/generation/model";
  */
 describe("neuronsUsed", () => {
   it("入力・出力それぞれの単価を掛けて合算する", () => {
-    // qwen3: 入力 4,625 / 出力 30,475（いずれも100万トークンあたり）
+    // gemma-sea-lion-v4: 入力 31,876 / 出力 50,488（いずれも100万トークンあたり）
     // 1,000,000トークンずつ渡せば、単価がそのまま出る
     expect(
       neuronsUsed(DEFAULT_MODEL, { prompt_tokens: 1_000_000, completion_tokens: 1_000_000 }),
-    ).toBeCloseTo(4_625 + 30_475);
+    ).toBeCloseTo(31_876 + 50_488);
   });
 
   it("実際の呼び出しに近い規模で1回分の消費になる", () => {
     // 入力350・出力500トークン（20件バッチのおおよその規模）
     expect(neuronsUsed(DEFAULT_MODEL, { prompt_tokens: 350, completion_tokens: 500 })).toBeCloseTo(
-      (350 * 4_625 + 500 * 30_475) / 1_000_000,
+      (350 * 31_876 + 500 * 50_488) / 1_000_000,
     );
   });
 
@@ -31,14 +31,14 @@ describe("neuronsUsed", () => {
 
   it("モデルごとに単価が違う", () => {
     const usage = { prompt_tokens: 1_000, completion_tokens: 1_000 };
-    const qwen = neuronsUsed("@cf/qwen/qwen3-30b-a3b-fp8", usage);
+    const seaLion = neuronsUsed("@cf/aisingapore/gemma-sea-lion-v4-27b-it", usage);
     const glm = neuronsUsed("@cf/zai-org/glm-4.7-flash", usage);
-    expect(glm).toBeGreaterThan(qwen);
+    expect(seaLion).toBeGreaterThan(glm);
   });
 
   it("片方しか返らなくても、返った分だけ数える", () => {
     expect(neuronsUsed(DEFAULT_MODEL, { completion_tokens: 1_000 })).toBeCloseTo(
-      (1_000 * 30_475) / 1_000_000,
+      (1_000 * 50_488) / 1_000_000,
     );
   });
 

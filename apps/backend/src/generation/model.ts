@@ -50,7 +50,7 @@ export interface ModelConfig {
 type RegisteredModel = ModelConfig & { neurons: NeuronRates };
 
 export const MODELS = {
-  // 既定。テーマのお題の品質が最も高い（2026-11-08 の実測、1回の生成あたり 中央値3.7秒 /
+  // 既定。テーマのお題の品質が最も高い（2026-11-09 の実測、1回の生成あたり 中央値3.7秒 /
   // 平均25.5 neurons / 採用率77%）。思考をしないモデルなので、思考を切る指示は要らない。
   // 以前の既定 @cf/qwen/qwen3-30b-a3b-fp8 は 2026-11-20 に Workers AI から廃止された
   "@cf/aisingapore/gemma-sea-lion-v4-27b-it": {

@@ -575,7 +575,7 @@ Yahoo! JLP API は個人での商用利用が不可だったため撤去済み�
 
 `MODELS`（`apps/backend/src/generation/model.ts`）に登録したモデルを、`GENERATION_MODEL`（`wrangler.jsonc` の vars）で切り替える。**既定は `@cf/aisingapore/gemma-sea-lion-v4-27b-it`**（登録に無い値は既定にフォールバック）。
 
-以前の既定 `@cf/qwen/qwen3-30b-a3b-fp8` は、2026-11-20 に Workers AI から廃止された（#359）。移行先は、本番と同じパイプラインで3モデルを43回ずつ生成させた実測（2026-11-08、詳細は #359 のコメント）で決めた。1回の生成（最大2ラウンド）あたりの値:
+以前の既定 `@cf/qwen/qwen3-30b-a3b-fp8` は、2026-11-20 に Workers AI から廃止された（#359）。移行先は、本番と同じパイプラインで3モデルを43回ずつ生成させた実測（2026-11-09、詳細は [benchmarks/2026-11-generation-model.md](benchmarks/2026-11-generation-model.md)）で決めた。1回の生成（最大2ラウンド）あたりの値:
 
 | モデル | 秒（中央値） | ニューロン（平均） | 採用率 | 目標到達 |
 |---|---|---|---|---|
@@ -610,7 +610,7 @@ Yahoo! JLP API は個人での商用利用が不可だったため撤去済み�
 | `@cf/aisingapore/gemma-sea-lion-v4-27b-it` | 31,876 | 50,488 |
 | `@cf/zai-org/glm-4.7-flash` | 5,500 | 36,400 |
 
-既定モデル（sea-lion）での実測は**1回の生成で平均25.5ニューロン**（2026-11-08、上の比較）。出典は [Workers AI Pricing](https://developers.cloudflare.com/workers-ai/platform/pricing/)。**料金が変わったら `MODELS` を直す。** Cloudflareはモデル別の単価表示に変えたが、課金の裏側は引き続きニューロン。
+既定モデル（sea-lion）での実測は**1回の生成で平均25.5ニューロン**（2026-11-09、上の比較）。出典は [Workers AI Pricing](https://developers.cloudflare.com/workers-ai/platform/pricing/)。**料金が変わったら `MODELS` を直す。** Cloudflareはモデル別の単価表示に変えたが、課金の裏側は引き続きニューロン。
 
 単価かトークン数のどちらかが取れなければ**0**として扱う。推定値で埋めると、消費していない分まで利用者の枠を削ることになる。
 

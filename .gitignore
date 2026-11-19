@@ -22,3 +22,7 @@ mix-vocabulary.md
 # apps/backend/scripts/compare-moderation-models.ts の既定の出力と、Node で動かすためのバンドル
 moderation-models.md
 .compare-moderation-models.mjs
+
+# apps/backend/scripts/compare-models.ts の既定の出力と、Node で動かすためのバンドル
+model-bench/
+.compare-models.mjs

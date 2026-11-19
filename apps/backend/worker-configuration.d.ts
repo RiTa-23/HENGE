@@ -6,7 +6,7 @@ interface __BaseEnv_Env {
 	DB: D1Database;
 	AI: Ai;
 	READING: Fetcher;
-	GENERATION_MODEL: "@cf/qwen/qwen3-30b-a3b-fp8";
+	GENERATION_MODEL: "@cf/aisingapore/gemma-sea-lion-v4-27b-it";
 	MODERATION_MODEL: "@cf/cloudflare/clef-flash";
 }
 declare namespace Cloudflare {

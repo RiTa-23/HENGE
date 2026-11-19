@@ -305,16 +305,16 @@ describe("resolveModel", () => {
     );
   });
 
-  it("既定は qwen3（速度・コスト・品質のバランスが最も良い）", () => {
-    expect(DEFAULT_MODEL).toBe("@cf/qwen/qwen3-30b-a3b-fp8");
+  it("既定は gemma-sea-lion-v4（テーマのお題の品質が最も高い）", () => {
+    expect(DEFAULT_MODEL).toBe("@cf/aisingapore/gemma-sea-lion-v4-27b-it");
+  });
+
+  it("廃止されたモデル（qwen3-30b）を指定しても、既定に戻る", () => {
+    expect(resolveModel("@cf/qwen/qwen3-30b-a3b-fp8")).toBe(DEFAULT_MODEL);
   });
 });
 
 describe("modelConfig", () => {
-  it("qwen3 には /no_think が設定されている（思考を切ると速く安く品質も上がる）", () => {
-    expect(modelConfig("@cf/qwen/qwen3-30b-a3b-fp8").promptSuffix).toBe("/no_think");
-  });
-
   it("設定を持たないモデルには空の設定を返す", () => {
     expect(modelConfig("@cf/zai-org/glm-4.7-flash").promptSuffix).toBeUndefined();
     expect(modelConfig("存在しないモデル").promptSuffix).toBeUndefined();
@@ -409,7 +409,7 @@ function wordsInPrompt(prompt: string): string[] {
       .slice(prompt.indexOf("語の組:") + "語の組:".length)
       .trim()
       .split("\n")
-      // 末尾にはモデル固有の指示（qwen3 の /no_think）が付く
+      // 末尾にモデル固有の指示（`/no_think` など）が付くことがある
       .filter((line) => !line.startsWith("/"))
       .flatMap((line) => line.split("／"))
   );

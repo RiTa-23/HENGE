@@ -14,7 +14,7 @@
   "observability": { "enabled": true },
   // 使う生成モデル。切り替えはここを変えてデプロイする（MODELS に無い値は既定にフォールバック）
   "vars": {
-    "GENERATION_MODEL": "@cf/qwen/qwen3-30b-a3b-fp8",
+    "GENERATION_MODEL": "@cf/aisingapore/gemma-sea-lion-v4-27b-it",
     // 検閲に使う判断モデル（generation/moderation.ts の MODERATION_MODELS）
     "MODERATION_MODEL": "@cf/cloudflare/clef-flash",
   },

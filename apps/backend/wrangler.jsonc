@@ -15,6 +15,8 @@
   // 使う生成モデル。切り替えはここを変えてデプロイする（MODELS に無い値は既定にフォールバック）
   "vars": {
     "GENERATION_MODEL": "@cf/qwen/qwen3-30b-a3b-fp8",
+    // 検閲に使う判断モデル（generation/moderation.ts の MODERATION_MODELS）
+    "MODERATION_MODEL": "@cf/cloudflare/clef-flash",
   },
   // 読み Worker への Service Binding（HTTP方式）。認証を持たないので公開しないのは
   // henge-reading 側の workers_dev: false で担保する

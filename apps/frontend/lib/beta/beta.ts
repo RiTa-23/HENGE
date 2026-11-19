@@ -1,5 +1,6 @@
 import { isAdminEmail } from "@henge/shared";
 import { getCloudflareContext } from "@opennextjs/cloudflare";
+import { errorResponse } from "@/lib/api/error";
 import { currentSession } from "@/lib/api/session";
 
 /**
@@ -47,6 +48,33 @@ export async function betaLimitation(request: Request): Promise<boolean> {
   // 公開版に戻したときのコストをゼロにする
   if (!isBetaMode(env.BETA_MODE)) return false;
   return isBetaLimitedUser(env.BETA_MODE, await currentSession(request), env.ADMIN_EMAILS);
+}
+
+/**
+ * 作成の依頼が最適化（`kind: "constraint"`）か。**検証より前に、生の入力から読む。**
+ *
+ * 検証に通ったかどうかで決めると、最適化で検証に失敗する音（小書きのかなで始まる・
+ * NG 語を含む）がテーマ側に倒れ、ベータ版では検証の文言の代わりに「調整中」が返る
+ * （#339）。kind が読めない壊れた入力は false（テーマ側に倒す）。
+ */
+export function isConstraintRequest(raw: unknown): boolean {
+  return (
+    typeof raw === "object" && raw !== null && (raw as { kind?: unknown }).kind === "constraint"
+  );
+}
+
+/**
+ * `POST /api/themes` のベータ版の判定。弾くなら `FORBIDDEN` の応答、通すなら null。
+ *
+ * 最適化は公開済みなので、`limited` を呼ばずに通す（セッション照合を走らせない）。
+ * 判定は認可なので、呼び出し側でレート制限やクォータの照会より前に置く（docs/04-api.md）
+ */
+export async function betaThemeRejection(
+  raw: unknown,
+  limited: () => Promise<boolean>,
+): Promise<Response | null> {
+  if (isConstraintRequest(raw) || !(await limited())) return null;
+  return errorResponse("FORBIDDEN", "お題の生成は調整中です。既にあるお題は引き続き遊べます");
 }
 
 /**

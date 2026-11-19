@@ -8,6 +8,7 @@ export {
   MIX_STANDARD_NAME,
   MIX_SUPER_CHAOS_NAME,
   type MixName,
+  mixFormsOf,
   mixWordsPerSentence,
   normalizeConstraintChar,
   normalizeName,
@@ -53,7 +54,8 @@ export {
   WORD_KEYSTROKE_MAX,
   WORD_KEYSTROKE_MIN,
 } from "./generation/validate";
-export { containsNgWord } from "./generation/ng";
+export { containsNgWord, containsNgWordInName } from "./generation/ng";
+export { containsReadingProneWord } from "./generation/reading-prone";
 export { NG_WORDS } from "./generation/ng-words";
 export {
   apiError,

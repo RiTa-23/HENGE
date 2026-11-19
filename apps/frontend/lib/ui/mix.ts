@@ -12,13 +12,19 @@ import {
  * 名前と1文の語数は `packages/shared` の `MIX_MODES` が持つ。ここは見せ方だけ。
  *
  * - `level`: 詳細ページの切り替えと肩書きに出す呼び名
+ * - `wordDescription`: 単語のあるモード（おまかせ）だけ。詳細の説明に書き足す
  */
-export const MIX_COPY: Record<MixName, { level: string; tagline: string; description: string }> = {
+export const MIX_COPY: Record<
+  MixName,
+  { level: string; tagline: string; description: string; wordDescription?: string }
+> = {
   [MIX_STANDARD_NAME]: {
     level: "おまかせ",
     tagline: "テーマも音も選ばずに、すぐ始める。毎回違う文章が出ます。",
     description:
       "テーマを選ばずに打てるお題です。よく使われる言葉からランダムに1語を選び、その語を使った自然な文章を作ります。",
+    wordDescription:
+      "単語は、よく使われる言葉そのものを、遊ぶたびにその場でランダムに20語選んで出します。",
   },
   [MIX_CHAOS_NAME]: {
     level: "カオス",

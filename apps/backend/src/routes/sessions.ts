@@ -1,4 +1,4 @@
-import { playSize, type PromptForm, stockTarget } from "@henge/shared";
+import { mixFormsOf, playSize, type PromptForm, stockTarget } from "@henge/shared";
 import { type Context, Hono } from "hono";
 import { createDb } from "../db/client";
 import { fetchPromptPage, type PlayablePrompt } from "../db/prompts";
@@ -10,6 +10,7 @@ import {
   promptCountOf,
 } from "../db/themes";
 import { kickRefill } from "../generation/refill";
+import { drawMixWords, mixVocabulary } from "../generation/vocabulary";
 import { fail } from "../http/error";
 import { isThemeLocked } from "../kv/lock";
 
@@ -50,6 +51,21 @@ export const sessionRoutes = new Hono<{ Bindings: Env }>().post("/sessions/start
   // 短文のオフセットも進み、遊んでいない短文のお題が飛ばされる
   const form: PromptForm = body.form ?? "sentence";
   const size = playSize(form);
+
+  // **おまかせの単語はプールを持たない。** 語彙リストからその場で取り出す（AI を使わないので、
+  // 在庫を積んで共有する意味が無い）。オフセットも補充も無い（docs/05-generation.md）
+  if (theme.kind === "mix" && form === "word" && mixFormsOf(theme.name).includes("word")) {
+    const words = drawMixWords(mixVocabulary(), size);
+    if (words.length < size) return fail(c, "THEME_EXHAUSTED");
+    // ログインユーザーは遊んだ回数だけ残す。**ランキングの登録判定**（遊んだ記録があるか）に使う
+    if (body.userId !== undefined) {
+      const played = await getPlayOffset(db, body.userId, body.themeId, form);
+      await setPlayOffset(db, body.userId, body.themeId, form, played + size);
+    }
+    await incrementPlayCount(db, body.themeId);
+    return c.json({ prompts: words, nextOffset: 0, remainingInPool: 0, refillKicked: false });
+  }
+
   const stock = promptCountOf(theme.promptCounts, form);
 
   const offset =

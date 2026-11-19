@@ -55,7 +55,8 @@ export function formLabel(form: PromptForm): string {
  *
  * 単語モードはテーマだけなので、`?kind=constraint&form=word` の組み合わせは
  * 画面から作られない（URLを手で書けば作れるが、単語プールが無いので枯渇になる）。
- * おまかせ・ごちゃまぜ（`?kind=mix`）も同じく短文だけ。
+ * おまかせ・ごちゃまぜ（`?kind=mix`）も短文だけ。**ただしおまかせには単語がある**（語彙リストから
+ * その場で取り出す。`mixFormsOf`）。
  */
 export function playHref(kind: ThemeKind, name: string, form: PromptForm = "sentence"): string {
   const path = `/play/${encodeURIComponent(name)}`;

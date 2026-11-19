@@ -15,6 +15,24 @@ import {
 } from "./schema";
 
 describe("themeNameSchema", () => {
+  test("NG 語の入った名前は、テーマでも最適化でも弾く", () => {
+    for (const value of [
+      { kind: "theme", name: "うんこの話" },
+      { kind: "theme", name: "チンコ" },
+      { kind: "constraint", name: "ちんこ" },
+    ]) {
+      const parsed = themeNameSchema.safeParse(value);
+      expect(parsed.success).toBe(false);
+      expect(parsed.error?.issues[0]?.message).toContain("この名前ではお題を作れません");
+    }
+  });
+
+  test("NG 語の部分を含むだけの普通の名前は通す", () => {
+    expect(themeNameSchema.safeParse({ kind: "theme", name: "思わぬ盲点" }).success).toBe(true);
+    expect(themeNameSchema.safeParse({ kind: "theme", name: "バイクの旅" }).success).toBe(true);
+    expect(themeNameSchema.safeParse({ kind: "constraint", name: "かす" }).success).toBe(true);
+  });
+
   test("最適化の運指は、音と合うものだけ通す", () => {
     const ki = { units: [{ roman: "ki", fingers: ["right-index", "right-middle"] }] };
     expect(

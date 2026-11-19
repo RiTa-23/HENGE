@@ -3,6 +3,8 @@ import { describe, expect, it } from "vitest";
 import {
   CONSTRAINT_VOCABULARY_MAX,
   CONSTRAINT_VOCABULARY_MIN,
+  drawMixWords,
+  mixVocabulary,
   vocabularyFor,
   vocabularySize,
 } from "../src/generation/vocabulary";
@@ -121,5 +123,41 @@ describe("vocabularyFor", () => {
     expect(vocabularyFor("にゃ").length).toBeLessThan(CONSTRAINT_VOCABULARY_MIN);
     // 小書きで始まる音は、前のかなと組んだ箇所に当たらない（作成フォームでも断る）
     expect(vocabularyFor("ゃ")).toHaveLength(0);
+  });
+});
+
+describe("drawMixWords（おまかせの単語をその場で取り出す）", () => {
+  it("指定の数だけ、表記の重複なしで返す", () => {
+    const drawn = drawMixWords(mixVocabulary(), 20);
+    expect(drawn).toHaveLength(20);
+    expect(new Set(drawn.map((w) => w.text)).size).toBe(20);
+  });
+
+  it("同じ表記の行が並んでいても1回しか出さない", () => {
+    const words = [
+      { text: "方", reading: "かた" },
+      { text: "方", reading: "ほう" },
+      { text: "忍者", reading: "にんじゃ" },
+    ];
+    const drawn = drawMixWords(words, 3);
+    expect(drawn.map((w) => w.text).toSorted()).toEqual(["忍者", "方"].toSorted());
+  });
+
+  it("打鍵数が単語の範囲外の語・ローマ字に組めない読みの語は飛ばす", () => {
+    const words = [
+      { text: "あ", reading: "あ" }, // 1打で短すぎる
+      { text: "変", reading: "ゔぁ\u{1F600}" }, // テーブルに無い文字
+      { text: "忍者", reading: "にんじゃ" },
+    ];
+    const drawn = drawMixWords(words, 3);
+    expect(drawn.map((w) => w.text)).toEqual(["忍者"]);
+    expect(drawn[0]?.readingRoman.length).toBeGreaterThan(0);
+  });
+
+  it("毎回同じ並びにならない（乱数で選ぶ）", () => {
+    const words = mixVocabulary();
+    const first = drawMixWords(words, 20, () => 0).map((w) => w.text);
+    const second = drawMixWords(words, 20, () => 0.999).map((w) => w.text);
+    expect(first).not.toEqual(second);
   });
 });

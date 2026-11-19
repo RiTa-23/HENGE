@@ -8,6 +8,7 @@ import { acquireThemeLock, releaseThemeLock } from "../kv/lock";
 import { createGetReadings } from "../reading/index";
 import { acceptsPartialBatch, generateBatch } from "./batch";
 import { resolveModel } from "./model";
+import { createModerateOutputs, resolveModerationModel } from "./moderation";
 import { existingContextSize } from "./prompt";
 
 /**
@@ -58,6 +59,7 @@ async function refill(env: Env, input: RefillInput): Promise<void> {
       vocabulary: await loadGenerationVocabulary(db, theme),
       model,
       getReadings: createGetReadings(env),
+      moderate: createModerateOutputs(env, resolveModerationModel(env.MODERATION_MODEL)),
       // **消費が確定した直後に記録する。** 補充は waitUntil の中で走り、
       // レスポンス送信から30秒で打ち切られる。終わってから記録する形だと、
       // 打ち切られた回の消費が丸ごと台帳に載らない

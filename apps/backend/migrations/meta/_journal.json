@@ -85,6 +85,20 @@
       "when": 1793082051649,
       "tag": "0011_cloudy_epoch",
       "breakpoints": true
+    },
+    {
+      "idx": 12,
+      "version": "6",
+      "when": 1793991370104,
+      "tag": "0012_remove_chinese_prompts",
+      "breakpoints": true
+    },
+    {
+      "idx": 13,
+      "version": "6",
+      "when": 1794029642413,
+      "tag": "0013_remove_reading_prone_prompts",
+      "breakpoints": true
     }
   ]
 }

@@ -22,6 +22,11 @@ export const ERROR_STATUS = {
   GENERATION_IN_PROGRESS: 409,
   /** リトライ上限でも目標に届かなかった。テーマ名の変更を促す */
   GENERATION_FAILED: 422,
+  /**
+   * 名前（テーマ名・最適化する音）を判断モデルが弾いた。`GENERATION_FAILED` と同じく名前の変更を
+   * 促すが、生成を試してもいないので分ける（AI Gateway のログで区別して数える）
+   */
+  INAPPROPRIATE_NAME: 422,
   /** Rate Limiting が弾いた */
   RATE_LIMITED: 429,
   /** 日次の生成上限に到達 */
@@ -47,6 +52,8 @@ const DEFAULT_MESSAGE: Record<ErrorCode, string> = {
   THEME_EXHAUSTED: "このテーマのお題を使い切りました",
   GENERATION_IN_PROGRESS: "お題を準備しています。少し待ってからもう一度お試しください",
   GENERATION_FAILED: "お題を作れませんでした。テーマ名を変えてお試しください",
+  // どこがだめだったかは示さない（言い換えて通す手がかりを与えない）
+  INAPPROPRIATE_NAME: "この名前ではお題を作れません。別の名前でお試しください",
   RATE_LIMITED: "続けて実行しすぎです。少し待ってからお試しください",
   QUOTA_EXCEEDED: "本日の生成上限に達しました",
   // **テーマ名の問題ではないと分かる文言にする。** GENERATION_FAILED と同じ

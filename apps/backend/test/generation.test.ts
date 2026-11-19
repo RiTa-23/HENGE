@@ -22,7 +22,15 @@ import {
   parseGeneratedBlocks,
   parseGeneratedLines,
 } from "../src/generation/prompt";
-import { MIX_VOCABULARY_SIZE, mixVocabulary, vocabularyFor } from "../src/generation/vocabulary";
+import { buildModerationRequest, type ModerateOutputs } from "../src/generation/moderation";
+import { AiUnavailableError } from "../src/generation/ai";
+import {
+  MIX_VOCABULARY_SIZE,
+  MIX_ZIPF_MIN,
+  mixVocabulary,
+  vocabularyFor,
+  vocabularySize,
+} from "../src/generation/vocabulary";
 import { fromSingle, type GetReading } from "./fake-readings";
 
 describe("parseGeneratedLines", () => {
@@ -203,9 +211,24 @@ describe("おまかせ・ごちゃまぜの生成（最適化と同じく語を�
     expect(prompts[0]).not.toContain("2語以上");
   });
 
-  it("共通リストの上から MIX_VOCABULARY_SIZE 語を使う", () => {
+  it("読みを読み違えやすい語はモデルに渡さない", () => {
+    const texts = mixVocabulary().map((w) => w.text);
+    expect(texts).not.toContain("市場");
+    expect(texts).not.toContain("辛い");
+    expect(vocabularyFor("じょ", 30000).map((w) => w.text)).not.toContain("市場");
+    expect(vocabularyFor("つら", 30000).map((w) => w.text)).not.toContain("辛い");
+  });
+
+  it("zipf 3.5 以上の語（共通リストの上から MIX_VOCABULARY_SIZE 語）を使う", () => {
     const words = mixVocabulary();
-    expect(words).toHaveLength(MIX_VOCABULARY_SIZE);
+    // 閾値で決める（語数を手で持たない）。境目は build.py が書き出す
+    expect(MIX_ZIPF_MIN).toBe(3.5);
+    // 読みを読み違えやすい語を外す分だけ、わずかに減る
+    expect(words.length).toBeLessThanOrEqual(MIX_VOCABULARY_SIZE);
+    expect(words.length).toBeGreaterThan(MIX_VOCABULARY_SIZE - 10);
+    // 境目が壊れて、リスト全体や数語になっていない（2026-10-29 の実測で 7,781語）
+    expect(MIX_VOCABULARY_SIZE).toBeGreaterThan(5000);
+    expect(MIX_VOCABULARY_SIZE).toBeLessThan(vocabularySize() / 2);
     // よく使われる順の先頭から取る（珍しい語の組で文が不自然にならないように）
     expect(words.slice(0, 3).map((w) => w.text)).toEqual(["自分", "時間", "思う"]);
     for (const word of words) {
@@ -392,8 +415,12 @@ function wordsInPrompt(prompt: string): string[] {
   );
 }
 
+/** 生成お題の判定を、すべて通す（判定そのものは別の describe で見る） */
+const allowAll: GenerateBatchInput["moderate"] = async ({ texts }) => texts.map(() => true);
+
 function input(overrides: Partial<GenerateBatchInput> = {}): GenerateBatchInput {
   return {
+    moderate: allowAll,
     kind: "theme",
     form: "sentence",
     name: "忍びの心得",
@@ -406,6 +433,120 @@ function input(overrides: Partial<GenerateBatchInput> = {}): GenerateBatchInput 
     ...overrides,
   };
 }
+
+/** 判定の依頼を記録し、`reject` に入っている文だけ弾く。1回ごとに 0.5 ニューロン使ったことにする */
+function recordingModerate(reject: string[], calls: Parameters<ModerateOutputs>[0][]) {
+  const moderate: ModerateOutputs = async (request) => {
+    calls.push(request);
+    await request.onNeurons(0.5);
+    return request.texts.map((text) => !reject.includes(text));
+  };
+  return moderate;
+}
+
+/** 判定が例外で止まる（判断モデルを呼べなかった） */
+const failingModerate: ModerateOutputs = async () => {
+  throw new AiUnavailableError("判断モデルを呼べなかった");
+};
+
+describe("generateBatch（生成お題の判定）", () => {
+  it("判定で弾いたお題は採用せず、moderate に数える", async () => {
+    const calls: Parameters<ModerateOutputs>[0][] = [];
+    const result = await generateBatch(
+      envWithAiResponses([["忍びは闇を走る。", "影が揺れた。", "座禅を組む。"], []]),
+      input({ target: 3, moderate: recordingModerate(["影が揺れた。"], calls) }),
+    );
+
+    expect(result.valid.map((p) => p.text)).toEqual(["忍びは闇を走る。", "座禅を組む。"]);
+    expect(result.rejected.moderate).toBe(1);
+  });
+
+  it("判定は1ラウンド1回で、無料の検査と読み取得を通った分だけを渡す", async () => {
+    const calls: Parameters<ModerateOutputs>[0][] = [];
+    await generateBatch(
+      envWithAiResponses([["「忍び」の心得", "忍びは闇を走る。"], ["影が揺れた。"]]),
+      input({ target: 2, moderate: recordingModerate([], calls) }),
+    );
+
+    // 1ラウンド目の「「忍び」の心得」は文字種で落ちるので渡さない
+    expect(calls.map((c) => c.texts)).toEqual([["忍びは闇を走る。"], ["影が揺れた。"]]);
+    expect(calls.map((c) => c.round)).toEqual([1, 2]);
+    expect(calls[0]).toMatchObject({ kind: "theme", form: "sentence", name: "忍びの心得" });
+  });
+
+  it("判定の消費も onNeurons で記録し、合計に含める（不変条件11）", async () => {
+    const recorded: number[] = [];
+    const result = await generateBatch(
+      envWithAiResponses([["忍びは闇を走る。"], []]),
+      input({
+        target: 1,
+        moderate: recordingModerate([], []),
+        onNeurons: (used) => {
+          recorded.push(used);
+        },
+      }),
+    );
+
+    // 生成（応答にトークン数が無いので0）と判定（0.5）
+    expect(recorded).toEqual([0, 0.5]);
+    expect(result.neurons).toBeCloseTo(0.5);
+  });
+
+  /** **判定できなければ通さない。** 例外のまま外へ伝え、呼び出し側が AI_UNAVAILABLE にする */
+  it("判定が例外で止まったら、採用せずに投げ直す（生成の消費は記録済み）", async () => {
+    const recorded: number[] = [];
+
+    await expect(
+      generateBatch(
+        envWithAiResponses([["忍びは闇を走る。"], []]),
+        input({
+          target: 1,
+          moderate: failingModerate,
+          onNeurons: (used) => {
+            recorded.push(used);
+          },
+        }),
+      ),
+    ).rejects.toBeInstanceOf(AiUnavailableError);
+    expect(recorded).toHaveLength(1);
+  });
+});
+
+describe("buildModerationRequest", () => {
+  it("生成お題は、判定基準を state に1回だけ置き、問いには候補の文だけ書く（#333）", () => {
+    const request = buildModerationRequest("@cf/cloudflare/clef-flash", {
+      type: "output",
+      form: "word",
+      texts: ["手裏剣", "城"],
+      theme: "忍者",
+    });
+
+    expect(request.model).toBe("clef-flash");
+    expect(request.state).toMatchObject({
+      種類: "単語のお題",
+      テーマ: "忍者",
+      候補: { q0: "手裏剣", q1: "城" },
+    });
+    expect(request.state).toHaveProperty("判定基準");
+    const questions = request.questions as Record<string, { instructions: string }>;
+    expect(questions.q1?.instructions).toBe(
+      "候補 q1「城」を、判定基準に照らして公開一覧にそのまま載せてよいか。",
+    );
+  });
+
+  it("入力は、判定基準を問いに書く（#330 で測った形）", () => {
+    const request = buildModerationRequest("@cf/cloudflare/clef", {
+      type: "input",
+      kind: "constraint",
+      name: "ざ",
+    });
+
+    expect(request.model).toBe("clef");
+    expect(request.state).not.toHaveProperty("判定基準");
+    expect(request.questions.q0?.instructions).toContain("最適化する音");
+    expect(request.questions.q0?.instructions).toContain("載せてはいけない");
+  });
+});
 
 describe("generateBatch", () => {
   it("目標に達したら2ラウンド目を走らせない", async () => {
@@ -606,6 +747,22 @@ describe("generateBatch", () => {
     expect(result.rejected.ng).toBe(1);
   });
 
+  it("読みを読み違えやすい語の入ったお題は misread で却下する", async () => {
+    const result = await generateBatch(
+      envWithAiResponses([["カレーは辛いです。", "影が揺れた。"], []]),
+      input({ target: 1 }),
+    );
+    expect(result.valid.map((v) => v.text)).toEqual(["影が揺れた。"]);
+    expect(result.rejected.misread).toBe(1);
+  });
+
+  it("中国語の表記が混ざった単語は misread で却下する", async () => {
+    const word = await generateBatch(envWithAiResponses([["博多站"]]), {
+      ...input({ form: "word", target: 1 }),
+    });
+    expect(word.rejected.misread).toBe(1);
+  });
+
   it("NG 語は単語でも見る", async () => {
     const word = await generateBatch(envWithAiResponses([["ポルノ"]]), {
       ...input({ form: "word", target: 1 }),
@@ -639,11 +796,11 @@ describe("generateBatch", () => {
 
     expect(logs).toHaveLength(2);
     expect(logs[0]?.metadata?.counts).toBe(
-      "charset:1,kanji:0,opening:0,keystroke:0,constraint:0,punct:0,ng:0,dup:0",
+      "charset:1,kanji:0,opening:0,keystroke:0,constraint:0,punct:0,ng:0,misread:0,moderate:0,dup:0",
     );
     // 累積を渡していれば charset:2 になる
     expect(logs[1]?.metadata?.counts).toBe(
-      "charset:1,kanji:0,opening:0,keystroke:0,constraint:0,punct:0,ng:0,dup:0",
+      "charset:1,kanji:0,opening:0,keystroke:0,constraint:0,punct:0,ng:0,misread:0,moderate:0,dup:0",
     );
   });
 

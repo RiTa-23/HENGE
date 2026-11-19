@@ -62,10 +62,6 @@ export const MODELS = {
     maxTokens: 16_000,
     neurons: { input: 5_500, output: 36_400 },
   },
-  // 速く安いが書式を崩すことがある（実測 2〜8秒 / 4〜6 neurons）
-  "@cf/meta/llama-3.1-8b-instruct-fp8": {
-    neurons: { input: 13_778, output: 26_128 },
-  },
 } as const satisfies Record<string, RegisteredModel>;
 
 export type ModelId = keyof typeof MODELS;

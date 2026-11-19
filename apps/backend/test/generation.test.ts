@@ -300,17 +300,16 @@ describe("resolveModel", () => {
   });
 
   it("既知のモデル名はそのまま使える", () => {
-    expect(resolveModel("@cf/meta/llama-3.1-8b-instruct-fp8")).toBe(
-      "@cf/meta/llama-3.1-8b-instruct-fp8",
-    );
+    expect(resolveModel("@cf/zai-org/glm-4.7-flash")).toBe("@cf/zai-org/glm-4.7-flash");
   });
 
   it("既定は gemma-sea-lion-v4（テーマのお題の品質が最も高い）", () => {
     expect(DEFAULT_MODEL).toBe("@cf/aisingapore/gemma-sea-lion-v4-27b-it");
   });
 
-  it("廃止されたモデル（qwen3-30b）を指定しても、既定に戻る", () => {
+  it("廃止されたモデル（qwen3-30b、llama-3.1-8b）を指定しても、既定に戻る", () => {
     expect(resolveModel("@cf/qwen/qwen3-30b-a3b-fp8")).toBe(DEFAULT_MODEL);
+    expect(resolveModel("@cf/meta/llama-3.1-8b-instruct-fp8")).toBe(DEFAULT_MODEL);
   });
 });
 
